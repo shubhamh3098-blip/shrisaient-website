@@ -117,6 +117,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentAgentName, setPaymentAgentName] = useState(activeAgent);
   const [paymentRemarks, setPaymentRemarks] = useState('');
+  const [sendWhatsAppOnPayment, setSendWhatsAppOnPayment] = useState(true);
 
   // Refund Form state
   const [refundCardSearch, setRefundCardSearch] = useState('');
@@ -322,6 +323,27 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       remarks: paymentRemarks || `Week ${paymentWeekNo} Installment collected by ${finalAgent}`,
       balanceAfter: newBalance,
     });
+
+    // Auto-send WhatsApp receipt if customer has mobile number
+    if (sendWhatsAppOnPayment && paymentSelectedCard.phone && paymentSelectedCard.phone.trim().length >= 10) {
+      const cleanPhone = paymentSelectedCard.phone.replace(/[^0-9]/g, '');
+      const waMessage = encodeURIComponent(
+        `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
+        `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
+        `--------------------------------\n` +
+        `पावती क्र.: *${receiptNo}*\n` +
+        `तारीख: ${date}\n` +
+        `कार्ड क्र.: *#${paymentSelectedCard.cardNumber}* (${paymentSelectedCard.schemeName})\n` +
+        `नाव: *${paymentSelectedCard.customerName}*\n` +
+        `जमा रक्कम: *₹${paymentAmount.toLocaleString()}* (Week ${paymentWeekNo})\n` +
+        `पेमेंट मोड: ${paymentMode} | एजंट: ${finalAgent}\n` +
+        `खात्यात एकूण शिल्लक जमा: *₹${newBalance.toLocaleString()}*\n` +
+        `--------------------------------\n` +
+        `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
+        `📞 संपर्क: ${settings.phone || '8766486915'}`
+      );
+      window.open(`https://wa.me/91${cleanPhone}?text=${waMessage}`, '_blank');
+    }
 
     // Success flash notification
     setLastActionMessage({
@@ -1555,6 +1577,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {selectedMemberForPassbook && (
         <CardPassbookModal
+          salesBills={salesBills || []}
           member={selectedMemberForPassbook}
           transactions={transactions}
           settings={settings}

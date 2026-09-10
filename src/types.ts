@@ -1,4 +1,4 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3';
+export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5' | 'scheme6' | string;
 
 export interface CardSchemeConfig {
   id: CardSchemeId;

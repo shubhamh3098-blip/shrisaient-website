@@ -192,12 +192,19 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
         const newReceipts: CardTransaction[] = parsedRows.map((r, idx) => {
           const cardNum = parseInt(r.CardNo || r['CARD.NO'] || r.cardNumber || '1001') || 1001;
           let schemeId: CardSchemeId = 'scheme1';
-          if (r.SchemeId) {
-            schemeId = r.SchemeId.toLowerCase() as CardSchemeId;
-          } else if (cardNum >= 4001 && cardNum <= 6000) {
+          const schemeField = (r.SchemeId || r.Scheme || r.scheme || '').toLowerCase();
+          if (schemeField.includes('3') || (cardNum >= 4001 && cardNum <= 6000)) {
             schemeId = 'scheme3';
-          } else if (cardNum >= 3001 && cardNum <= 3999) {
+          } else if (schemeField.includes('2') || (cardNum >= 3001 && cardNum <= 3999)) {
             schemeId = 'scheme2';
+          } else if (schemeField.includes('4') || (cardNum >= 6001 && cardNum <= 7999)) {
+            schemeId = 'scheme4';
+          } else if (schemeField.includes('5') || (cardNum >= 8001 && cardNum <= 9999)) {
+            schemeId = 'scheme5';
+          } else if (schemeField.includes('6') || (cardNum >= 10001 && cardNum <= 12000)) {
+            schemeId = 'scheme6';
+          } else {
+            schemeId = 'scheme1';
           }
 
           const type = r.Type === 'Refund' ? 'Refund' : 'WeeklyPayment';
@@ -237,15 +244,22 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
 
           let schemeId: CardSchemeId = 'scheme1';
           let schemeName = 'Scheme 1 (योजना 1)';
-          if (r.SchemeId) {
-            schemeId = r.SchemeId.toLowerCase() as CardSchemeId;
-            schemeName = schemeId === 'scheme3' ? 'Scheme 3 (योजना 3)' : schemeId === 'scheme2' ? 'Scheme 2 (योजना 2)' : 'Scheme 1 (योजना 1)';
-          } else if (cardNum >= 4001 && cardNum <= 6000) {
+          const rawScheme = (r.SchemeId || r.Scheme || r.scheme || '').toLowerCase();
+          if (rawScheme.includes('3') || (cardNum >= 4001 && cardNum <= 6000)) {
             schemeId = 'scheme3';
             schemeName = 'Scheme 3 (योजना 3)';
-          } else if (cardNum >= 3001 && cardNum <= 3999) {
+          } else if (rawScheme.includes('2') || (cardNum >= 3001 && cardNum <= 3999)) {
             schemeId = 'scheme2';
             schemeName = 'Scheme 2 (योजना 2)';
+          } else if (rawScheme.includes('4') || (cardNum >= 6001 && cardNum <= 7999)) {
+            schemeId = 'scheme4';
+            schemeName = 'Scheme 4 (योजना 4)';
+          } else if (rawScheme.includes('5') || (cardNum >= 8001 && cardNum <= 9999)) {
+            schemeId = 'scheme5';
+            schemeName = 'Scheme 5 (योजना 5)';
+          } else if (rawScheme.includes('6') || (cardNum >= 10001 && cardNum <= 12000)) {
+            schemeId = 'scheme6';
+            schemeName = 'Scheme 6 (योजना 6)';
           } else {
             schemeId = 'scheme1';
             schemeName = 'Scheme 1 (योजना 1)';

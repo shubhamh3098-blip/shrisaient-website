@@ -82,6 +82,36 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     description: '३०-महिने साप्ताहिक बचत योजना 3 • कार्ड नं 4001 ते 6000 • स्मार्ट टीव्ही, एलईडी व इलेक्ट्रॉनिक्स',
     color: 'from-purple-600 to-indigo-800',
   },
+  {
+    id: 'scheme4',
+    name: 'Scheme 4 (योजना 4)',
+    code: 'SCH-4',
+    startCardNo: 6001,
+    endCardNo: 7999,
+    registrationFee: 50,
+    description: 'साप्ताहिक बचत योजना 4 • कार्ड नं 6001 ते 7999 • प्रीमियम इलेक्ट्रॉनिक्स व फर्निचर',
+    color: 'from-amber-600 to-orange-800',
+  },
+  {
+    id: 'scheme5',
+    name: 'Scheme 5 (योजना 5)',
+    code: 'SCH-5',
+    startCardNo: 8001,
+    endCardNo: 9999,
+    registrationFee: 50,
+    description: 'साप्ताहिक बचत योजना 5 • कार्ड नं 8001 ते 9999 • नवीन ऑफर्स व फेस्टिव्हल स्कीम',
+    color: 'from-pink-600 to-rose-800',
+  },
+  {
+    id: 'scheme6',
+    name: 'Scheme 6 (योजना 6)',
+    code: 'SCH-6',
+    startCardNo: 10001,
+    endCardNo: 12000,
+    registrationFee: 50,
+    description: 'साप्ताहिक बचत योजना 6 • कार्ड नं 10001 ते 12000 • सुपर सेव्हर वीकली स्कीम',
+    color: 'from-cyan-600 to-blue-900',
+  },
 ];
 
 
