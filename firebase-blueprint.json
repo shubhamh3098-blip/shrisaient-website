@@ -1,0 +1,24 @@
+{
+  "entities": {
+    "StoreData": {
+      "collection": "stores",
+      "fields": {
+        "updatedAt": { "type": "string", "description": "Last updated timestamp" },
+        "updatedBy": { "type": "string", "description": "Device or source name" },
+        "settings": { "type": "object", "description": "Business settings" },
+        "stock": { "type": "array", "description": "Inventory list" },
+        "customers": { "type": "array", "description": "Customer list" },
+        "transactions": { "type": "array", "description": "Invoices and sales" },
+        "purchases": { "type": "array", "description": "Purchases from suppliers" },
+        "dealers": { "type": "array", "description": "Dealers list" },
+        "dealerPayments": { "type": "array", "description": "Dealer payments" },
+        "cardMembers": { "type": "array", "description": "Card scheme members" },
+        "cardTransactions": { "type": "array", "description": "Card deposits and refunds" },
+        "staff": { "type": "array", "description": "Staff members" },
+        "expenses": { "type": "array", "description": "Expenses" },
+        "authSessions": { "type": "array", "description": "Recent authenticated login records" },
+        "adminUsers": { "type": "array", "description": "Authorized admin and staff credentials" }
+      }
+    }
+  }
+}
