@@ -72,14 +72,14 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 3001 ते 3999 • कुलर, फ्रिज, वॉशिंग मशीन',
     color: 'from-emerald-600 to-teal-800',
   },
-  {
+{
     id: 'scheme3',
     name: 'Scheme 3 (योजना 3)',
     code: 'SCH-3',
-    startCardNo: 4001,
+    startCardNo: 1001,
     endCardNo: 6000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 3 • कार्ड नं 4001 ते 6000 • स्मार्ट टीव्ही, एलईडी व इलेक्ट्रॉनिक्स',
+    description: '३०-महिने साप्ताहिक बचत योजना 3 • कार्ड नं 1001 ते 6000 • स्मार्ट टीव्ही, एलईडी व इलेक्ट्रॉनिक्स',
     color: 'from-purple-600 to-indigo-800',
   },
   {
