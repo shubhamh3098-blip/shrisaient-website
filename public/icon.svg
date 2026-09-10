@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#142646" />
+      <stop offset="60%" stop-color="#0B1528" />
+      <stop offset="100%" stop-color="#050A14" />
+    </radialGradient>
+
+    <!-- Metallic Gold Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBF0B9" />
+      <stop offset="25%" stop-color="#E5C158" />
+      <stop offset="50%" stop-color="#D4AF37" />
+      <stop offset="75%" stop-color="#AA7C1E" />
+      <stop offset="100%" stop-color="#F3DC82" />
+    </linearGradient>
+
+    <!-- Secondary Gold Shimmer -->
+    <linearGradient id="goldHighlight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#AA7C1E" />
+      <stop offset="50%" stop-color="#FDF4C9" />
+      <stop offset="100%" stop-color="#C59B27" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#D4AF37" flood-opacity="0.25" />
+    </filter>
+
+    <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Squircle Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  
+  <!-- Subtle border on squircle -->
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-opacity="0.35" />
+
+  <!-- Circular Outer Gold Border -->
+  <circle cx="256" cy="256" r="218" fill="none" stroke="url(#goldGrad)" stroke-width="11" filter="url(#subtleShadow)" />
+  <circle cx="256" cy="256" r="206" fill="none" stroke="url(#goldGrad)" stroke-width="2.5" stroke-opacity="0.75" />
+
+  <!-- Monogram & Tower Group -->
+  <g filter="url(#goldGlow)">
+    <!-- Electrical Transmission Tower / Spire in Center -->
+    <!-- Tower Beacon / Spark on Top -->
+    <path d="M256 102 C252 108 250 114 250 120 C250 124 252 127 256 127 C260 127 262 124 262 120 C262 114 260 108 256 102 Z" fill="url(#goldHighlight)" />
+    <!-- Top Spire Platform -->
+    <rect x="246" y="126" width="20" height="5" rx="2" fill="url(#goldGrad)" />
+    
+    <!-- Central Tower Legs -->
+    <!-- Left Leg -->
+    <line x1="249" y1="131" x2="236" y2="256" stroke="url(#goldGrad)" stroke-width="4.5" stroke-linecap="round" />
+    <!-- Right Leg -->
+    <line x1="263" y1="131" x2="276" y2="256" stroke="url(#goldGrad)" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- Cross Bracing on Tower -->
+    <line x1="248" y1="152" x2="264" y2="152" stroke="url(#goldGrad)" stroke-width="3.5" />
+    <line x1="248" y1="152" x2="268" y2="182" stroke="url(#goldGrad)" stroke-width="2.5" />
+    <line x1="264" y1="152" x2="244" y2="182" stroke="url(#goldGrad)" stroke-width="2.5" />
+    
+    <line x1="244" y1="182" x2="268" y2="182" stroke="url(#goldGrad)" stroke-width="3.5" />
+    <line x1="244" y1="182" x2="272" y2="218" stroke="url(#goldGrad)" stroke-width="2.5" />
+    <line x1="268" y1="182" x2="240" y2="218" stroke="url(#goldGrad)" stroke-width="2.5" />
+    
+    <line x1="240" y1="218" x2="272" y2="218" stroke="url(#goldGrad)" stroke-width="4" />
+    <line x1="240" y1="218" x2="276" y2="256" stroke="url(#goldGrad)" stroke-width="2.5" />
+    <line x1="272" y1="218" x2="236" y2="256" stroke="url(#goldGrad)" stroke-width="2.5" />
+
+    <!-- Tower Horizontal Crossarms (Electronics / Power Mast) -->
+    <line x1="230" y1="152" x2="282" y2="152" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" />
+    <line x1="222" y1="182" x2="290" y2="182" stroke="url(#goldGrad)" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- Stylized "S" Monogram -->
+    <path d="M214 140 C175 140 148 162 148 194 C148 238 212 245 220 270 C226 288 210 306 182 306 C158 306 138 290 134 268 L112 272 C118 308 145 330 182 330 C226 330 250 302 250 268 C250 220 182 215 174 190 C168 174 182 160 208 160 C230 160 248 172 252 192 L274 186 C268 156 244 140 214 140 Z" fill="url(#goldHighlight)" />
+
+    <!-- Stylized "E" Monogram -->
+    <!-- Back spine -->
+    <path d="M272 178 L348 178 L348 200 L298 200 L298 240 L342 240 L342 262 L298 262 L298 304 L352 304 L352 326 L272 326 Z" fill="url(#goldGrad)" />
+  </g>
+
+  <!-- Typography: SHRI SAI ENTERPRISES -->
+  <g text-anchor="middle" filter="url(#subtleShadow)">
+    <!-- SHRI SAI -->
+    <text x="256" y="382" font-family="'Cinzel', 'Playfair Display', 'Georgia', serif" font-size="34" font-weight="800" fill="url(#goldGrad)" letter-spacing="4">SHRI SAI</text>
+    
+    <!-- ENTERPRISES -->
+    <text x="256" y="416" font-family="'Inter', 'Montserrat', 'Segoe UI', sans-serif" font-size="20" font-weight="700" fill="url(#goldHighlight)" letter-spacing="9">ENTERPRISES</text>
+    
+    <!-- Verified Quality Star Accents -->
+    <polygon points="125,410 128,414 133,414 129,417 131,421 126,418 122,421 123,417 120,414 125,414" fill="url(#goldGrad)" />
+    <polygon points="387,410 390,414 395,414 391,417 393,421 388,418 384,421 385,417 382,414 387,414" fill="url(#goldGrad)" />
+  </g>
+
+  <!-- Subtle bottom accent line -->
+  <line x1="180" y1="434" x2="332" y2="434" stroke="url(#goldGrad)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.75" />
+</svg>
