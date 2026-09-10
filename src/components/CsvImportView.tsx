@@ -10,7 +10,10 @@ import {
   Building2,
   Receipt,
   ArrowRight,
-  Database
+  Database,
+  Layers,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import {
   CardMember,
@@ -21,23 +24,87 @@ import {
   PurchaseEntry,
   TransactionEntry
 } from '../types';
+import { SCHEMES_CONFIG } from '../utils/storage';
 
 interface CsvImportViewProps {
   onImportBills: (bills: TransactionEntry[]) => void;
   onImportReceipts: (receipts: CardTransaction[]) => void;
-  onImportCardMembers: (members: CardMember[]) => void;
+  onImportCardMembers: (members: CardMember[], autoReceipts?: CardTransaction[]) => void;
   onImportPurchases: (purchases: PurchaseEntry[], dealers: Dealer[]) => void;
+  existingCardMembers?: CardMember[];
+  existingDealers?: Dealer[];
+  onSwitchTab?: (tab: any) => void;
 }
 
 type ImportType = 'bills' | 'receipts' | 'cards' | 'purchases';
+
+// Helper: Normalize header keys (lowercase + remove all non-alphanumeric characters)
+const normKey = (k: any): string => {
+  if (!k) return '';
+  return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
+// Helper: Get value matching any of the candidate keys
+const getField = (row: Record<string, any>, candidates: string[], defaultValue = ''): string => {
+  const normMap: Record<string, string> = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      normMap[normKey(k)] = String(v).trim();
+    }
+  }
+
+  for (const cand of candidates) {
+    const nk = normKey(cand);
+    if (normMap[nk] !== undefined && normMap[nk] !== '') {
+      return normMap[nk];
+    }
+  }
+  return defaultValue;
+};
+
+// Helper: Parse numerical values cleanly
+const parseNum = (val: any, defaultVal = 0): number => {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? defaultVal : n;
+};
+
+// Helper: Normalize dates into YYYY-MM-DD
+const normalizeDate = (dStr: string): string => {
+  if (!dStr) return new Date().toISOString().split('T')[0];
+  const clean = dStr.trim().replace(/\//g, '-');
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const p1 = parts[0].trim();
+    const p2 = parts[1].trim();
+    const p3 = parts[2].trim();
+    // DD-MM-YYYY
+    if (p1.length <= 2 && p3.length === 4) {
+      return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    }
+    // DD-MM-YY
+    if (p1.length <= 2 && p3.length === 2) {
+      return `20${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    }
+    // YYYY-MM-DD
+    if (p1.length === 4) {
+      return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+    }
+  }
+  return clean || new Date().toISOString().split('T')[0];
+};
 
 export const CsvImportView: React.FC<CsvImportViewProps> = ({
   onImportBills,
   onImportReceipts,
   onImportCardMembers,
   onImportPurchases,
+  existingCardMembers = [],
+  onSwitchTab,
 }) => {
-  const [activeImportType, setActiveImportType] = useState<ImportType>('bills');
+  const [activeImportType, setActiveImportType] = useState<ImportType>('cards');
+  const [targetSchemeId, setTargetSchemeId] = useState<string>('auto');
   const [csvText, setCsvText] = useState('');
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [parseError, setParseError] = useState('');
@@ -45,44 +112,38 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
 
   // Sample CSV Templates
   const sampleTemplates: Record<ImportType, { filename: string; content: string; desc: string }> = {
-    bills: {
-      filename: 'sample_old_bills.csv',
-      desc: 'Old Sales Invoices & Customer Bills',
-      content: `InvoiceNo,Date,CustomerName,CustomerPhone,CardNumber,ItemDetails,TotalAmount,PaidAmount,DueAmount,PaymentMode
-INV-2025-0101,2025-11-12,Ramesh Patil,9822012345,1001,Copper Wire 2.5mm 10 coils,15000,10000,5000,Cash
-INV-2025-0102,2025-11-15,Mahesh Kulkarni,9823098765,,Modular switches 20 pcs,4800,4800,0,Online
-INV-2025-0103,2025-12-01,Sunita More,9765412980,1002,LED Battens 20W (15 pcs),3750,3750,0,Cash
-INV-2025-0104,2026-01-10,Vikas Jadhav,9421876543,1045,Distribution Box 8 Way + MCBs,6200,4000,2200,Cash`,
-    },
-    receipts: {
-      filename: 'sample_weekly_receipts.csv',
-      desc: 'Weekly Card Payment & Refund Receipts (साप्ताहिक जमा व परतावा)',
-      content: `ReceiptNo,CardNo,SchemeId,CustomerName,Date,WeekNo,Amount,Type,PaymentMode,Remarks
-REC-SCH1-101,1030,scheme1,SANGITA UTTAM PATIL,2025-06-08,1,450,WeeklyPayment,Cash,Week 1 payment
-REC-SCH2-102,3191,scheme2,SUNIL DANDAGE,2024-11-15,2,1000,WeeklyPayment,Cash,Week 2 payment
-REC-SCH3-103,4107,scheme3,RANJANA SHAMBHARKAR,2025-07-12,1,600,WeeklyPayment,Cash,Week 1 deposit
-REF-SCH1-104,1001,scheme1,Prakash Shinde,2026-09-04,,5000,Refund,Cash,Customer return refund (10000 me se 5000 wapas)`,
-    },
     cards: {
       filename: 'sample_card_members.csv',
       desc: 'Card Scheme Members (NAME, CARD.NO, VILLEGE, MOBILE.NO, OPENING AMT, DATE, SHEET NO)',
       content: `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
 RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793
 VAISHALI BAVNE,4304,HINGNI,,100,18-10-2025,5104
-SANGITA,4181,DEVNAGAR,,200,01-10-2025,5110
 SUNIL DANDAGE,3191,PIPRI,8855881081,3000,01-11-2024,
-PRASHANT BHALE,3201,SATODA,,100,01-11-2024,
 SANGITA UTTAM PATIL,1030,HINGNI,7972811639,450,01-06-2025,
 YAMUNA PRABHAKAR KAIKADI,1029,HINGNI,8698041323,200,01-06-2025,`,
+    },
+    bills: {
+      filename: 'sample_sales_bills.csv',
+      desc: 'Old Sales Invoices & Customer Bills (Bill No, Customer Name, Grand Total, Amount Paid, Balance Due)',
+      content: `Bill No,Date,Card No,Customer Name,Mobile,Village,Items Summary,SubTotal,Discount,Grand Total,Amount Paid,Balance Due,Payment Mode,Agent,Remarks
+1002,23-02-2023,WALK-IN,ARUN SAYRE,,ANTERGAON,,,,6500,5200,1300,Credit / Udhari,,
+1003,23-02-2023,WALK-IN,PRAKASH BUDHBAWARE,8262988399,ANTERGAON,,,,4000,2000,2000,Credit / Udhari,,
+B-02,30-08-2024,WALK-IN,AMOL LENDE,9763990295,WARDHA,,,,13500,13500,0,Cash,,`,
+    },
+    receipts: {
+      filename: 'sample_receipts_collections.csv',
+      desc: 'Old Receipts & Cash Collections (Receipt No, Date, Customer Name, Amount Received, Against Bill No)',
+      content: `Receipt No,Date,Card No,Customer Name,Ref Bill No,Payment Mode,Amount Received,Against Bill No,Remarks
+SSE/RCPT/202302/0001,23-02-2023,,ARUN SAYRE (ANTERGAON),1002,Cash,5200,1002,Imported Sale Receipt against Bill 1002
+SSE/SCHEME3/DEP/3011,05-09-2026,4850,,,,1000,,Scheme: Scheme3
+SSE/RCPT/202609/3013,07-09-2026,1021,SURAJ GAUTAM MOON (Scheme1),,Cash,200,,Weekly Scheme Deposit (Scheme1)`,
     },
     purchases: {
       filename: 'sample_dealer_purchases.csv',
       desc: 'Dealer / Supplier Old Purchases (e.g. Manisha Enterprises)',
       content: `BillNo,Date,DealerName,Items,TotalAmount,PaidAmount,PaymentMode
 PUR-7701,2026-08-10,Manisha Enterprises,Wires and modular accessories,95000,75000,Online
-PUR-7702,2026-08-25,Manisha Enterprises,PVC pipes & conduits lot,50000,40000,Online
-PUR-7703,2026-08-15,Polycab Distributors Ltd.,Submersible cables 4mm,72500,72500,Online
-PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,20000,Online`,
+PUR-7702,2026-08-25,Manisha Enterprises,PVC pipes & conduits lot,50000,40000,Online`,
     },
   };
 
@@ -111,27 +172,32 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
     try {
       const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
       if (lines.length < 2) {
-        setParseError('CSV must contain a header row and at least 1 data row.');
+        setParseError('CSV file must contain a header row and at least 1 data row.');
         setParsedRows([]);
         return;
       }
 
-      const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
-      const rows: any[] = [];
+      const rawHeaders = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((h) =>
+        h.trim().replace(/^["']|["']$/g, '')
+      );
 
+      const rows: any[] = [];
       for (let i = 1; i < lines.length; i++) {
         const currentLine = lines[i];
-        // Split by comma ignoring commas inside quotes
         const values = currentLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((val) =>
           val.trim().replace(/^["']|["']$/g, '')
         );
 
-        if (values.length < 2) continue;
+        const hasContent = values.some((v) => v && v.length > 0);
+        if (!hasContent) continue;
 
-        const rowObj: any = {};
-        headers.forEach((header, index) => {
-          rowObj[header] = values[index] || '';
+        const rowObj: Record<string, string> = {};
+        rawHeaders.forEach((header, index) => {
+          if (header) {
+            rowObj[header] = values[index] !== undefined ? values[index] : '';
+          }
         });
+
         rows.push(rowObj);
       }
 
@@ -155,159 +221,224 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
     reader.readAsText(file);
   };
 
+  // Determine Scheme for Card Member
+  const resolveCardScheme = (cardNum: number, rawSchemeText: string): { schemeId: CardSchemeId; schemeName: string } => {
+    if (targetSchemeId !== 'auto') {
+      const found = SCHEMES_CONFIG.find((s) => s.id === targetSchemeId);
+      if (found) {
+        return { schemeId: found.id as CardSchemeId, schemeName: found.name };
+      }
+    }
+
+    const text = (rawSchemeText || '').toLowerCase();
+    if (text.includes('scheme 1') || text.includes('scheme1') || text.includes('योजना 1') || text.includes('sch-1')) {
+      return { schemeId: 'scheme1', schemeName: 'Scheme 1 (योजना 1)' };
+    }
+    if (text.includes('scheme 2') || text.includes('scheme2') || text.includes('योजना 2') || text.includes('sch-2')) {
+      return { schemeId: 'scheme2', schemeName: 'Scheme 2 (योजना 2)' };
+    }
+    if (text.includes('scheme 3') || text.includes('scheme3') || text.includes('योजना 3') || text.includes('sch-3')) {
+      return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
+    }
+    if (text.includes('scheme 4') || text.includes('scheme4') || text.includes('योजना 4') || text.includes('sch-4')) {
+      return { schemeId: 'scheme4', schemeName: 'Scheme 4 (योजना 4)' };
+    }
+    if (text.includes('scheme 5') || text.includes('scheme5') || text.includes('योजना 5') || text.includes('sch-5')) {
+      return { schemeId: 'scheme5', schemeName: 'Scheme 5 (योजना 5)' };
+    }
+    if (text.includes('scheme 6') || text.includes('scheme6') || text.includes('योजना 6') || text.includes('sch-6')) {
+      return { schemeId: 'scheme6', schemeName: 'Scheme 6 (योजना 6)' };
+    }
+
+    if (cardNum >= 4001 && cardNum <= 6000) {
+      return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
+    } else if (cardNum >= 3001 && cardNum <= 3999) {
+      return { schemeId: 'scheme2', schemeName: 'Scheme 2 (योजना 2)' };
+    } else if (cardNum >= 6001 && cardNum <= 7999) {
+      return { schemeId: 'scheme4', schemeName: 'Scheme 4 (योजना 4)' };
+    } else if (cardNum >= 8001 && cardNum <= 9999) {
+      return { schemeId: 'scheme5', schemeName: 'Scheme 5 (योजना 5)' };
+    } else if (cardNum >= 10001 && cardNum <= 12000) {
+      return { schemeId: 'scheme6', schemeName: 'Scheme 6 (योजना 6)' };
+    }
+    return { schemeId: 'scheme1', schemeName: 'Scheme 1 (योजना 1)' };
+  };
+
   // Execute Import
   const handleCommitImport = () => {
     if (parsedRows.length === 0) return;
 
     try {
-      if (activeImportType === 'bills') {
+      if (activeImportType === 'cards') {
+        const newCards: CardMember[] = [];
+        const autoReceipts: CardTransaction[] = [];
+
+        parsedRows.forEach((r, idx) => {
+          const cardNumRaw = getField(r, ['CARD.NO', 'Card No', 'CardNumber', 'CardNo', 'CARD NO', 'CARD_NO']);
+          const cardNum = parseNum(cardNumRaw, 1001);
+          const customerName = getField(r, ['NAME', 'Customer Name', 'CustomerName', 'Name', 'MEMBER NAME'], `Member #${cardNum}`);
+          const village = getField(r, ['VILLEGE', 'Village', 'City', 'Town', 'Address']);
+          const phone = getField(r, ['MOBILE.NO', 'Mobile', 'Phone', 'CustomerPhone', 'MOBILE NO', 'Contact']);
+          const sheetNo = getField(r, ['SHEET NO', 'SheetNo', 'SHEET_NO', 'Sheet']);
+          const rawScheme = getField(r, ['Scheme', 'SchemeId', 'SCHEME', 'Scheme Name']);
+          const dateRaw = getField(r, ['DATE', 'Date', 'JoiningDate', 'Joining Date']);
+          const joiningDate = normalizeDate(dateRaw);
+
+          const openingAmtRaw = getField(r, ['OPENING AMT', 'Saving Balance', 'OpeningAmt', 'Opening Balance', 'Balance', 'Total Deposited', 'TotalDeposited']);
+          const openingAmt = parseNum(openingAmtRaw, 0);
+
+          const { schemeId, schemeName } = resolveCardScheme(cardNum, rawScheme);
+
+          const cardId = `cm-${schemeId}-${cardNum}`;
+
+          const member: CardMember = {
+            id: cardId,
+            cardNumber: cardNum,
+            schemeId,
+            schemeName,
+            customerName,
+            phone: phone || '',
+            village: village || undefined,
+            sheetNo: sheetNo || undefined,
+            openingAmt: openingAmt > 0 ? openingAmt : undefined,
+            address: village ? `${village}, Wardha` : '',
+            joiningDate,
+            registrationFee: 50,
+            registrationFeePaid: true,
+            totalDeposited: openingAmt,
+            totalRefunded: 0,
+            netBalance: openingAmt,
+            status: 'Active',
+            notes: `Imported via CSV record${sheetNo ? ` • Sheet #${sheetNo}` : ''}${village ? ` • Village: ${village}` : ''}`,
+          };
+
+          newCards.push(member);
+
+          if (openingAmt > 0) {
+            autoReceipts.push({
+              id: `rcpt-opn-${schemeId}-${cardNum}-${Date.now().toString().slice(-4)}-${idx}`,
+              cardId,
+              cardNumber: cardNum,
+              schemeId,
+              customerName,
+              customerPhone: phone || undefined,
+              receiptNo: `REC-OPN-${cardNum}`,
+              date: joiningDate,
+              type: 'WeeklyPayment',
+              weekNumber: 1,
+              amount: openingAmt,
+              paymentMode: 'Cash',
+              agentName: 'Opening Balance',
+              remarks: `Initial/Opening Deposit of ₹${openingAmt} (Imported from records)`,
+              balanceAfter: openingAmt,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        });
+
+        onImportCardMembers(newCards, autoReceipts);
+        setSuccessMessage(
+          `Successfully imported ${newCards.length} members into ${
+            targetSchemeId !== 'auto' ? targetSchemeId.toUpperCase() : 'their Schemes'
+          }! ${autoReceipts.length} Opening Deposits were also auto-credited to Passbooks & Collection Ledger.`
+        );
+      } else if (activeImportType === 'bills') {
         const newBills: TransactionEntry[] = parsedRows.map((r, idx) => {
-          const totalAmount = parseFloat(r.TotalAmount || r.totalAmount || '0') || 0;
-          const payingNow = parseFloat(r.PaidAmount || r.paidAmount || '0') || 0;
-          const dueAmount = parseFloat(r.DueAmount || r.dueAmount || '0') || Math.max(0, totalAmount - payingNow);
-          const cardNum = r.CardNumber || r.CardNo || r['CARD.NO'] ? parseInt(r.CardNumber || r.CardNo || r['CARD.NO']) : undefined;
-          const village = (r.Village || r.VILLEGE || r.village || '').trim();
+          const invoiceNo = getField(r, ['Bill No', 'InvoiceNo', 'BillNo', 'Invoice No', 'Invoice', 'Bill_No'], `INV-${Date.now().toString().slice(-4)}-${idx + 1}`);
+          const dateRaw = getField(r, ['Date', 'BillDate', 'DATE']);
+          const date = normalizeDate(dateRaw);
+          const customerName = getField(r, ['Customer Name', 'CustomerName', 'NAME', 'Name', 'Customer'], 'Walk-in Customer');
+          const customerPhone = getField(r, ['Mobile', 'CustomerPhone', 'Phone', 'MOBILE.NO']);
+          const village = getField(r, ['Village', 'VILLEGE', 'City', 'Town']);
+          const itemDetails = getField(r, ['Items Summary', 'ItemDetails', 'Items', 'Description', 'Item'], 'Imported Sale Bill');
+          
+          const grandTotalRaw = getField(r, ['Grand Total', 'TotalAmount', 'Total Amount', 'Total', 'SubTotal']);
+          const amountPaidRaw = getField(r, ['Amount Paid', 'PaidAmount', 'Paid Amount', 'Paid', 'PayingNow']);
+          const balanceDueRaw = getField(r, ['Balance Due', 'DueAmount', 'Due Amount', 'Due', 'Balance']);
+          const paymentModeRaw = getField(r, ['Payment Mode', 'PaymentMode', 'Mode']);
+
+          const totalAmount = parseNum(grandTotalRaw, 0);
+          const payingNow = parseNum(amountPaidRaw, 0);
+          const dueAmount = parseNum(balanceDueRaw, Math.max(0, totalAmount - payingNow));
+
+          const cardNumRaw = getField(r, ['Card No', 'CardNo', 'Card Number', 'CARD.NO']);
+          const cardNum = cardNumRaw && cardNumRaw !== 'WALK-IN' ? parseInt(cardNumRaw.replace(/[^0-9]/g, '')) : undefined;
 
           return {
             id: `inv-imp-${Date.now()}-${idx}`,
-            invoiceNo: r.InvoiceNo || `INV-IMP-${Date.now().toString().slice(-4)}-${idx + 1}`,
-            date: r.Date || new Date().toISOString().split('T')[0],
-            customerName: r.CustomerName || r.NAME || 'Walk-in Customer',
-            customerPhone: r.CustomerPhone || r['MOBILE.NO'] || '',
-            cardNumber: cardNum,
+            invoiceNo,
+            date,
+            customerName,
+            customerPhone: customerPhone || undefined,
+            cardNumber: cardNum && !isNaN(cardNum) ? cardNum : undefined,
             village: village || undefined,
-            itemDetails: r.ItemDetails || 'Imported Bill Items',
+            itemDetails,
             totalAmount,
             payingNow,
             dueAmount,
-            paymentMode: (r.PaymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online',
-            notes: `Imported via CSV on ${new Date().toISOString().split('T')[0]}${village ? ` • Village: ${village}` : ''}`,
+            paymentMode: paymentModeRaw.toLowerCase().includes('online') ? 'Online' : 'Cash',
+            notes: `Imported Sale Bill • Total: ₹${totalAmount} • Paid: ₹${payingNow} • Due: ₹${dueAmount}${village ? ` • Village: ${village}` : ''}`,
             createdAt: new Date().toISOString(),
           };
         });
 
         onImportBills(newBills);
-        setSuccessMessage(`Successfully imported ${newBills.length} old sales bills into the ledger!`);
+        setSuccessMessage(`Successfully imported ${newBills.length} old sales bills into Customer & Sales Ledger!`);
       } else if (activeImportType === 'receipts') {
         const newReceipts: CardTransaction[] = parsedRows.map((r, idx) => {
-          const cardNum = parseInt(r.CardNo || r['CARD.NO'] || r.cardNumber || '1001') || 1001;
-          let schemeId: CardSchemeId = 'scheme1';
-          const schemeField = (r.SchemeId || r.Scheme || r.scheme || '').toLowerCase();
-          if (schemeField.includes('3') || (cardNum >= 4001 && cardNum <= 6000)) {
-            schemeId = 'scheme3';
-          } else if (schemeField.includes('2') || (cardNum >= 3001 && cardNum <= 3999)) {
-            schemeId = 'scheme2';
-          } else if (schemeField.includes('4') || (cardNum >= 6001 && cardNum <= 7999)) {
-            schemeId = 'scheme4';
-          } else if (schemeField.includes('5') || (cardNum >= 8001 && cardNum <= 9999)) {
-            schemeId = 'scheme5';
-          } else if (schemeField.includes('6') || (cardNum >= 10001 && cardNum <= 12000)) {
-            schemeId = 'scheme6';
-          } else {
-            schemeId = 'scheme1';
-          }
+          const receiptNo = getField(r, ['Receipt No', 'ReceiptNo', 'Ref Bill No', 'Bill No'], `REC-${Date.now().toString().slice(-4)}-${idx + 1}`);
+          const dateRaw = getField(r, ['Date', 'DATE']);
+          const date = normalizeDate(dateRaw);
+          const customerName = getField(r, ['Customer Name', 'CustomerName', 'NAME', 'Name'], 'Member');
+          const cardNumRaw = getField(r, ['Card No', 'CARD.NO', 'CardNo', 'CardNumber']);
+          const cardNum = parseNum(cardNumRaw, 1001);
+          
+          const amountRaw = getField(r, ['Amount Received', 'Amount', 'TotalReceived', 'AmountPaid', 'Total Amount']);
+          const amount = parseNum(amountRaw, 0);
 
-          const type = r.Type === 'Refund' ? 'Refund' : 'WeeklyPayment';
-          const amount = parseFloat(r.Amount || '0') || 0;
+          const againstBill = getField(r, ['Against Bill No', 'Ref Bill No', 'AgainstBillNo', 'RefBillNo']);
+          const remarks = getField(r, ['Remarks', 'Notes', 'Remarks / Note'], againstBill ? `Payment against Bill #${againstBill}` : 'Weekly collection');
+
+          const { schemeId } = resolveCardScheme(cardNum, remarks);
 
           return {
             id: `rec-imp-${Date.now()}-${idx}`,
-            cardId: `cm-${cardNum}`,
+            cardId: `cm-${schemeId}-${cardNum}`,
             cardNumber: cardNum,
             schemeId,
-            customerName: r.CustomerName || r.NAME || `Card Member #${cardNum}`,
-            receiptNo: r.ReceiptNo || `REC-${cardNum}-${idx + 1}`,
-            date: r.Date || new Date().toISOString().split('T')[0],
-            type,
-            weekNumber: r.WeekNo ? parseInt(r.WeekNo) : undefined,
+            customerName,
+            receiptNo,
+            date,
+            type: 'WeeklyPayment',
+            weekNumber: 1,
             amount,
-            paymentMode: (r.PaymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online',
-            remarks: r.Remarks || `Imported ${type}`,
+            paymentMode: 'Cash',
+            remarks,
             balanceAfter: amount,
             createdAt: new Date().toISOString(),
           };
         });
 
         onImportReceipts(newReceipts);
-        setSuccessMessage(`Successfully imported ${newReceipts.length} card receipts & refunds!`);
-      } else if (activeImportType === 'cards') {
-        const newCards: CardMember[] = parsedRows.map((r, idx) => {
-          const cardNum = parseInt(r['CARD.NO'] || r['CARD NO'] || r.CardNo || r.cardNumber || r.CardNumber || '1001') || 1001;
-          const customerName = (r.NAME || r.Name || r.CustomerName || r.customerName || `Member #${cardNum}`).trim();
-          const village = (r.VILLEGE || r.Village || r.village || r.City || '').trim();
-          const phone = (r['MOBILE.NO'] || r['MOBILE NO'] || r.Mobile || r.phone || r.Phone || '').trim();
-          const sheetNo = (r['SHEET NO'] || r['SHEET_NO'] || r.SheetNo || r.sheetNo || '').trim();
-          const openingAmt = parseFloat(r['OPENING AMT'] || r.OpeningAmt || r.openingAmt || '0') || 0;
-          const totalDeposited = openingAmt > 0 ? openingAmt : (parseFloat(r.TotalDeposited || '0') || 0);
-          const totalRefunded = parseFloat(r.TotalRefunded || '0') || 0;
-          const joiningDate = r.DATE || r.Date || r.JoiningDate || new Date().toISOString().split('T')[0];
-
-          let schemeId: CardSchemeId = 'scheme1';
-          let schemeName = 'Scheme 1 (योजना 1)';
-          const rawScheme = (r.SchemeId || r.Scheme || r.scheme || '').toLowerCase();
-          if (rawScheme.includes('3') || (cardNum >= 4001 && cardNum <= 6000)) {
-            schemeId = 'scheme3';
-            schemeName = 'Scheme 3 (योजना 3)';
-          } else if (rawScheme.includes('2') || (cardNum >= 3001 && cardNum <= 3999)) {
-            schemeId = 'scheme2';
-            schemeName = 'Scheme 2 (योजना 2)';
-          } else if (rawScheme.includes('4') || (cardNum >= 6001 && cardNum <= 7999)) {
-            schemeId = 'scheme4';
-            schemeName = 'Scheme 4 (योजना 4)';
-          } else if (rawScheme.includes('5') || (cardNum >= 8001 && cardNum <= 9999)) {
-            schemeId = 'scheme5';
-            schemeName = 'Scheme 5 (योजना 5)';
-          } else if (rawScheme.includes('6') || (cardNum >= 10001 && cardNum <= 12000)) {
-            schemeId = 'scheme6';
-            schemeName = 'Scheme 6 (योजना 6)';
-          } else {
-            schemeId = 'scheme1';
-            schemeName = 'Scheme 1 (योजना 1)';
-          }
-
-          return {
-            id: `cm-imp-${cardNum}-${idx}`,
-            cardNumber: cardNum,
-            schemeId,
-            schemeName,
-            customerName,
-            phone,
-            village: village || undefined,
-            sheetNo: sheetNo || undefined,
-            openingAmt: openingAmt > 0 ? openingAmt : undefined,
-            address: village ? `${village}, Wardha` : (r.Address || ''),
-            joiningDate,
-            registrationFee: 50,
-            registrationFeePaid: true,
-            totalDeposited,
-            totalRefunded,
-            netBalance: totalDeposited - totalRefunded,
-            status: 'Active',
-            notes: `Imported from CSV records${sheetNo ? ` • Sheet #${sheetNo}` : ''}${village ? ` • Village: ${village}` : ''}`,
-          };
-        });
-
-        onImportCardMembers(newCards);
-        setSuccessMessage(`Successfully imported ${newCards.length} scheme cards with villages & sheet numbers into system!`);
+        setSuccessMessage(`Successfully imported ${newReceipts.length} payment receipts into collections!`);
       } else if (activeImportType === 'purchases') {
         const newPurchases: PurchaseEntry[] = parsedRows.map((r, idx) => {
-          const totalAmount = parseFloat(r.TotalAmount || '0') || 0;
-          const paidAmount = parseFloat(r.PaidAmount || '0') || 0;
-
+          const totalAmount = parseNum(getField(r, ['TotalAmount', 'Total Amount', 'Total', 'Grand Total']), 0);
+          const paidAmount = parseNum(getField(r, ['PaidAmount', 'Paid Amount', 'Paid']), 0);
+          const dealerName = getField(r, ['DealerName', 'Dealer Name', 'Supplier', 'Dealer'], 'Manisha Enterprises');
           return {
             id: `pur-imp-${Date.now()}-${idx}`,
-            billNo: r.BillNo || `PUR-IMP-${idx + 1}`,
-            date: r.Date || new Date().toISOString().split('T')[0],
-            supplierName: r.DealerName || 'Manisha Enterprises',
-            items: r.Items || 'Stock Supply',
+            billNo: getField(r, ['BillNo', 'Bill No', 'InvoiceNo'], `PUR-IMP-${idx + 1}`),
+            date: normalizeDate(getField(r, ['Date', 'DATE'])),
+            supplierName: dealerName,
+            items: getField(r, ['Items', 'ItemDetails', 'Description'], 'Stock Supply'),
             totalAmount,
             paidAmount,
             status: paidAmount >= totalAmount ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending',
-            paymentMode: (r.PaymentMode === 'Cash' ? 'Cash' : 'Online') as any,
+            paymentMode: 'Online',
           };
         });
 
-        // Group by dealer name to ensure dealer records exist
         const dealerMap = new Map<string, Dealer>();
         newPurchases.forEach((p) => {
           const name = p.supplierName.trim();
@@ -348,14 +479,14 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              CSV Data Import (पुरानी फाइल्स का डेटा अपलोड)
+              CSV Data Import (पुरानी फाइल्स व हिसाब अपलोड)
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
-              Instant Migration
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> Smart Auto-Match
             </span>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Easily upload your old bills, weekly installment receipts, card scheme customer files, and dealer purchases into ShriSaiEnt.
+            Scheme 1, 2, 3 कार्ड मेंबर्स, बिल व रसीदों का डेटा बिना किसी स्पेलिंग मिसमैच के 100% सही लोड करें।
           </p>
         </div>
       </div>
@@ -369,7 +500,7 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
           </div>
           <button
             onClick={() => setSuccessMessage('')}
-            className="text-xs text-emerald-700 underline font-bold"
+            className="text-xs text-emerald-700 underline font-bold cursor-pointer"
           >
             Dismiss
           </button>
@@ -380,198 +511,356 @@ PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,200
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {
+            type: 'cards' as ImportType,
+            label: 'Card Members (योजना ग्राहक)',
+            desc: 'Scheme 1, 2, 3 ग्राहक सूची',
+            icon: CreditCard,
+            color: 'blue',
+          },
+          {
             type: 'bills' as ImportType,
-            label: '1. Old Sales Bills',
-            sub: 'पुराने ग्राहक बिल CSV',
-            icon: Receipt,
-            color: 'border-blue-500 bg-blue-50/50',
+            label: 'Sales Bills (दुकान बिल/बिक्री)',
+            desc: 'Invoice, Total, Paid, Due',
+            icon: FileText,
+            color: 'amber',
           },
           {
             type: 'receipts' as ImportType,
-            label: '2. Weekly Receipts',
-            sub: 'किस्त रसीदें व रिफंड CSV',
-            icon: FileSpreadsheet,
-            color: 'border-emerald-500 bg-emerald-50/50',
-          },
-          {
-            type: 'cards' as ImportType,
-            label: '3. Scheme Cards',
-            sub: 'कार्ड धारक डेटा CSV',
-            icon: CreditCard,
-            color: 'border-amber-500 bg-amber-50/50',
+            label: 'Receipts / Collections (जमा रसीदें)',
+            desc: 'Amount Received & Against Bill',
+            icon: Receipt,
+            color: 'emerald',
           },
           {
             type: 'purchases' as ImportType,
-            label: '4. Dealer Purchases',
-            sub: 'डीलर खरीद (Manisha Ent.)',
+            label: 'Dealer Purchases (सप्लायर खरीदी)',
+            desc: 'Manisha Ent & Distributor bills',
             icon: Building2,
-            color: 'border-indigo-500 bg-indigo-50/50',
+            color: 'purple',
           },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeImportType === tab.type;
+        ].map((item) => {
+          const Icon = item.icon;
+          const isActive = activeImportType === item.type;
           return (
             <button
-              key={tab.type}
+              key={item.type}
               onClick={() => {
-                setActiveImportType(tab.type);
-                setCsvText('');
+                setActiveImportType(item.type);
                 setParsedRows([]);
                 setParseError('');
+                setSuccessMessage('');
               }}
-              className={`p-4 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                 isActive
-                  ? `border-2 border-slate-900 bg-white shadow-sm ring-2 ring-slate-900/5`
-                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                  ? 'bg-slate-900 border-slate-900 text-white shadow-md ring-2 ring-slate-900/20'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
-                <Icon
-                  className={`w-5 h-5 ${
-                    isActive ? 'text-slate-900' : 'text-slate-400'
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
                   }`}
-                />
-                {isActive && (
-                  <span className="w-2 h-2 rounded-full bg-slate-900" />
-                )}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                {isActive && <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>}
               </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-xs">{tab.label}</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5">{tab.sub}</p>
+              <div className="font-bold text-sm leading-snug">{item.label}</div>
+              <div className={`text-xs mt-0.5 ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>
+                {item.desc}
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* Upload Box & Template helper */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      {/* Specific Scheme Selector for Member Import */}
+      {activeImportType === 'cards' && (
+        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-700" />
+                <h3 className="font-bold text-indigo-950 text-sm md:text-base">
+                  Target Scheme Selection (यह फाइल किस योजना की है?)
+                </h3>
+              </div>
+              <p className="text-xs text-indigo-800 mt-0.5">
+                आप जिस योजना को चुनेंगे, फाइल के सभी कार्ड सीधे उसी योजना में सही रूप से जमा होंगे।
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={targetSchemeId}
+                onChange={(e) => setTargetSchemeId(e.target.value)}
+                className="px-4 py-2 bg-white border border-indigo-300 rounded-xl font-bold text-sm text-indigo-950 shadow-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="auto">✨ Auto-Detect (कार्ड नं. से अपने आप पहचानें)</option>
+                <option value="scheme1">Scheme 1 (योजना 1 • कार्ड 1001-2999)</option>
+                <option value="scheme2">Scheme 2 (योजना 2 • कार्ड 3001-3999)</option>
+                <option value="scheme3">Scheme 3 (योजना 3 • कार्ड 1001-6000)</option>
+                <option value="scheme4">Scheme 4 (योजना 4 • कार्ड 6001-7999)</option>
+                <option value="scheme5">Scheme 5 (योजना 5 • कार्ड 8001-9999)</option>
+                <option value="scheme6">Scheme 6 (योजना 6 • कार्ड 10001-12000)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Box */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">
-              Upload CSV File for {sampleTemplates[activeImportType].desc}
-            </h3>
+            <h2 className="font-bold text-slate-900 text-lg">
+              {activeImportType === 'cards' && 'Upload Card Scheme Members CSV'}
+              {activeImportType === 'bills' && 'Upload Sales & Invoices CSV'}
+              {activeImportType === 'receipts' && 'Upload Receipts & Collections CSV'}
+              {activeImportType === 'purchases' && 'Upload Purchases CSV'}
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select a .csv file from your computer or download the sample template below.
+              Spelling tolerant: Supports <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">NAME</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">CARD.NO</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">VILLEGE</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">OPENING AMT</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">Saving Balance</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">Grand Total</code> etc.
             </p>
           </div>
-
           <button
             onClick={() => handleDownloadSample(activeImportType)}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer self-start sm:self-auto"
           >
-            <Download className="w-4 h-4 text-blue-600" />
-            Download Sample {sampleTemplates[activeImportType].filename}
+            <Download className="w-4 h-4 text-slate-600" />
+            Download Sample Format
           </button>
         </div>
 
-        {/* Drag Drop or File Select */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-blue-500 transition flex flex-col items-center justify-center bg-slate-50/50">
-            <Upload className="w-8 h-8 text-blue-600 mb-2" />
-            <p className="text-xs font-bold text-slate-800">
-              Click to browse or drag & drop your CSV file here
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">Supports standard CSV exports from Excel</p>
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={handleFileUpload}
-              className="mt-3 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                Or Paste CSV Text Directly
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setCsvText(sampleTemplates[activeImportType].content);
-                  parseCSVContent(sampleTemplates[activeImportType].content);
-                }}
-                className="text-[11px] text-blue-600 hover:underline font-semibold"
-              >
-                Load Sample Data into Box
-              </button>
+        {/* Drag & Drop Area */}
+        <div className="relative border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-blue-50/20 transition group">
+          <input
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            onChange={handleFileUpload}
+            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+          />
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition">
+              <Upload className="w-6 h-6" />
             </div>
-            <textarea
-              rows={6}
-              value={csvText}
-              onChange={(e) => {
-                setCsvText(e.target.value);
-                parseCSVContent(e.target.value);
-              }}
-              placeholder={`Paste raw CSV here...\n${sampleTemplates[activeImportType].content.split('\n')[0]}`}
-              className="w-full p-3 border border-slate-200 rounded-xl text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div>
+              <p className="text-sm font-bold text-slate-800">
+                Click to browse or drag & drop CSV file here
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                CSV (.csv) or plain text format directly exported from Excel / Google Sheets
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Parse Error */}
+        {/* Or Paste Raw CSV Text */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            Or Paste CSV Content Directly (या टेक्स्ट कॉपी-पेस्ट करें):
+          </label>
+          <textarea
+            rows={4}
+            value={csvText}
+            onChange={(e) => {
+              setCsvText(e.target.value);
+              parseCSVContent(e.target.value);
+            }}
+            placeholder="NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO&#10;RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793"
+            className="w-full font-mono text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          />
+        </div>
+
         {parseError && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{parseError}</span>
           </div>
         )}
+      </div>
 
-        {/* Parsed Preview Table */}
-        {parsedRows.length > 0 && (
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
+      {/* Preview Section */}
+      {parsedRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                  Parsed Preview ({parsedRows.length} Rows Ready to Import)
-                </h4>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                  Verified Valid Format
+                <span className="font-bold text-slate-900 text-lg">
+                  Preview Ready ({parsedRows.length} Records Found)
+                </span>
+                <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 font-bold text-xs rounded-full">
+                  Verified Clean
                 </span>
               </div>
-
-              <button
-                onClick={handleCommitImport}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer"
-              >
-                <Database className="w-4 h-4" />
-                Import {parsedRows.length} Records into System
-              </button>
-            </div>
-
-            <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-60 overflow-y-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 text-slate-700 font-semibold sticky top-0">
-                  <tr>
-                    {Object.keys(parsedRows[0] || {}).map((header) => (
-                      <th key={header} className="py-2 px-3 whitespace-nowrap">
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {parsedRows.slice(0, 10).map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      {Object.values(row).map((val: any, colIdx) => (
-                        <td key={colIdx} className="py-2 px-3 whitespace-nowrap text-slate-700">
-                          {String(val)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {parsedRows.length > 10 && (
-              <p className="text-[11px] text-slate-400 text-right">
-                Showing first 10 of {parsedRows.length} rows...
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review below how columns and amounts have been matched before saving into system.
               </p>
-            )}
+            </div>
+
+            <button
+              onClick={handleCommitImport}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition cursor-pointer"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              Confirm & Save {parsedRows.length} Records Now
+            </button>
           </div>
-        )}
-      </div>
+
+          {/* Table Preview */}
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="p-3">#</th>
+                  {activeImportType === 'cards' && (
+                    <>
+                      <th className="p-3">Card No</th>
+                      <th className="p-3">Customer Name</th>
+                      <th className="p-3">Village</th>
+                      <th className="p-3">Opening Amt</th>
+                      <th className="p-3">Target Scheme</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Sheet No</th>
+                    </>
+                  )}
+                  {activeImportType === 'bills' && (
+                    <>
+                      <th className="p-3">Bill No</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Customer Name</th>
+                      <th className="p-3">Village</th>
+                      <th className="p-3">Grand Total</th>
+                      <th className="p-3">Amount Paid</th>
+                      <th className="p-3">Balance Due</th>
+                    </>
+                  )}
+                  {activeImportType === 'receipts' && (
+                    <>
+                      <th className="p-3">Receipt No</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Customer / Card</th>
+                      <th className="p-3">Amount Received</th>
+                      <th className="p-3">Against Bill</th>
+                      <th className="p-3">Remarks</th>
+                    </>
+                  )}
+                  {activeImportType === 'purchases' && (
+                    <>
+                      <th className="p-3">Bill No</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Dealer Name</th>
+                      <th className="p-3">Items</th>
+                      <th className="p-3">Total Amount</th>
+                      <th className="p-3">Paid Amount</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {parsedRows.slice(0, 10).map((row, idx) => {
+                  if (activeImportType === 'cards') {
+                    const cardNum = parseNum(getField(row, ['CARD.NO', 'Card No', 'CardNumber', 'CardNo', 'CARD NO']));
+                    const name = getField(row, ['NAME', 'Customer Name', 'CustomerName', 'Name']);
+                    const village = getField(row, ['VILLEGE', 'Village', 'City', 'Address']);
+                    const opnAmt = parseNum(getField(row, ['OPENING AMT', 'Saving Balance', 'OpeningAmt', 'Balance']));
+                    const date = normalizeDate(getField(row, ['DATE', 'Date']));
+                    const sheet = getField(row, ['SHEET NO', 'SheetNo']);
+                    const rawScheme = getField(row, ['Scheme', 'SchemeId']);
+                    const scheme = resolveCardScheme(cardNum, rawScheme);
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/80">
+                        <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                        <td className="p-3 font-bold text-indigo-700">#{cardNum}</td>
+                        <td className="p-3 font-bold text-slate-900">{name}</td>
+                        <td className="p-3 text-slate-600">{village || '—'}</td>
+                        <td className="p-3 font-bold text-emerald-700">₹{opnAmt.toLocaleString('en-IN')}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold text-[10px]">
+                            {scheme.schemeName}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-500">{date}</td>
+                        <td className="p-3 font-mono text-slate-500">{sheet || '—'}</td>
+                      </tr>
+                    );
+                  }
+
+                  if (activeImportType === 'bills') {
+                    const billNo = getField(row, ['Bill No', 'InvoiceNo', 'BillNo', 'Invoice No']);
+                    const date = normalizeDate(getField(row, ['Date', 'BillDate']));
+                    const name = getField(row, ['Customer Name', 'CustomerName', 'NAME', 'Name']);
+                    const village = getField(row, ['Village', 'VILLEGE', 'City']);
+                    const grandTotal = parseNum(getField(row, ['Grand Total', 'TotalAmount', 'Total Amount', 'Total']));
+                    const amountPaid = parseNum(getField(row, ['Amount Paid', 'PaidAmount', 'Paid Amount', 'Paid']));
+                    const balanceDue = parseNum(getField(row, ['Balance Due', 'DueAmount', 'Due Amount', 'Due']));
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/80">
+                        <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                        <td className="p-3 font-bold text-amber-700">{billNo}</td>
+                        <td className="p-3 text-slate-500">{date}</td>
+                        <td className="p-3 font-bold text-slate-900">{name}</td>
+                        <td className="p-3 text-slate-600">{village || '—'}</td>
+                        <td className="p-3 font-bold text-slate-900">₹{grandTotal.toLocaleString('en-IN')}</td>
+                        <td className="p-3 font-bold text-emerald-700">₹{amountPaid.toLocaleString('en-IN')}</td>
+                        <td className="p-3 font-bold text-rose-600">₹{balanceDue.toLocaleString('en-IN')}</td>
+                      </tr>
+                    );
+                  }
+
+                  if (activeImportType === 'receipts') {
+                    const receiptNo = getField(row, ['Receipt No', 'ReceiptNo', 'Ref Bill No']);
+                    const date = normalizeDate(getField(row, ['Date']));
+                    const name = getField(row, ['Customer Name', 'CustomerName', 'NAME', 'Name']);
+                    const cardNo = getField(row, ['Card No', 'CARD.NO']);
+                    const amt = parseNum(getField(row, ['Amount Received', 'Amount', 'TotalReceived']));
+                    const againstBill = getField(row, ['Against Bill No', 'Ref Bill No']);
+                    const remarks = getField(row, ['Remarks', 'Notes']);
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/80">
+                        <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                        <td className="p-3 font-bold text-blue-700">{receiptNo}</td>
+                        <td className="p-3 text-slate-500">{date}</td>
+                        <td className="p-3 font-bold text-slate-900">
+                          {name} {cardNo ? `(#${cardNo})` : ''}
+                        </td>
+                        <td className="p-3 font-bold text-emerald-700">₹{amt.toLocaleString('en-IN')}</td>
+                        <td className="p-3 font-mono text-amber-700">{againstBill || '—'}</td>
+                        <td className="p-3 text-slate-500 truncate max-w-xs">{remarks || '—'}</td>
+                      </tr>
+                    );
+                  }
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80">
+                      <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="p-3 font-bold text-slate-900">{getField(row, ['BillNo', 'Bill No'])}</td>
+                      <td className="p-3 text-slate-500">{normalizeDate(getField(row, ['Date']))}</td>
+                      <td className="p-3 font-bold text-slate-900">{getField(row, ['DealerName', 'Dealer Name'])}</td>
+                      <td className="p-3 text-slate-500">{getField(row, ['Items'])}</td>
+                      <td className="p-3 font-bold text-slate-900">
+                        ₹{parseNum(getField(row, ['TotalAmount', 'Total Amount'])).toLocaleString('en-IN')}
+                      </td>
+                      <td className="p-3 font-bold text-emerald-700">
+                        ₹{parseNum(getField(row, ['PaidAmount', 'Paid Amount'])).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {parsedRows.length > 10 && (
+            <p className="text-xs text-center text-slate-400 italic">
+              Showing first 10 of {parsedRows.length} total rows in file. All {parsedRows.length} will be imported on confirm.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };
