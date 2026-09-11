@@ -59,6 +59,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   onAddMember,
   onRecordTransaction,
   onNavigateCsv,
+  salesBills = [],
 }) => {
   // Safe resolution of data arrays to prevent any undefined error
   const members = useMemo(

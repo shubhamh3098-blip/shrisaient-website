@@ -96,39 +96,39 @@ export const FloatingCallAndWhatsApp: React.FC<FloatingCallAndWhatsAppProps> = (
       )}
 
       {/* Floating Action Buttons: Left = Call Now, Right = WhatsApp */}
-      {/* Mobile: bottom-20 (just above fixed bottom nav) | Desktop: bottom-6 */}
-      <div className="fixed bottom-20 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
+      {/* Mobile: sleek circular buttons at bottom-18 | Desktop: pills at bottom-6 */}
+      <div className="fixed bottom-16 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
         <a
           href={`tel:${primaryPhone}`}
-          className="group flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-blue-700 to-indigo-700 text-white shadow-xl shadow-blue-700/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
+          className="group flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-blue-700 to-indigo-700 text-white shadow-xl shadow-blue-700/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
           title="श्री साई इंटरप्राइजेसला थेट कॉल करा"
         >
           <div className="relative flex items-center justify-center">
             <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 animate-ping" />
             <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
           </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[11px] sm:text-xs font-black tracking-tight leading-none">
+          <div className="hidden sm:flex flex-col text-left sm:ml-2">
+            <span className="text-xs font-black tracking-tight leading-none">
               Call Now
             </span>
-            <span className="text-[9px] text-blue-200 hidden sm:inline leading-tight font-mono">
+            <span className="text-[9px] text-blue-200 leading-tight font-mono">
               {primaryPhone}
             </span>
           </div>
         </a>
       </div>
 
-      <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
+      <div className="fixed bottom-16 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
         <button
           onClick={() => setShowWhatsAppPicker(true)}
-          className="group flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-xl shadow-emerald-600/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
+          className="group flex items-center justify-center w-11 h-11 sm:w-auto sm:h-auto sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-xl shadow-emerald-600/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
           title="WhatsApp वर चॅट करा"
         >
-          <div className="flex flex-col text-right">
-            <span className="text-[11px] sm:text-xs font-black tracking-tight leading-none">
+          <div className="hidden sm:flex flex-col text-right sm:mr-2">
+            <span className="text-xs font-black tracking-tight leading-none">
               WhatsApp
             </span>
-            <span className="text-[9px] text-emerald-100 hidden sm:inline leading-tight">
+            <span className="text-[9px] text-emerald-100 leading-tight">
               चॅट सुरू करा
             </span>
           </div>
