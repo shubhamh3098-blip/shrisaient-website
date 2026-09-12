@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   Store,
   Phone,
@@ -20,8 +19,6 @@ import {
   ArrowRight,
   PackageCheck,
   Lock,
-  Unlock,
-  Shield,
   Share2,
   ShoppingCart,
   Plus,
@@ -39,7 +36,11 @@ import {
   Camera,
   FileText,
   KeyRound,
-  AlertCircle
+  BookOpen,
+  AlertCircle,
+  Zap,
+  Sun,
+  Moon
 } from 'lucide-react';
 import {
   BusinessSettings,
@@ -49,12 +50,6 @@ import {
   CardSchemeConfig
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
-import {
-  maskPhoneNumber,
-  maskAddress,
-  verifyCustomerLast4Digits,
-  checkSearchRateLimit
-} from '../utils/security';
 import { AppLogo } from './AppLogo';
 import { PWAInstallModal } from './PWAInstallModal';
 import { usePWAInstall } from '../utils/usePWAInstall';
@@ -62,6 +57,7 @@ import { ProductEditModal } from './ProductEditModal';
 import { OrderBillModal, OrderBillData } from './OrderBillModal';
 import { ServicesAndTrustSection } from './ServicesAndTrustSection';
 import { FloatingCallAndWhatsApp } from './FloatingCallAndWhatsApp';
+import { useTheme } from '../context/ThemeContext';
 
 interface CartItem {
   item: StockItem;
@@ -82,6 +78,7 @@ interface ShopLandingViewProps {
   onAddStockItem?: (item: StockItem) => void;
   onDeleteStockItem?: (itemId: string) => void;
   onRecordOrder?: (tx: any) => void;
+  onOpenFieldActions?: () => void;
 }
 
 export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
@@ -98,13 +95,16 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   onAddStockItem,
   onDeleteStockItem,
   onRecordOrder,
+  onOpenFieldActions,
 }) => {
+  const { theme, toggleTheme } = useTheme();
+
   // Live typing search state for customer passbook lookup
   const [searchQuery, setSearchQuery] = useState(
     initialPassbookCardNo ? String(initialPassbookCardNo) : ''
   );
+  const [searchError, setSearchError] = useState<string>('');
   const [selectedMember, setSelectedMember] = useState<CardMember | null>(null);
-  const [passbookSearchError, setPassbookSearchError] = useState('');
   const [showFullPassbookModal, setShowFullPassbookModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   
@@ -131,31 +131,6 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   // Printed Bill state for online orders
   const [activeOrderBill, setActiveOrderBill] = useState<OrderBillData | null>(null);
   const [showOrderBillModal, setShowOrderBillModal] = useState(false);
-
-  // Customer verification & PII protection state for Digital Passbook
-  const [isMemberVerified, setIsMemberVerified] = useState(false);
-  const [verifyLast4Input, setVerifyLast4Input] = useState('');
-  const [verifyError, setVerifyError] = useState('');
-
-  // Unlocked if either Admin is logged in, or customer verified last 4 digits
-  const isUnlocked = isAdminMode || isMemberVerified;
-
-  const handleVerifyOwnership = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMember) return;
-    if (!selectedMember.phone) {
-      setIsMemberVerified(true);
-      setVerifyError('');
-      return;
-    }
-    if (verifyCustomerLast4Digits(selectedMember.phone, verifyLast4Input)) {
-      setIsMemberVerified(true);
-      setVerifyError('');
-      setVerifyLast4Input('');
-    } else {
-      setVerifyError('शेवटचे ४ अंक जुळले नाहीत. कृपया नोंदणीकृत मोबाईलचे शेवटचे ४ अंक तपासा.');
-    }
-  };
 
   useEffect(() => {
     if (isAdminLoggedIn) {
@@ -218,27 +193,17 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
 
     if (match) {
       setSelectedMember(match);
-      setPassbookSearchError('');
     } else {
       setSelectedMember(null);
     }
   }, [searchQuery, cardMembers]);
 
-  // Handle explicit form submit / Enter key on Digital Passbook search
-  const handlePassbookSubmit = (e?: React.FormEvent) => {
+  // Explicit Search / Enter Handler requested by user
+  const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setPassbookSearchError('');
-
-    // Rate-limiting check to protect customer records against scraping
-    const rateCheck = checkSearchRateLimit();
-    if (!rateCheck.allowed) {
-      setPassbookSearchError(rateCheck.message || 'सुरक्षिततेसाठी कृपया काही सेकंद थांबा.');
-      return;
-    }
-
     const q = searchQuery.trim();
     if (!q) {
-      setPassbookSearchError('कृपया आधी तुमचा कार्ड नंबर किंवा १०-अंकी मोबाईल नंबर टाका.');
+      setSearchError('कृपया कार्ड नंबर (उदा. 1001) किंवा मोबाईल नंबर टाका');
       return;
     }
 
@@ -256,27 +221,11 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
     });
 
     if (match) {
-      if (selectedMember?.cardNumber !== match.cardNumber) {
-        setIsMemberVerified(false);
-        setVerifyLast4Input('');
-        setVerifyError('');
-      }
       setSelectedMember(match);
-      setPassbookSearchError('');
-      // If already shown on screen, opening the full passbook modal gives instant satisfaction
-      if (selectedMember && selectedMember.cardNumber === match.cardNumber) {
-        setShowFullPassbookModal(true);
-      } else {
-        setTimeout(() => {
-          const el = document.getElementById('digital-passbook-card');
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 50);
-      }
+      setSearchError('');
+      setShowFullPassbookModal(true);
     } else {
-      setSelectedMember(null);
-      setPassbookSearchError(`कार्ड किंवा मोबाईल नंबर "${q}" सापडला नाही. कृपया नंबर तपासा किंवा 8766486915 वर संपर्क करा.`);
+      setSearchError(`कार्ड / मोबाईल '${q}' साठी नोंद सापडली नाही. कृपया नंबर तपासा.`);
     }
   };
 
@@ -392,7 +341,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       notes: orderNotes.trim(),
     };
 
-    // 1. Record into ERP store transactions if handler provided
+    // Record into ERP store transactions if handler provided
     if (onRecordOrder) {
       const summary = cart.map((ci) => `${ci.item.name} (${ci.quantity})`).join(', ');
       onRecordOrder({
@@ -408,43 +357,10 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       });
     }
 
-    // 2. Play sound chime
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.18);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.5);
-      }
-    } catch (e) {}
-
-    // 3. Dispatch event for real-time notification alert in ERP
-    try {
-      window.dispatchEvent(new CustomEvent('shri_sai_order_placed', { detail: billData }));
-    } catch (e) {}
-
-    // 4. Save to local storage online orders
-    try {
-      const savedOrders = JSON.parse(localStorage.getItem('shri_sai_online_orders') || '[]');
-      localStorage.setItem('shri_sai_online_orders', JSON.stringify([billData, ...savedOrders.slice(0, 19)]));
-    } catch (e) {}
-
     setActiveOrderBill(billData);
     setShowOrderBillModal(true);
     setCart([]);
     setIsCartOpen(false);
-
-    // 5. Automatically forward order to owner's WhatsApp so owner gets immediate notification
-    handlePlaceOrderWhatsApp('8766486915');
   };
 
   // WhatsApp Order Submission (Direct forward)
@@ -510,7 +426,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-[#0B1528] selection:text-white">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-[#0D9488] selection:text-white transition-colors duration-200">
       {/* Top Admin Notice if Admin is Previewing */}
       {isAdminLoggedIn && (
         <div className="bg-slate-900 text-white px-4 py-2 text-xs flex items-center justify-between border-b border-slate-800 no-print">
@@ -546,21 +462,21 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
 
       {/* Primary Unique Header in English */}
       <header className="sticky top-0 z-40 bg-[#0B1528] text-white border-b border-white/10 shadow-lg no-print">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
           {/* Brand Name & Address */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <a href="#top" className="flex items-center gap-2 sm:gap-3 group min-w-0">
+          <div className="flex items-center gap-3">
+            <a href="#top" className="flex items-center gap-3 group">
               <AppLogo size="sm" variant="iconOnly" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="font-extrabold text-white text-xs sm:text-base lg:text-xl tracking-tight group-hover:text-amber-300 transition truncate">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-white text-base sm:text-xl tracking-tight group-hover:text-amber-300 transition">
                     SHRI SAI ENTERPRISES
                   </span>
-                  <span className="hidden md:inline-block px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-bold">
+                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-bold">
                     श्री साई इंटरप्राइजेस
                   </span>
                 </div>
-                <p className="text-[10px] sm:text-[11px] text-slate-300 hidden sm:block truncate max-w-md">
+                <p className="text-[11px] text-slate-300 hidden sm:block truncate max-w-md">
                   Matoshree Sabhagruha Samor, Arvi Road, Punjab Colony, Wardha - 442001
                 </p>
               </div>
@@ -568,16 +484,16 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
           </div>
 
           {/* Header Action Buttons & Cart */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Install App Button */}
             <button
               onClick={() => setShowInstallModal(true)}
-              className="hidden xs:flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-400/10 hover:from-amber-500/30 hover:to-amber-400/20 border border-amber-400/40 text-[11px] sm:text-xs font-bold text-amber-300 transition cursor-pointer shadow-sm animate-pulse"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-400/10 hover:from-amber-500/30 hover:to-amber-400/20 border border-amber-400/40 text-xs font-bold text-amber-300 transition cursor-pointer shadow-sm animate-pulse"
               title="Install Mobile App on Phone"
             >
               <Download className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden sm:inline">इन्स्टॉल ॲप</span>
-              <span className="sm:hidden font-extrabold">ॲप</span>
+              <span className="sm:hidden font-extrabold">ॲप 📥</span>
             </button>
 
             {/* Contact numbers popup button */}
@@ -590,47 +506,73 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
               <span>संपर्क नंबर</span>
             </button>
 
-            {/* Direct WhatsApp Buttons for both 8766486915 & 8600122798 (hidden on small mobile to avoid crowded header) */}
+            {/* Direct WhatsApp Buttons for both 8766486915 & 8600122798 */}
             <a
               href="https://wa.me/918766486915?text=Hello%20Shri%20Sai%20Enterprises"
               target="_blank"
               rel="noreferrer"
-              className="hidden sm:flex px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition items-center gap-1.5 shadow-sm"
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               title="Chat on WhatsApp 1 (8766486915)"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>WA 1</span>
+              <span className="hidden sm:inline">WA 1</span>
             </a>
             <a
               href="https://wa.me/918600122798?text=Hello%20Shri%20Sai%20Enterprises"
               target="_blank"
               rel="noreferrer"
-              className="hidden md:flex px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition items-center gap-1.5 shadow-sm"
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               title="Chat on WhatsApp 2 (8600122798)"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>WA 2</span>
+              <span className="hidden sm:inline">WA 2</span>
             </a>
+
+            {/* Day / Night Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'} Mode`}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-amber-300 transition-colors border border-white/15 cursor-pointer flex items-center justify-center shrink-0"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-300 animate-spin-slow" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-200" />
+              )}
+            </button>
 
             {/* Shopping Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="relative px-3 py-1.5 rounded-lg bg-[#0D9488] hover:bg-[#0f766e] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
               title="Open Shopping Cart"
             >
-              <ShoppingCart className="w-3.5 h-3.5 text-slate-950" />
+              <ShoppingCart className="w-3.5 h-3.5 text-white" />
               <span className="font-extrabold">Cart</span>
               {cartItemsCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#0B1528] text-amber-300 text-[10px] font-mono font-black ml-0.5">
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-300 text-[10px] font-mono font-black ml-0.5">
                   {cartItemsCount}
                 </span>
               )}
             </button>
 
+            {/* Quick Field Staff Actions Button (Fast access for marketing / field collection staff) */}
+            {onOpenFieldActions && (
+              <button
+                onClick={onOpenFieldActions}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95"
+                title="Field Staff Counter: Weekly Collection, New Bill, Receipt & Ledger"
+              >
+                <Zap className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
+                <span>स्टाफ काउंटर</span>
+              </button>
+            )}
+
             {/* Staff & Admin Login */}
             <button
               onClick={onOpenLoginModal}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-white/20 hover:bg-white/10 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg border border-white/20 hover:bg-white/10 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
               title="Staff & Owner Portal Login"
             >
               <Lock className="w-3.5 h-3.5 text-amber-400" />
@@ -670,360 +612,264 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 pb-24 lg:pb-12 overflow-x-hidden">
+      <main className="flex-1">
         {/* HERO SECTION WITH LIVE TYPING PASSBOOK LOOKUP */}
-        <section className="bg-gradient-to-b from-[#0B1528] via-[#102038] to-slate-900 text-white pt-10 pb-12 px-4 sm:px-6 relative overflow-hidden">
-          <div className="max-w-4xl mx-auto text-center space-y-5 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-xs font-bold text-amber-300">
-              <Award className="w-3.5 h-3.5 text-amber-400" />
-              Official Store in Wardha • Digital Passbook & Free Delivery
+        <section className="bg-[#0B1528] text-white pt-8 pb-10 px-4 sm:px-6 relative border-b border-slate-800">
+          <div className="max-w-4xl mx-auto text-center space-y-4 relative z-10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/25 text-xs font-semibold text-teal-300">
+              <Award className="w-3.5 h-3.5 text-teal-400" />
+              <span>अधिकृत इलेक्ट्रॉनिक्स शोरूम • डिजिटल पासबुक • मोफत डिलिव्हरी</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
-              Best Electronics & Home Appliances in Wardha<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
-                श्री साई ३०-महिने साप्ताहिक बचत योजना & सर्व्हिस सेंटर
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white font-marathi">
+              श्री साई एंटरप्रायझेस, वर्धा<br />
+              <span className="text-teal-400 text-xl sm:text-2xl font-bold block mt-1">
+                इलेक्ट्रॉनिक्स, होम अप्लायन्सेस व ३०-महिने बचत योजना
               </span>
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              वर्धा शहरातील विश्वासू इलेक्ट्रॉनिक्स भांडार! कुलर, स्मार्ट LED टीव्ही, फ्रिज, वॉशिंग मशीन, पंखे व वायरिंग साहित्य. खाली तुमचा <strong className="text-amber-300">कार्ड नंबर (उदा. 1001)</strong> किंवा <strong className="text-amber-300">मोबाईल नंबर</strong> टाकताच डिजिटल पासबुक थेट समोर येईल!
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto leading-relaxed font-marathi font-normal">
+              कुलर, स्मार्ट LED टीव्ही, फ्रिज, वॉशिंग मशीन व दर्जेदार वायरिंग साहित्य. खाली तुमचा <strong className="text-teal-300 font-semibold">कार्ड नंबर</strong> किंवा <strong className="text-teal-300 font-semibold">मोबाईल नंबर</strong> टाकून थेट पासबुक तपासा.
             </p>
 
-            {/* LIVE PASSBOOK SEARCH INPUT BOX WITH ENTER OPTION */}
-            <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-2xl max-w-xl mx-auto text-left space-y-2.5">
-              <label className="block text-xs font-bold text-amber-300 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-amber-400" />
-                  Instant Digital Passbook (कार्ड नंबर किंवा मोबाईल टाका)
+            {/* LIVE PASSBOOK SEARCH INPUT BOX WITH ENTER BUTTON */}
+            <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl border border-slate-700/80 shadow-xl max-w-xl mx-auto text-left space-y-2.5">
+              <label className="block text-xs font-semibold text-teal-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-marathi">
+                  <CreditCard className="w-4 h-4 text-teal-400" />
+                  डिजिटल पासबुक शोध (कार्ड नंबर किंवा मोबाईल)
                 </span>
                 {selectedMember && (
                   <span className="text-[11px] text-emerald-400 font-mono font-bold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Found Card #{selectedMember.cardNumber}
+                    <CheckCircle2 className="w-3.5 h-3.5" /> कार्ड सापडले #{selectedMember.cardNumber}
                   </span>
                 )}
               </label>
 
-              <form onSubmit={handlePassbookSubmit} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        if (passbookSearchError) setPassbookSearchError('');
+              <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSearchError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchSubmit();
+                      }
+                    }}
+                    placeholder="उदा. 1001 किंवा 10-अंकी मोबाईल नंबर..."
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white text-slate-900 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D9488] shadow-inner"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSelectedMember(null);
+                        setSearchError('');
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handlePassbookSubmit(e);
-                        }
-                      }}
-                      placeholder="कार्ड नंबर (उदा. 1001, 2001) किंवा 10-अंकी मोबाईल..."
-                      className="w-full pl-10 pr-10 py-3 rounded-xl bg-white text-slate-900 text-sm font-bold placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-inner"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedMember(null);
-                          setPassbookSearchError('');
-                        }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        title="Clear"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* PROMINENT ENTER / SUBMIT BUTTON */}
-                  <button
-                    type="submit"
-                    className="px-4 sm:px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-sm transition flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer active:scale-95"
-                    title="पासबुक शोधा किंवा कीबोर्डवर Enter दाबा"
-                  >
-                    <span>Enter</span>
-                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                  </button>
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
-                {passbookSearchError && (
-                  <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-semibold flex items-center gap-2 animate-fade-in">
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>{passbookSearchError}</span>
-                  </div>
-                )}
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-[#0D9488] hover:bg-[#0f766e] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer shrink-0"
+                >
+                  <BookOpen className="w-4 h-4 text-white" />
+                  <span>पासबुक उघडा</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </form>
 
-              <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-300 pt-0.5 gap-2">
-                <span>
-                  सॅम्पल कार्ड्स:{' '}
-                  <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('1001'); }}>1001</strong>,{' '}
-                  <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('1002'); }}>1002</strong>,{' '}
-                  <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('2001'); }}>2001</strong>
-                </span>
-                <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                  ⚡ नंबर टाकून <strong>Enter</strong> दाबा
-                </span>
+              {/* Validation message if card not found */}
+              {searchError && (
+                <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs flex items-center gap-2 animate-shake">
+                  <AlertCircle className="w-4 h-4 text-rose-300 shrink-0" />
+                  <span>{searchError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1">
+                <span>उदा. कार्ड नंबर तपासा: <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('1001'); setSearchError(''); }}>1001</strong>, <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('1002'); setSearchError(''); }}>1002</strong>, <strong className="text-amber-300 cursor-pointer hover:underline" onClick={() => { setSearchQuery('2001'); setSearchError(''); }}>2001</strong></span>
+                <span className="text-emerald-400 font-semibold">⚡ थेट लाइव्ह पासबुक</span>
               </div>
             </div>
 
-            {/* INSTANT MINIMAL & ANIMATED PASSBOOK CARD (APPEARS AS USER TYPES OR HITS ENTER) */}
-            <AnimatePresence mode="wait">
-              {selectedMember && (
-                <motion.div
-                  key={`passbook-${selectedMember.cardNumber}`}
-                  initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -12, scale: 0.98 }}
-                  transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-                  id="digital-passbook-card"
-                  className="max-w-2xl mx-auto text-left bg-white text-slate-900 rounded-3xl p-5 sm:p-6 shadow-2xl border border-amber-300/40 space-y-5 scroll-mt-24 relative overflow-hidden"
-                >
-                  {/* Top Member Card Banner */}
-                  <div className="bg-gradient-to-r from-[#0B1528] to-[#1E3A8A] text-white p-4 sm:p-5 rounded-2xl border border-white/15 relative overflow-hidden shadow-md">
-                    <div className="absolute right-3 top-3 opacity-10 pointer-events-none">
-                      <Store className="w-32 h-32" />
-                    </div>
-                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-mono font-black text-xs uppercase">
-                            CARD #{selectedMember.cardNumber}
-                          </span>
-                          <span className="text-xs text-slate-300 font-medium">
-                            {selectedMember.schemeName}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-slate-200 border border-white/20 text-[10px] font-semibold">
-                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                            {isUnlocked ? 'Verified Access' : 'Protected PII'}
-                          </span>
-                        </div>
-                        <h3 className="text-lg sm:text-xl font-extrabold text-white mt-1">
-                          {selectedMember.customerName}
-                        </h3>
-                        <p className="text-xs text-slate-300 font-mono mt-0.5 flex flex-wrap items-center gap-2">
-                          <span>📞 {maskPhoneNumber(selectedMember.phone, isUnlocked)}</span>
-                          <span>•</span>
-                          <span>📍 {maskAddress(selectedMember.address, selectedMember.village, isUnlocked)}</span>
-                        </p>
-                      </div>
-
-                      <div className="text-left sm:text-right">
-                        <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold text-xs">
-                          ● {selectedMember.status} Member
+            {/* INSTANT MINIMAL & INTERESTING PASSBOOK CARD (APPEARS AS USER TYPES) */}
+            {selectedMember && (
+              <div className="max-w-2xl mx-auto text-left bg-white text-slate-900 rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-300/40 animate-fade-in space-y-5">
+                {/* Top Member Card Banner */}
+                <div className="bg-gradient-to-r from-[#0B1528] to-[#1E3A8A] text-white p-4 sm:p-5 rounded-xl border border-white/15 relative overflow-hidden shadow-md">
+                  <div className="absolute right-3 top-3 opacity-10 pointer-events-none">
+                    <Store className="w-32 h-32" />
+                  </div>
+                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-mono font-black text-xs uppercase">
+                          CARD #{selectedMember.cardNumber}
                         </span>
-                        <p className="text-[11px] text-amber-300 font-semibold mt-1">
-                          🎁 Eligible for Weekly Lucky Draw
-                        </p>
+                        <span className="text-xs text-slate-300 font-medium">
+                          {selectedMember.schemeName}
+                        </span>
                       </div>
+                      <h3 className="text-lg sm:text-xl font-extrabold text-white mt-1">
+                        {selectedMember.customerName}
+                      </h3>
+                      <p className="text-xs text-slate-300 font-mono mt-0.5">
+                        📞 {selectedMember.phone || 'Phone not registered'} • {selectedMember.village || 'Wardha'}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold text-xs">
+                        ● {selectedMember.status} Member
+                      </span>
+                      <p className="text-[11px] text-amber-300 font-semibold mt-1">
+                        🎁 Eligible for Weekly Lucky Draw
+                      </p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Customer Ownership & Privacy Shield Unlock Box */}
-                  {!isUnlocked ? (
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-3.5 sm:p-4 text-xs space-y-2.5">
-                      <div className="flex items-start gap-2.5">
-                        <div className="p-2 rounded-xl bg-amber-100 text-amber-900 shrink-0">
-                          <Lock className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                            <span>ग्राहक सुरक्षा व गोपनीयता (PII Protected)</span>
-                            <span className="px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 text-[10px] uppercase font-mono">
-                              Private
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 mt-0.5">
-                            तुमची खाजगी माहिती इतर कोणासही दिसू नये म्हणून फोन व पत्ता सुरक्षित ठेवला आहे. तुमचे संपूर्ण स्टेटमेंट अनलॉक करण्यासाठी नोंदणीकृत मोबाईलचे शेवटचे ४ अंक टाका:
-                          </p>
-                        </div>
-                      </div>
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <span className="text-slate-500 text-[11px] block">Total Deposited</span>
+                    <span className="text-base sm:text-lg font-black text-emerald-700 font-mono">
+                      ₹{selectedMember.totalDeposited.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <span className="text-slate-500 text-[11px] block">Installments Paid</span>
+                    <span className="text-base sm:text-lg font-black text-blue-700 font-mono">
+                      {memberTransactions.length} Weeks
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <span className="text-slate-500 text-[11px] block">Weekly Amount</span>
+                    <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
+                      ₹500 / week
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <span className="text-slate-500 text-[11px] block">Passbook Status</span>
+                    <span className="text-base sm:text-lg font-black text-emerald-600">
+                      Verified ✓
+                    </span>
+                  </div>
+                </div>
 
-                      <form onSubmit={handleVerifyOwnership} className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200/50">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-bold text-slate-700">
-                            मोबाईलचे शेवटचे ४ अंक:
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={4}
-                            value={verifyLast4Input}
-                            onChange={(e) => {
-                              setVerifyLast4Input(e.target.value.replace(/[^0-9]/g, ''));
-                              if (verifyError) setVerifyError('');
-                            }}
-                            placeholder="उदा. 1030"
-                            className="w-24 px-2.5 py-1.5 rounded-lg bg-white border border-amber-300 text-center font-mono font-black text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-inner"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          className="px-3.5 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 active:scale-95 text-white font-bold text-xs cursor-pointer transition flex items-center gap-1.5 shadow-xs"
+                {/* 52-WEEK PROGRESS VISUAL MATRIX */}
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                      52-Week Progress Tracker (साप्ताहिक हप्ते ट्रॅकर)
+                    </span>
+                    <span className="text-slate-600 font-mono font-semibold">
+                      {memberTransactions.length} / 52 Completed
+                    </span>
+                  </div>
+
+                  {/* Visual micro-pills for 52 weeks */}
+                  <div className="grid grid-cols-13 gap-1 pt-1">
+                    {Array.from({ length: 52 }).map((_, idx) => {
+                      const weekNo = idx + 1;
+                      const isPaid = weekNo <= memberTransactions.length;
+                      return (
+                        <div
+                          key={weekNo}
+                          title={`Week ${weekNo}: ${isPaid ? 'PAID ✓' : 'Upcoming'}`}
+                          className={`h-5 rounded flex items-center justify-center text-[9px] font-mono font-bold transition ${
+                            isPaid
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-slate-200 text-slate-400'
+                          }`}
                         >
-                          <Unlock className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Unlock Full Statement</span>
-                        </button>
-                      </form>
-                      {verifyError && (
-                        <p className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {verifyError}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>ग्राहक पडताळणी पूर्ण • संपूर्ण डिजिटल पासबुक व पावत्या अनलॉक झाल्या आहेत.</span>
-                      </span>
-                      {!isAdminMode && (
-                        <button
-                          type="button"
-                          onClick={() => setIsMemberVerified(false)}
-                          className="text-[11px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                        >
-                          Lock Again
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Key Metrics Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 text-[11px] block">Total Deposited</span>
-                      <span className="text-base sm:text-lg font-black text-emerald-700 font-mono">
-                        ₹{selectedMember.totalDeposited.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 text-[11px] block">Installments Paid</span>
-                      <span className="text-base sm:text-lg font-black text-blue-700 font-mono">
-                        {memberTransactions.length} Weeks
-                      </span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 text-[11px] block">Weekly Amount</span>
-                      <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
-                        ₹500 / week
-                      </span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <span className="text-slate-500 text-[11px] block">Passbook Status</span>
-                      <span className="text-base sm:text-lg font-black text-emerald-600">
-                        Verified ✓
-                      </span>
-                    </div>
+                          {weekNo}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {/* 52-WEEK PROGRESS VISUAL MATRIX */}
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        52-Week Progress Tracker (साप्ताहिक हप्ते ट्रॅकर)
-                      </span>
-                      <span className="text-slate-600 font-mono font-semibold">
-                        {memberTransactions.length} / 52 Completed
-                      </span>
-                    </div>
-
-                    {/* Visual micro-pills for 52 weeks */}
-                    <div className="grid grid-cols-13 gap-1 pt-1">
-                      {Array.from({ length: 52 }).map((_, idx) => {
-                        const weekNo = idx + 1;
-                        const isPaid = weekNo <= memberTransactions.length;
-                        return (
-                          <div
-                            key={weekNo}
-                            title={`Week ${weekNo}: ${isPaid ? 'PAID ✓' : 'Upcoming'}`}
-                            className={`h-5 rounded flex items-center justify-center text-[9px] font-mono font-bold transition ${
-                              isPaid
-                                ? 'bg-emerald-600 text-white shadow-2xs'
-                                : 'bg-slate-200 text-slate-400'
-                            }`}
-                          >
-                            {weekNo}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded bg-emerald-600"></span> हप्ता भरला (Paid)
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2.5 h-2.5 rounded bg-slate-200"></span> आगामी हप्ते (Upcoming)
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded bg-emerald-600"></span> हप्ता भरला (Paid)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded bg-slate-200"></span> आगामी हप्ते (Upcoming)
+                    </span>
                   </div>
+                </div>
 
-                  {/* Recent Receipts List */}
-                  {memberTransactions.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-xs font-bold text-slate-700 block">Recent Payment Receipts:</span>
-                      <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
-                        <table className="w-full text-left">
-                          <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
-                            <tr>
-                              <th className="py-2 px-3">Receipt No</th>
-                              <th className="py-2 px-3">Date</th>
-                              <th className="py-2 px-3">Type</th>
-                              <th className="py-2 px-3 text-right">Amount (₹)</th>
+                {/* Recent Receipts List */}
+                {memberTransactions.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-slate-700 block">Recent Payment Receipts:</span>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="py-2 px-3">Receipt No</th>
+                            <th className="py-2 px-3">Date</th>
+                            <th className="py-2 px-3">Type</th>
+                            <th className="py-2 px-3 text-right">Amount (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-mono">
+                          {memberTransactions.slice(-4).map((tx) => (
+                            <tr key={tx.id} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 font-semibold text-slate-900">{tx.receiptNo}</td>
+                              <td className="py-2 px-3 text-slate-600">{tx.date}</td>
+                              <td className="py-2 px-3">
+                                <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-sans font-semibold">
+                                  {tx.paymentMode}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right font-bold text-emerald-600">
+                                ₹{tx.amount.toLocaleString()}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-mono">
-                            {memberTransactions.slice(-4).map((tx) => (
-                              <tr key={tx.id} className="hover:bg-slate-50">
-                                <td className="py-2 px-3 font-semibold text-slate-900">{tx.receiptNo}</td>
-                                <td className="py-2 px-3 text-slate-600">{tx.date}</td>
-                                <td className="py-2 px-3">
-                                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-sans font-semibold">
-                                    {tx.paymentMode}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 text-right font-bold text-emerald-600">
-                                  ₹{tx.amount.toLocaleString()}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Passbook Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
-                    <div className="text-[11px] text-slate-500">
-                      Verified Digital Record from ShriSaiEnt.in
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSharePassbook(selectedMember)}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                        WhatsApp Share
-                      </button>
-                      <button
-                        onClick={() => setShowFullPassbookModal(true)}
-                        className="px-3.5 py-1.5 rounded-lg bg-[#0B1528] hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-amber-400" />
-                        Print Official Slip
-                      </button>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+
+                {/* Passbook Action Buttons */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                  <div className="text-[11px] text-slate-500">
+                    Verified Digital Record from ShriSaiEnt.in
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSharePassbook(selectedMember)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      WhatsApp Share
+                    </button>
+                    <button
+                      onClick={() => setShowFullPassbookModal(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-[#0B1528] hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-amber-400" />
+                      Print Official Slip
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1096,10 +942,10 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
                   selectedCategory === cat
-                    ? 'bg-[#0B1528] text-amber-300 shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                    ? 'bg-[#0D9488] text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
                 }`}
               >
                 {cat === 'all' ? 'All Products' : cat}
@@ -1110,14 +956,13 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
           {/* Stock Items Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredStock.map((item) => (
-              <motion.div
+              <div
                 key={item.id}
-                whileHover={{ y: -4, transition: { duration: 0.18 } }}
-                className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow group relative"
+                className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition group relative"
               >
                 <div>
                   {/* Product Photo */}
-                  <div className="w-full h-48 rounded-xl overflow-hidden bg-slate-100 mb-3 relative flex items-center justify-center border border-slate-100">
+                  <div className="w-full h-48 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3 relative flex items-center justify-center border border-slate-100 dark:border-slate-700">
                     {item.imageUrl ? (
                       <img
                         src={item.imageUrl}
@@ -1127,7 +972,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-slate-400 gap-1.5 p-4 text-center">
-                        <Tv className="w-10 h-10 text-slate-300" />
+                        <Tv className="w-10 h-10 text-slate-300 dark:text-slate-600" />
                         <span className="text-[11px] font-medium text-slate-400">{item.category}</span>
                       </div>
                     )}
@@ -1140,10 +985,10 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                           setEditingStockItem(item);
                           setIsProductEditModalOpen(true);
                         }}
-                        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-900 text-amber-300 text-[11px] font-bold backdrop-blur-xs flex items-center gap-1 shadow-md transition cursor-pointer"
+                        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-900 text-teal-300 text-[11px] font-bold backdrop-blur-xs flex items-center gap-1 shadow-md transition cursor-pointer"
                         title="किंमत व फोटो बदला"
                       >
-                        <Edit3 className="w-3 h-3 text-amber-400" />
+                        <Edit3 className="w-3 h-3 text-teal-300" />
                         किंमत/फोटो बदला
                       </button>
                     )}
@@ -1152,20 +997,20 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                   {/* Badges & Code */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono font-medium">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono font-medium">
                         {item.code}
                       </span>
-                      <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-500" /> In Stock ({item.quantity} {item.unit})
                       </span>
                     </div>
 
                     <div>
-                      <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition leading-snug line-clamp-2">
+                      <h3 className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-[#0D9488] transition leading-snug line-clamp-2">
                         {item.name}
                       </h3>
                       {item.description && (
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                           {item.description}
                         </p>
                       )}
@@ -1173,15 +1018,15 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-4 mt-3 border-t border-slate-100 space-y-3">
+                <div className="pt-4 mt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
                   <div className="flex items-baseline justify-between">
                     <div>
                       <span className="text-[10px] text-slate-400 block font-medium">किंमत (Retail Price):</span>
-                      <span className="text-xl font-black text-slate-900 font-mono">
+                      <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
                         ₹{item.sellingPrice.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
                       Genuine Warranty
                     </span>
                   </div>
@@ -1193,9 +1038,9 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                         setEditingStockItem(item);
                         setIsProductEditModalOpen(true);
                       }}
-                      className="w-full py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-1.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                      <Edit3 className="w-3.5 h-3.5 text-teal-600" />
                       किंमत व फोटो बदला (Set Price & Photo)
                     </button>
                   )}
@@ -1203,7 +1048,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
                       onClick={() => addToCart(item)}
-                      className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                      className="w-full py-2 rounded-xl bg-[#0D9488] hover:bg-[#0f766e] text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add to Cart
@@ -1212,7 +1057,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                       href={getDirectWhatsAppItemLink(item, '8766486915')}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-full py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      className="w-full py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition flex items-center justify-center gap-1 cursor-pointer"
                       title="WhatsApp वर चौकशी करा"
                     >
                       <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
@@ -1220,60 +1065,59 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                     </a>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </section>
 
         {/* 30-MONTH SAVINGS SCHEMES SECTION */}
-        <section id="savings-schemes" className="bg-slate-100 py-12 px-4 sm:px-6 border-y border-slate-200">
+        <section id="savings-schemes" className="bg-slate-50 dark:bg-[#0c1427] py-12 px-4 sm:px-6 border-y border-slate-200 dark:border-slate-800">
           <div className="max-w-7xl mx-auto space-y-8">
             <div className="text-center max-w-2xl mx-auto space-y-2">
-              <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">
-                Weekly Savings & Lucky Draw Scheme
+              <span className="text-xs font-semibold text-[#0D9488] uppercase tracking-wider">
+                साप्ताहिक बचत व लकी ड्रॉ योजना
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight font-marathi">
                 श्री साई ३०-महिने साप्ताहिक बचत योजना 1, 2, 3
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                प्रत्येक आठवड्याला छोटी बचत करा आणि ३० महिन्यांत आपल्या पसंतीचे घरगुती इलेक्ट्रॉनिक्स उपकरणे मिळवा!
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-marathi">
+                प्रत्येक आठवड्याला नियमित छोटी बचत करा आणि ३० महिन्यांत खात्रीशीर आपल्या पसंतीचे दर्जेदार इलेक्ट्रॉनिक्स उपकरणे मिळवा.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {SCHEMES_CONFIG.map((sc, idx) => (
-                <motion.div
+                <div
                   key={sc.id}
-                  whileHover={{ y: -4, transition: { duration: 0.18 } }}
-                  className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-blue-300 hover:shadow-md transition group"
+                  className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-teal-500/50 transition"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-mono font-bold text-xs">
+                      <span className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-mono font-bold text-xs">
                         {sc.code}
                       </span>
-                      <span className="text-xs text-amber-600 font-bold">
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-bold font-marathi">
                         योजना क्र. {idx + 1}
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-black text-slate-900">{sc.name}</h3>
-                    <p className="text-xs text-slate-600 leading-relaxed">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white font-marathi">{sc.name}</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                       {sc.description}
                     </p>
 
-                    <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-1.5 border border-slate-100 font-mono">
-                      <div className="flex justify-between text-slate-600">
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-xs space-y-1.5 border border-slate-100 dark:border-slate-700 font-mono">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
                         <span>Card Range:</span>
-                        <span className="font-bold text-slate-900">{sc.startCardNo} - {sc.endCardNo}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{sc.startCardNo} - {sc.endCardNo}</span>
                       </div>
-                      <div className="flex justify-between text-slate-600">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
                         <span>Registration Fee:</span>
-                        <span className="font-bold text-slate-900">₹{sc.registrationFee} (One Time)</span>
+                        <span className="font-bold text-slate-900 dark:text-white">₹{sc.registrationFee} (One Time)</span>
                       </div>
-                      <div className="flex justify-between text-slate-600">
+                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
                         <span>कालावधी (Tenure):</span>
-                        <span className="font-bold text-slate-900">३० महिने (130 Weeks)</span>
+                        <span className="font-bold text-slate-900 dark:text-white font-marathi">३० महिने (130 Weeks)</span>
                       </div>
                     </div>
                   </div>
@@ -1285,7 +1129,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                       )}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs"
+                      className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                       title="WhatsApp 1 (8766486915)"
                     >
                       <MessageCircle className="w-3.5 h-3.5" />
@@ -1297,14 +1141,14 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                       )}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs"
+                      className="py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                       title="WhatsApp 2 (8600122798)"
                     >
                       <MessageCircle className="w-3.5 h-3.5" />
                       WA 8600122798
                     </a>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>
@@ -1430,259 +1274,243 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
         </div>
       </footer>
 
-      {/* CLEAN & MINIMAL SHOPPING CART MODAL */}
+      {/* SHOPPING CART MODAL / DRAWER */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh] animate-fade-in">
-            {/* Minimal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <ShoppingCart className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">तुमची कार्ट (Cart)</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    {cartItemsCount} {cartItemsCount === 1 ? 'वस्तू' : 'वस्तू'}
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
+            {/* Cart Header */}
+            <div className="bg-[#0F172A] text-white px-5 py-4 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-[#0D9488]" />
+                <h3 className="font-bold text-base text-white">Your Shopping Cart</h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#0D9488] text-white text-xs font-black">
+                  {cartItemsCount}
+                </span>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
-                title="बंद करा"
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Cart Content */}
-            {cart.length === 0 ? (
-              <div className="p-8 text-center space-y-3 flex-1 flex flex-col items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-slate-400" />
+            {/* Cart Items List */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4 text-slate-800 dark:text-slate-200">
+              {cart.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-3">
+                  <ShoppingCart className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600" />
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Your cart is empty</p>
+                  <p className="text-xs text-slate-500">Browse the products below and click "Add to Cart" to start.</p>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800">तुमची कार्ट रिकामी आहे</p>
-                  <p className="text-xs text-slate-400 mt-0.5">खालील उत्पादने पाहून "Add to Cart" वर क्लिक करा.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    const el = document.getElementById('products');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="mt-1 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
-                >
-                  उत्पादने पहा (Browse Products)
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-y-auto flex-1">
-                {/* Minimal Item Rows */}
-                <div className="divide-y divide-slate-100 px-5">
-                  {cart.map(({ item, quantity }) => (
-                    <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-11 h-11 rounded-xl bg-slate-50 overflow-hidden shrink-0 border border-slate-200/70 flex items-center justify-center">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Tv className="w-5 h-5 text-slate-400" />
-                          )}
+              ) : (
+                <>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {cart.map(({ item, quantity }) => (
+                      <div key={item.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Tv className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="truncate">
+                            <h4 className="font-bold text-slate-900 dark:text-white truncate">{item.name}</h4>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                              ₹{item.sellingPrice.toLocaleString()} each
+                            </span>
+                            {isAdminMode && (
+                              <button
+                                onClick={() => {
+                                  setEditingStockItem(item);
+                                  setIsProductEditModalOpen(true);
+                                }}
+                                className="block text-[10px] text-teal-600 dark:text-teal-400 font-bold hover:underline"
+                              >
+                                ✏️ किंमत/फोटो बदला
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-slate-800 truncate text-xs">{item.name}</h4>
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            ₹{item.sellingPrice.toLocaleString()}
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-800">
+                            <button
+                              onClick={() => updateQuantity(item.id, -1)}
+                              className="px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold transition cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="px-2.5 py-1 font-mono font-bold text-slate-900 dark:text-white">
+                              {quantity}
+                            </span>
+                            <button
+                              onClick={() => updateQuantity(item.id, 1)}
+                              className="px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold transition cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          <span className="font-mono font-bold text-slate-900 dark:text-white min-w-16 text-right">
+                            ₹{(item.sellingPrice * quantity).toLocaleString()}
                           </span>
+
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-
-                      {/* Stepper & Total */}
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <div className="inline-flex items-center rounded-lg bg-slate-100 p-0.5">
-                          <button
-                            onClick={() => updateQuantity(item.id, -1)}
-                            className="w-5 h-5 rounded hover:bg-white text-slate-600 flex items-center justify-center transition cursor-pointer"
-                            title="कमी करा"
-                          >
-                            <Minus className="w-2.5 h-2.5" />
-                          </button>
-                          <span className="w-5 text-center text-[11px] font-mono font-bold text-slate-900">
-                            {quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.id, 1)}
-                            className="w-5 h-5 rounded hover:bg-white text-slate-600 flex items-center justify-center transition cursor-pointer"
-                            title="वाढवा"
-                          >
-                            <Plus className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-
-                        <span className="font-mono font-bold text-slate-900 text-xs min-w-14 text-right">
-                          ₹{(item.sellingPrice * quantity).toLocaleString()}
-                        </span>
-
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-slate-300 hover:text-rose-500 transition p-1 cursor-pointer"
-                          title="काढून टाका"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Minimal Delivery Selection */}
-                <div className="px-5 py-3 bg-slate-50/70 border-y border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-600 font-medium flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5 text-slate-400" />
-                      डिलिव्हरी:
-                    </span>
-                    <div className="inline-flex rounded-lg bg-slate-200/80 p-0.5 text-xs font-medium">
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryType('local')}
-                        className={`px-2.5 py-1 rounded-md transition cursor-pointer text-xs ${
-                          deliveryType === 'local' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        📍 वर्धा शहर
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryType('outer')}
-                        className={`px-2.5 py-1 rounded-md transition cursor-pointer text-xs ${
-                          deliveryType === 'outer' ? 'bg-white text-slate-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        🚚 इतर गावे (+₹{delivery.outerDeliveryFee})
-                      </button>
-                    </div>
+                    ))}
                   </div>
 
-                  <div className="text-[11px]">
+                  {/* Delivery Location & Free Delivery Banner */}
+                  <div className="bg-slate-50 dark:bg-slate-850 rounded-xl p-3 border border-slate-200 dark:border-slate-750 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">Delivery Destination:</span>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="deliveryType"
+                            checked={deliveryType === 'local'}
+                            onChange={() => setDeliveryType('local')}
+                            className="text-[#0D9488]"
+                          />
+                          <span>Wardha City</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="deliveryType"
+                            checked={deliveryType === 'outer'}
+                            onChange={() => setDeliveryType('outer')}
+                            className="text-[#0D9488]"
+                          />
+                          <span>Surrounding Village</span>
+                        </label>
+                      </div>
+                    </div>
+
                     {isFreeDelivery ? (
-                      <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        ₹{delivery.freeDeliveryMinAmount.toLocaleString()} पेक्षा जास्त खरेदीवर मोफत डिलिव्हरी लागू!
-                      </span>
+                      <div className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 p-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>🎉 FREE HOME DELIVERY APPLIED! (Order over ₹{delivery.freeDeliveryMinAmount.toLocaleString()})</span>
+                      </div>
                     ) : (
-                      <span className="text-slate-400">
-                        आणखी ₹{(delivery.freeDeliveryMinAmount - cartSubtotal).toLocaleString()} ची खरेदी करा व मोफत डिलिव्हरी मिळवा
-                      </span>
+                      <div className="text-[11px] text-slate-500">
+                        Add ₹{(delivery.freeDeliveryMinAmount - cartSubtotal).toLocaleString()} more for FREE Delivery!
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* Minimal Customer Form */}
-                <div className="px-5 py-3 space-y-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <input
-                      type="text"
-                      placeholder="तुमचे नाव (Full Name)"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 placeholder:text-slate-400"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="WhatsApp / मोबाइल नंबर"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 placeholder:text-slate-400 font-mono"
-                    />
+                  {/* Customer Checkout Form */}
+                  <div className="space-y-2 pt-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 font-marathi">ग्राहक माहिती (Customer Details):</span>
+                      <span className="text-[10px] text-teal-700 dark:text-teal-400 font-semibold font-marathi">📲 छापील बिल WhatsApp वर मिळेल</span>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block mb-0.5 font-marathi">पूर्ण नाव (Full Name):</label>
+                      <input
+                        type="text"
+                        placeholder="उदा. रमेश पाटील"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0D9488]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block mb-0.5 font-marathi">WhatsApp / मोबाईल नंबर:</label>
+                      <input
+                        type="tel"
+                        placeholder="उदा. 9876543210"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0D9488] font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block mb-0.5 font-marathi">डिलिव्हरी पत्ता / गाव:</label>
+                      <input
+                        type="text"
+                        placeholder="उदा. शिवाजी नगर, वर्धा / सावंगी"
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0D9488]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 block mb-0.5 font-marathi">विशेष नोंद (Order Notes - Optional):</label>
+                      <input
+                        type="text"
+                        placeholder="उदा. दुपारी डिलिव्हरी करावी"
+                        value={orderNotes}
+                        onChange={(e) => setOrderNotes(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0D9488] text-xs"
+                      />
+                    </div>
                   </div>
+                </>
+              )}
+            </div>
 
-                  <input
-                    type="text"
-                    placeholder="डिलिव्हरी पत्ता / गाव (Address / Village)"
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Minimal Summary & Confirm */}
+            {/* Cart Footer Total & Checkout */}
             {cart.length > 0 && (
-              <div className="p-5 bg-white border-t border-slate-100 space-y-3 shrink-0">
+              <div className="bg-slate-50 dark:bg-slate-900/90 p-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-slate-500">
-                    <span>किंमत (Subtotal):</span>
-                    <span className="font-mono text-slate-800">₹{cartSubtotal.toLocaleString()}</span>
+                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Items Subtotal:</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">₹{cartSubtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-slate-500">
-                    <span>डिलिव्हरी (Delivery):</span>
-                    <span className={`font-mono ${isFreeDelivery ? 'text-emerald-700 font-bold' : 'text-slate-800'}`}>
-                      {isFreeDelivery ? 'मोफत (Free)' : `₹${currentDeliveryFee}`}
+                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Delivery Charge:</span>
+                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      {isFreeDelivery ? 'FREE' : `₹${currentDeliveryFee}`}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm font-bold text-slate-900 pt-1.5 border-t border-slate-100">
-                    <span>एकूण देय (Grand Total):</span>
-                    <span className="font-mono text-base font-black text-slate-950">₹{cartGrandTotal.toLocaleString()}</span>
+                  <div className="flex justify-between text-sm font-black text-slate-900 dark:text-white pt-1 border-t border-slate-200 dark:border-slate-800">
+                    <span>Total Payable:</span>
+                    <span className="font-mono text-base text-[#0D9488] font-black">₹{cartGrandTotal.toLocaleString()}</span>
                   </div>
                 </div>
 
-                {/* Dominant Primary Action Button */}
+                {/* Primary Action: Confirm Order & Open Printed Bill */}
                 <button
                   onClick={handlePlaceOrderAndGenerateBill}
-                  className="w-full py-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm cursor-pointer active:scale-[0.99]"
+                  className="w-full py-3 rounded-xl bg-[#0D9488] hover:bg-[#0f766e] text-white font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
                 >
-                  <FileText className="w-4 h-4 text-amber-400" />
-                  <span>ऑर्डर निश्चित करा व बिल मिळवा (Confirm Order)</span>
+                  <FileText className="w-4 h-4 text-white" />
+                  <span className="font-marathi">ऑर्डर निश्चित करा व बिल मिळवा (Confirm & Get Bill)</span>
                 </button>
 
-                {/* Direct WhatsApp Option */}
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>WhatsApp वर पाठवा:</span>
+                {/* WhatsApp Direct Forwarding Options */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
                   <button
                     onClick={() => handlePlaceOrderWhatsApp('8766486915')}
-                    className="font-bold text-emerald-700 hover:underline cursor-pointer"
+                    className="py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                    title="दुकान WhatsApp 1 वर ऑर्डर पाठवा"
                   >
-                    8766486915
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WA 1 (8766486915)
                   </button>
-                  <span>•</span>
                   <button
                     onClick={() => handlePlaceOrderWhatsApp('8600122798')}
-                    className="font-bold text-emerald-700 hover:underline cursor-pointer"
+                    className="py-2 px-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                    title="दुकान WhatsApp 2 वर ऑर्डर पाठवा"
                   >
-                    8600122798
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WA 2 (8600122798)
                   </button>
                 </div>
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* SLEEK FLOATING CART PILL WHEN CART HAS ITEMS */}
-      {cartItemsCount > 0 && !isCartOpen && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 animate-fade-in no-print">
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-slate-950 hover:bg-slate-900 text-white shadow-xl border border-white/10 transition cursor-pointer group active:scale-95"
-            title="कार्ट उघडा"
-          >
-            <div className="relative">
-              <ShoppingCart className="w-4 h-4 text-amber-400" />
-              <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black flex items-center justify-center font-mono">
-                {cartItemsCount}
-              </span>
-            </div>
-            <div className="text-xs font-medium border-l border-white/20 pl-2.5 flex items-center gap-1.5">
-              <span className="font-bold text-amber-300 font-mono">₹{cartGrandTotal.toLocaleString()}</span>
-              <span className="text-slate-300 hidden sm:inline">• कार्ट उघडा</span>
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
-          </button>
         </div>
       )}
 
@@ -1748,15 +1576,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] block">PHONE / मोबाइल:</span>
-                  <span className="font-semibold text-slate-800">{maskPhoneNumber(selectedMember.phone, isUnlocked)}</span>
-                </div>
-                <div className="col-span-2 border-t border-slate-200/60 pt-1 text-[11px] font-sans flex items-center justify-between">
-                  <span className="text-slate-500">गाव / पत्ता: {maskAddress(selectedMember.address, selectedMember.village, isUnlocked)}</span>
-                  {!isUnlocked && (
-                    <span className="text-amber-700 font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-amber-600" /> PII Masked
-                    </span>
-                  )}
+                  <span className="font-semibold text-slate-800">{selectedMember.phone || 'N/A'}</span>
                 </div>
               </div>
 
@@ -2023,6 +1843,18 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
             <Download className="w-5 h-5 mb-0.5 animate-bounce" />
             <span className="font-bold">ॲप 📥</span>
           </button>
+
+          {/* Field Staff Quick Counter */}
+          {onOpenFieldActions && (
+            <button
+              onClick={onOpenFieldActions}
+              className="flex flex-col items-center justify-center p-1 rounded-xl text-amber-400 hover:text-amber-300 transition cursor-pointer"
+              title="Field Staff Quick Actions"
+            >
+              <Zap className="w-5 h-5 mb-0.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span className="font-extrabold text-amber-300 text-[9px]">स्टाफ</span>
+            </button>
+          )}
 
           {/* Staff Login */}
           <button

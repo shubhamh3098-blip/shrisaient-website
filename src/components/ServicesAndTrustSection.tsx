@@ -243,15 +243,15 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
       {/* 1. SERVICES & PRICING / QUOTATION SECTION */}
       <section id="services" className="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
-            आमच्या अधिकृत सेवा व दरपत्रक (Verified Services in Wardha)
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[#0D9488] dark:text-teal-300 text-xs font-semibold uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
+            <span className="font-marathi">आमच्या अधिकृत सेवा व दरपत्रक (Verified Services in Wardha)</span>
           </div>
-          <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            Best Enterprise Services in Wardha, Maharashtra
+          <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight font-marathi">
+            श्री साई एंटरप्रायझेस, वर्धा - प्रमुख सेवा
           </h2>
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            श्री साई इंटरप्राइजेस - घरगुती इलेक्ट्रॉनिक्स विक्री, ३०-महिने साप्ताहिक बचत योजना, वायरिंग व रिपेअरिंगची विश्वासू सेवा.
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-marathi">
+            घरगुती इलेक्ट्रॉनिक्स विक्री, ३०-महिने साप्ताहिक बचत योजना, कन्सिल्ड वायरिंग व सर्व्हिसिंगची खात्रीशीर सेवा.
           </p>
         </div>
 
@@ -262,41 +262,41 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
             return (
               <div
                 key={srv.id}
-                className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:shadow-xl hover:border-blue-300 transition-all duration-300 flex flex-col justify-between group"
+                className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-6 shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col justify-between group"
               >
                 <div className="space-y-4">
                   {/* Header with Icon & Category */}
                   <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300 shadow-xs">
+                    <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/50 text-[#0D9488] dark:text-teal-300 flex items-center justify-center group-hover:bg-[#0D9488] group-hover:text-white transition-colors duration-300 shadow-xs">
                       <Icon className="w-6 h-6 stroke-[2]" />
                     </div>
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-marathi">
                       {srv.category}
                     </span>
                   </div>
 
                   {/* Service Title */}
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 group-hover:text-blue-700 transition-colors">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-[#0D9488] transition-colors font-marathi">
                       {srv.nameMr}
                     </h3>
-                    <span className="text-xs font-medium text-slate-400 block mt-0.5">
+                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mt-0.5">
                       {srv.nameEn}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-600 leading-relaxed">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-marathi">
                     {srv.description}
                   </p>
 
                   {/* Advantages bullet points */}
-                  <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2 border border-slate-100">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3.5 space-y-2 border border-slate-100 dark:border-slate-700">
+                    <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block font-marathi">
                       मुख्य वैशिष्ट्ये व फायदे (Key Advantages):
                     </span>
                     {srv.advantages.map((adv, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-marathi">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                         <span className="leading-snug">{adv}</span>
                       </div>
                     ))}
@@ -304,20 +304,20 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
                 </div>
 
                 {/* Bottom Action & Quote Button */}
-                <div className="pt-5 mt-5 border-t border-slate-100 space-y-3">
+                <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-slate-500 font-medium">दर स्वरूप:</span>
-                    <span className="font-bold text-slate-900 text-[11px] text-right">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium font-marathi">दर स्वरूप:</span>
+                    <span className="font-bold text-slate-900 dark:text-white text-[11px] text-right font-marathi">
                       {srv.pricingHint}
                     </span>
                   </div>
 
                   <button
                     onClick={() => handleSelectServiceForQuote(srv.nameMr)}
-                    className="w-full py-2.5 rounded-xl bg-[#0B1528] hover:bg-blue-900 text-amber-300 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer group-hover:bg-blue-700 group-hover:text-white"
+                    className="w-full py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#0D9488] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                   >
-                    <span>Request a Quote / दरपत्रक मिळवा</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-amber-400 group-hover:text-white" />
+                    <span className="font-marathi">दरपत्रक मिळवा (Request a Quote)</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-teal-300" />
                   </button>
                 </div>
               </div>

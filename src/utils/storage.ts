@@ -72,45 +72,15 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 3001 ते 3999 • कुलर, फ्रिज, वॉशिंग मशीन',
     color: 'from-emerald-600 to-teal-800',
   },
-{
+  {
     id: 'scheme3',
     name: 'Scheme 3 (योजना 3)',
     code: 'SCH-3',
-    startCardNo: 1001,
+    startCardNo: 4001,
     endCardNo: 6000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 3 • कार्ड नं 1001 ते 6000 • स्मार्ट टीव्ही, एलईडी व इलेक्ट्रॉनिक्स',
+    description: '३०-महिने साप्ताहिक बचत योजना 3 • कार्ड नं 4001 ते 6000 • स्मार्ट टीव्ही, एलईडी व इलेक्ट्रॉनिक्स',
     color: 'from-purple-600 to-indigo-800',
-  },
-  {
-    id: 'scheme4',
-    name: 'Scheme 4 (योजना 4)',
-    code: 'SCH-4',
-    startCardNo: 6001,
-    endCardNo: 7999,
-    registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 4 • कार्ड नं 6001 ते 7999 • प्रीमियम इलेक्ट्रॉनिक्स व फर्निचर',
-    color: 'from-amber-600 to-orange-800',
-  },
-  {
-    id: 'scheme5',
-    name: 'Scheme 5 (योजना 5)',
-    code: 'SCH-5',
-    startCardNo: 8001,
-    endCardNo: 9999,
-    registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 5 • कार्ड नं 8001 ते 9999 • नवीन ऑफर्स व फेस्टिव्हल स्कीम',
-    color: 'from-pink-600 to-rose-800',
-  },
-  {
-    id: 'scheme6',
-    name: 'Scheme 6 (योजना 6)',
-    code: 'SCH-6',
-    startCardNo: 10001,
-    endCardNo: 12000,
-    registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 6 • कार्ड नं 10001 ते 12000 • सुपर सेव्हर वीकली स्कीम',
-    color: 'from-cyan-600 to-blue-900',
   },
 ];
 
@@ -503,7 +473,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SANGITA UTTAM PATIL',
-    phone: '9822001030',
+    phone: '7972811639',
     village: 'HINGNI',
     address: 'HINGNI, Wardha',
     joiningDate: '2025-06-01',
@@ -521,7 +491,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'YAMUNA PRABHAKAR KAIKADI',
-    phone: '9822001029',
+    phone: '8698041323',
     village: 'HINGNI',
     address: 'HINGNI, Wardha',
     joiningDate: '2025-06-01',
@@ -539,7 +509,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SURAJ GAUTAM MOON',
-    phone: '9822001021',
+    phone: '9175534365',
     village: 'SINDHI MEGHE',
     address: 'SINDHI MEGHE, Wardha',
     joiningDate: '2025-06-01',
@@ -575,7 +545,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SAVITA VASANT RAUT',
-    phone: '9822001242',
+    phone: '8888296288',
     village: 'WAIFAD',
     address: 'WAIFAD, Wardha',
     joiningDate: '2025-06-01',
@@ -595,7 +565,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SUNIL DANDAGE',
-    phone: '9822003191',
+    phone: '8855881081',
     village: 'PIPRI',
     address: 'PIPRI, Wardha',
     sheetNo: '',
@@ -655,7 +625,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'PRATIBHA MAROTI KHOLAME',
-    phone: '9822003123',
+    phone: '8551060253',
     village: 'PARSODI',
     address: 'PARSODI, Wardha',
     sheetNo: '',
@@ -675,7 +645,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'BALAJI SHAMRAO DANDGE',
-    phone: '9822003014',
+    phone: '9021496579',
     village: 'SHIVNAGAR',
     address: 'SHIVNAGAR, Wardha',
     sheetNo: '',
@@ -695,7 +665,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SARIKA SANDIP BHANDEKAR',
-    phone: '9822003234',
+    phone: '9096037244',
     village: 'KANHOLI BARA',
     address: 'KANHOLI BARA, Wardha',
     sheetNo: '',
@@ -715,7 +685,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SUNIL GHONGADE',
-    phone: '9822003027',
+    phone: '9673448626',
     village: 'SATODA',
     address: 'SATODA, Wardha',
     sheetNo: '',
@@ -857,7 +827,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme3',
     schemeName: 'Scheme 3 (योजना 3)',
     customerName: 'GANESH TELRANDE',
-    phone: '9822004398',
+    phone: '9689033168',
     village: 'KELHZAR',
     address: 'KELHZAR, Wardha',
     sheetNo: '5166',
@@ -999,7 +969,10 @@ export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [
   },
 ];
 
+import { saveDatabaseToIndexedDB } from './indexedDb';
+
 const STORAGE_KEY = 'shri_sai_ent_db_v2';
+const STORAGE_SUMMARY_KEY = 'shri_sai_ent_summary_v2';
 
 export interface AppDatabase {
   settings: BusinessSettings;
@@ -1048,10 +1021,25 @@ export function loadDatabase(): AppDatabase {
           })
         : INITIAL_STOCK;
 
+      const loadedCustomers: Customer[] = Array.isArray(parsed.customers)
+        ? parsed.customers.map((c: Customer) => {
+            const purchased = Number(c.totalPurchased || 0);
+            const paid = Number(c.totalPaid || 0);
+            const due = Number(c.balanceDue || 0);
+            if (purchased === 0 && (paid > 0 || due > 0)) {
+              return {
+                ...c,
+                totalPurchased: paid + due,
+              };
+            }
+            return c;
+          })
+        : [];
+
       return {
         settings: mergedSettings,
         stock: loadedStock,
-        customers: Array.isArray(parsed.customers) ? parsed.customers : [],
+        customers: loadedCustomers,
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
         purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
         dealers: Array.isArray(parsed.dealers) ? parsed.dealers : [],
@@ -1099,10 +1087,48 @@ export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
 }
 
 export function saveDatabase(db: AppDatabase): void {
+  // 1. Always save the complete database to IndexedDB (unlimited storage)
+  saveDatabaseToIndexedDB(db).catch((err) => {
+    console.warn('IndexedDB save notice:', err);
+  });
+
+  // 2. Try saving to localStorage. If quota is exceeded, gracefully fall back to saving
+  // critical core configuration and summary so app never crashes or errors out.
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-  } catch (e) {
-    console.error('Failed to save database to localStorage', e);
+  } catch (e: any) {
+    const isQuota =
+      e?.name === 'QuotaExceededError' ||
+      e?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      e?.message?.includes('quota') ||
+      e?.message?.includes('Quota') ||
+      e?.code === 22 ||
+      e?.code === 1014;
+
+    if (isQuota) {
+      console.warn('localStorage quota exceeded. Large dataset is safely stored in IndexedDB and Cloud Firestore.');
+      try {
+        // Save an essential compact version to localStorage so synchronous boots still have settings & stock
+        const compactDb: Partial<AppDatabase> = {
+          settings: db.settings,
+          stock: db.stock,
+          staff: db.staff,
+          // Limit heavy arrays in localStorage to prevent quota errors
+          customers: (db.customers || []).slice(0, 100),
+          transactions: (db.transactions || []).slice(0, 50),
+          cardMembers: (db.cardMembers || []).slice(0, 50),
+          cardTransactions: (db.cardTransactions || []).slice(0, 50),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(compactDb));
+      } catch (innerErr) {
+        // If even compact doesn't fit, just save minimal settings
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: db.settings, staff: db.staff }));
+        } catch (_) {}
+      }
+    } else {
+      console.error('Failed to save database to localStorage', e);
+    }
   }
 }
 

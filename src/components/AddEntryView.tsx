@@ -285,21 +285,21 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
       )}
 
       {/* Main Entry Card matching screenshot */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-7">
+      <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 shadow-xs p-5 sm:p-7">
         <form onSubmit={handleSubmit} className="space-y-6">
           {errorMsg && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-xl flex items-center gap-2.5">
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm px-4 py-3 rounded-xl flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Product / Item linking to stock */}
-          <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-4 space-y-2 relative">
+          <div className="bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-xl p-4 space-y-2 relative">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-700">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 Product / Item{' '}
-                <span className="font-normal text-slate-400">
+                <span className="font-normal text-slate-400 dark:text-slate-500">
                   (optional — links to stock & auto-deducts)
                 </span>
               </label>

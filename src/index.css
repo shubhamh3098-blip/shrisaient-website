@@ -1,5 +1,53 @@
 @import "tailwindcss";
 
+:root {
+  /* Ultra-Modern Fintech Design Tokens */
+  --brand-navy: #0F172A;
+  --tech-teal: #0D9488;
+  --accent-indigo: #4F46E5;
+  --bg-app: #F8FAFC;
+  --card-surface: #FFFFFF;
+  --border-subtle: #E2E8F0;
+  --text-body: #334155;
+  --text-muted: #64748B;
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-danger: #EF4444;
+}
+
+html {
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Yantramanav', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Day Mode (Default) */
+body {
+  background-color: #F8FAFC;
+  color: #334155;
+}
+
+/* Night / Dark Mode */
+.dark body {
+  background-color: #0B1120;
+  color: #E2E8F0;
+}
+
+.dark {
+  --bg-app: #0B1120;
+  --card-surface: #0F172A;
+  --border-subtle: #1E293B;
+  --text-body: #CBD5E1;
+  --text-muted: #94A3B8;
+}
+
+/* Refined Typography for Marathi & Devanagari numerals/text */
+.font-marathi {
+  font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;
+  letter-spacing: 0.01em;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -27,7 +75,9 @@
     display: none !important;
   }
 
-  #printable-invoice {
+  #printable-invoice,
+  #printable-ledger,
+  #printable-receipt {
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;

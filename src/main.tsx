@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { ThemeProvider } from './context/ThemeContext';
 import { registerSW } from 'virtual:pwa-register';
 
 // Auto-register and update PWA service worker for offline support
@@ -19,7 +20,9 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 );
 

@@ -3,12 +3,12 @@ import {
   getFirestore, 
   doc, 
   setDoc, 
-  deleteDoc,
   onSnapshot, 
   getDoc,
-  collection,
-  serverTimestamp, 
-  Firestore 
+  serverTimestamp,
+  Firestore,
+  disableNetwork,
+  enableNetwork
 } from 'firebase/firestore';
 import type { AppDatabase } from '../utils/storage';
 import type { AuthUser } from '../types';
@@ -23,9 +23,9 @@ export const firestore: Firestore = getFirestore(
   firebaseConfig.firestoreDatabaseId || '(default)'
 );
 
-export type CloudSyncStatus = 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
+const MAIN_STORE_DOC_PATH = 'stores/shri_sai_enterprise_main';
 
-const CHUNK_SIZE = 300; // 300 records per doc is ~120KB, well safe within Firestore 1MB limit
+export type CloudSyncStatus = 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
 
 // Helper to remove any undefined values before sending to Firestore
 function sanitizeForFirestore(obj: any): any {
@@ -42,24 +42,72 @@ function sanitizeForFirestore(obj: any): any {
   return result;
 }
 
+// Quota and circuit-breaker tracking: default to protected offline mode while daily write quota is resetting
+let isCloudQuotaExhausted = true;
+try {
+  if (typeof window !== 'undefined') {
+    const isExplicitlyEnabled = localStorage.getItem('firestore_cloud_enabled') === 'true';
+    const quotaUntil = localStorage.getItem('firestore_quota_exhausted_until');
+    if (isExplicitlyEnabled && (!quotaUntil || Number(quotaUntil) < Date.now())) {
+      isCloudQuotaExhausted = false;
+    } else {
+      isCloudQuotaExhausted = true;
+      disableNetwork(firestore).catch(() => {});
+    }
+  }
+} catch (e) {}
+
+export function markQuotaExhausted(): void {
+  isCloudQuotaExhausted = true;
+  try {
+    if (typeof window !== 'undefined') {
+      const until = Date.now() + 4 * 60 * 60 * 1000; // 4 hours circuit breaker
+      localStorage.setItem('firestore_quota_exhausted_until', until.toString());
+      localStorage.removeItem('firestore_cloud_enabled');
+      sessionStorage.setItem('firestore_quota_exhausted', 'true');
+    }
+  } catch (e) {}
+  try {
+    disableNetwork(firestore).catch(() => {});
+  } catch (e) {}
+}
+
+export function isFirestoreQuotaExhausted(): boolean {
+  return isCloudQuotaExhausted;
+}
+
+export async function resetFirestoreQuotaFlag(): Promise<void> {
+  isCloudQuotaExhausted = false;
+  try {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('firestore_quota_exhausted');
+      localStorage.removeItem('firestore_quota_exhausted_until');
+      localStorage.setItem('firestore_cloud_enabled', 'true');
+    }
+  } catch (e) {}
+  try {
+    await enableNetwork(firestore);
+  } catch (e) {}
+}
+
 /**
- * Saves current database snapshot to Cloud Firestore using partitioned documents
- * so that large imports of bills, cards, or receipts NEVER exceed Firestore 1MB limits.
+ * Saves current database snapshot to Cloud Firestore.
+ * Supports debounced (default 2500ms) or immediate save.
  */
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingDataToSave: AppDatabase | null = null;
-let isSaving = false;
-
-// Track existing chunk counts to clean up stale chunks if items are deleted
-let lastTransactionChunks = 0;
-let lastCardMemberChunks = 0;
-let lastCardTransactionChunks = 0;
 
 export async function syncDatabaseToCloud(
   database: AppDatabase, 
   onStatusChange?: (status: CloudSyncStatus, error?: string) => void,
   immediate: boolean = false
 ): Promise<void> {
+  // If Firestore daily write limit is reached, safely bypass cloud write to avoid errors
+  if (isCloudQuotaExhausted) {
+    if (onStatusChange) onStatusChange('offline', 'Daily Cloud write limit reached. Safely saved in Local Storage.');
+    return;
+  }
+
   pendingDataToSave = database;
   if (onStatusChange) onStatusChange('syncing');
 
@@ -68,130 +116,55 @@ export async function syncDatabaseToCloud(
   }
 
   const executeSave = async () => {
-    if (!pendingDataToSave || isSaving) return;
+    if (!pendingDataToSave || isCloudQuotaExhausted) return;
     const data = pendingDataToSave;
     pendingDataToSave = null;
-    isSaving = true;
 
     try {
-      const sectionsCol = collection(firestore, 'stores', 'shri_sai_enterprise_main', 'sections');
-      const nowIso = new Date().toISOString();
-
-      // 1. Single/Small sections
-      const singleSaves = [
-        setDoc(doc(sectionsCol, 'settings'), { data: sanitizeForFirestore(data.settings), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'stock'), { items: sanitizeForFirestore(data.stock || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'customers'), { items: sanitizeForFirestore(data.customers || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'purchases'), { items: sanitizeForFirestore(data.purchases || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'dealers'), { items: sanitizeForFirestore(data.dealers || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'dealerPayments'), { items: sanitizeForFirestore(data.dealerPayments || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'staff'), { items: sanitizeForFirestore(data.staff || []), updatedAt: nowIso }),
-        setDoc(doc(sectionsCol, 'expenses'), { items: sanitizeForFirestore(data.expenses || []), updatedAt: nowIso }),
-      ];
-
-      // 2. Chunked Transactions (Bills)
-      const transactions = data.transactions || [];
-      const txChunkCount = Math.max(1, Math.ceil(transactions.length / CHUNK_SIZE));
-      const txSaves: Promise<any>[] = [
-        setDoc(doc(sectionsCol, 'transactions_meta'), { totalItems: transactions.length, chunkCount: txChunkCount, updatedAt: nowIso })
-      ];
-      for (let i = 0; i < txChunkCount; i++) {
-        const chunk = transactions.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        txSaves.push(
-          setDoc(doc(sectionsCol, `transactions_chunk_${i}`), {
-            items: sanitizeForFirestore(chunk),
-            chunkIndex: i,
-            updatedAt: nowIso
-          })
-        );
-      }
-      // Delete old unused transaction chunks
-      for (let i = txChunkCount; i < lastTransactionChunks; i++) {
-        txSaves.push(deleteDoc(doc(sectionsCol, `transactions_chunk_${i}`)));
-      }
-      lastTransactionChunks = txChunkCount;
-
-      // 3. Chunked Card Members
-      const cardMembers = data.cardMembers || [];
-      const cmChunkCount = Math.max(1, Math.ceil(cardMembers.length / CHUNK_SIZE));
-      const cmSaves: Promise<any>[] = [
-        setDoc(doc(sectionsCol, 'cardMembers_meta'), { totalItems: cardMembers.length, chunkCount: cmChunkCount, updatedAt: nowIso })
-      ];
-      for (let i = 0; i < cmChunkCount; i++) {
-        const chunk = cardMembers.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        cmSaves.push(
-          setDoc(doc(sectionsCol, `cardMembers_chunk_${i}`), {
-            items: sanitizeForFirestore(chunk),
-            chunkIndex: i,
-            updatedAt: nowIso
-          })
-        );
-      }
-      for (let i = cmChunkCount; i < lastCardMemberChunks; i++) {
-        cmSaves.push(deleteDoc(doc(sectionsCol, `cardMembers_chunk_${i}`)));
-      }
-      lastCardMemberChunks = cmChunkCount;
-
-      // 4. Chunked Card Transactions (Receipts)
-      const cardTransactions = data.cardTransactions || [];
-      const ctxChunkCount = Math.max(1, Math.ceil(cardTransactions.length / CHUNK_SIZE));
-      const ctxSaves: Promise<any>[] = [
-        setDoc(doc(sectionsCol, 'cardTransactions_meta'), { totalItems: cardTransactions.length, chunkCount: ctxChunkCount, updatedAt: nowIso })
-      ];
-      for (let i = 0; i < ctxChunkCount; i++) {
-        const chunk = cardTransactions.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        ctxSaves.push(
-          setDoc(doc(sectionsCol, `cardTransactions_chunk_${i}`), {
-            items: sanitizeForFirestore(chunk),
-            chunkIndex: i,
-            updatedAt: nowIso
-          })
-        );
-      }
-      for (let i = ctxChunkCount; i < lastCardTransactionChunks; i++) {
-        ctxSaves.push(deleteDoc(doc(sectionsCol, `cardTransactions_chunk_${i}`)));
-      }
-      lastCardTransactionChunks = ctxChunkCount;
-
-      // 5. Root summary document
-      const mainStoreRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
-      const rootSave = setDoc(mainStoreRef, {
-        updatedAt: nowIso,
+      const storeRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
+      const payload = {
+        updatedAt: new Date().toISOString(),
         serverTime: serverTimestamp(),
         domain: 'shrisaient.in',
-        stats: {
-          transactionsCount: transactions.length,
-          cardMembersCount: cardMembers.length,
-          cardTransactionsCount: cardTransactions.length,
-          customersCount: (data.customers || []).length,
-          stockCount: (data.stock || []).length,
-        }
-      }, { merge: true });
+        settings: sanitizeForFirestore(data.settings),
+        stock: sanitizeForFirestore(data.stock),
+        customers: sanitizeForFirestore(data.customers),
+        transactions: sanitizeForFirestore(data.transactions),
+        purchases: sanitizeForFirestore(data.purchases),
+        dealers: sanitizeForFirestore(data.dealers),
+        dealerPayments: sanitizeForFirestore(data.dealerPayments),
+        cardMembers: sanitizeForFirestore(data.cardMembers),
+        cardTransactions: sanitizeForFirestore(data.cardTransactions),
+        staff: sanitizeForFirestore(data.staff),
+        expenses: sanitizeForFirestore(data.expenses),
+      };
 
-      await Promise.all([
-        ...singleSaves,
-        ...txSaves,
-        ...cmSaves,
-        ...ctxSaves,
-        rootSave
-      ]);
-
+      await setDoc(storeRef, payload, { merge: true });
       if (onStatusChange) onStatusChange('connected');
     } catch (err: any) {
-      console.warn('Cloud sync error (persisted locally):', err);
-      if (onStatusChange) onStatusChange('error', err?.message || 'Sync failed');
-    } finally {
-      isSaving = false;
-      if (pendingDataToSave) {
-        saveTimeout = setTimeout(executeSave, 300);
+      const isQuota = 
+        err?.code === 'resource-exhausted' || 
+        err?.message?.includes('Quota') || 
+        err?.message?.includes('resource-exhausted') ||
+        err?.message?.includes('limit');
+
+      if (isQuota) {
+        markQuotaExhausted();
+        console.warn('Firestore daily write quota reached. Switching to local offline mode.');
+        if (onStatusChange) onStatusChange('offline', 'Daily Cloud quota reached. All data safely saved locally.');
+        return;
       }
+
+      console.warn('Cloud sync notice (safely stored locally):', err?.message || err);
+      if (onStatusChange) onStatusChange('offline', err?.message || 'Sync offline');
     }
   };
 
   if (immediate) {
     await executeSave();
   } else {
-    saveTimeout = setTimeout(executeSave, 400);
+    // 2500ms debounce to prevent excessive writes on every stroke
+    saveTimeout = setTimeout(executeSave, 2500);
   }
 }
 
@@ -199,6 +172,7 @@ export async function syncDatabaseToCloud(
  * Records a successful login event in Cloud Firestore for secure audit tracking.
  */
 export async function logAuthEventToCloud(user: AuthUser): Promise<void> {
+  if (isCloudQuotaExhausted) return;
   try {
     const storeRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
     const loginRecord = {
@@ -217,149 +191,88 @@ export async function logAuthEventToCloud(user: AuthUser): Promise<void> {
       },
       { merge: true }
     );
-  } catch (err) {
-    console.warn('Could not record login audit to Firestore:', err);
+  } catch (err: any) {
+    if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota')) {
+      markQuotaExhausted();
+    }
+    console.warn('Login audit notice:', err?.message || err);
   }
 }
 
 /**
- * Listens in REAL TIME to changes in Cloud Firestore using the partitioned subcollection.
+ * Listens in REAL TIME to changes in Cloud Firestore.
  * When a bill, card entry, or customer is added on mobile or another PC,
- * this callback will immediately update the local state without size limit issues.
+ * this callback will immediately update the local state.
  */
 export function subscribeToCloudDatabase(
   onDataReceived: (remoteData: AppDatabase) => void,
   onStatusChange?: (status: CloudSyncStatus, error?: string) => void,
   initialFallback?: AppDatabase
 ): () => void {
+  if (isCloudQuotaExhausted) {
+    if (onStatusChange) onStatusChange('offline', 'Operating in Local Storage mode.');
+    return () => {};
+  }
+
   if (onStatusChange) onStatusChange('syncing');
 
-  const sectionsCol = collection(firestore, 'stores', 'shri_sai_enterprise_main', 'sections');
+  const storeRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
 
-  const unsubscribe = onSnapshot(
-    sectionsCol,
-    async (snapshot) => {
-      if (!snapshot.empty) {
-        let settings: any = undefined;
-        let stock: any[] = [];
-        let customers: any[] = [];
-        let purchases: any[] = [];
-        let dealers: any[] = [];
-        let dealerPayments: any[] = [];
-        let staff: any[] = [];
-        let expenses: any[] = [];
+  let unsubscribe = () => {};
 
-        const txChunks: Record<number, any[]> = {};
-        const cmChunks: Record<number, any[]> = {};
-        const ctxChunks: Record<number, any[]> = {};
-
-        snapshot.forEach((docSnap) => {
-          const id = docSnap.id;
-          const docData = docSnap.data();
-          if (!docData) return;
-
-          if (id === 'settings' && docData.data) {
-            settings = docData.data;
-          } else if (id === 'stock' && Array.isArray(docData.items)) {
-            stock = docData.items;
-          } else if (id === 'customers' && Array.isArray(docData.items)) {
-            customers = docData.items;
-          } else if (id === 'purchases' && Array.isArray(docData.items)) {
-            purchases = docData.items;
-          } else if (id === 'dealers' && Array.isArray(docData.items)) {
-            dealers = docData.items;
-          } else if (id === 'dealerPayments' && Array.isArray(docData.items)) {
-            dealerPayments = docData.items;
-          } else if (id === 'staff' && Array.isArray(docData.items)) {
-            staff = docData.items;
-          } else if (id === 'expenses' && Array.isArray(docData.items)) {
-            expenses = docData.items;
-          } else if (id.startsWith('transactions_chunk_')) {
-            const idx = parseInt(id.replace('transactions_chunk_', ''), 10);
-            if (!isNaN(idx) && Array.isArray(docData.items)) {
-              txChunks[idx] = docData.items;
-            }
-          } else if (id.startsWith('cardMembers_chunk_')) {
-            const idx = parseInt(id.replace('cardMembers_chunk_', ''), 10);
-            if (!isNaN(idx) && Array.isArray(docData.items)) {
-              cmChunks[idx] = docData.items;
-            }
-          } else if (id.startsWith('cardTransactions_chunk_')) {
-            const idx = parseInt(id.replace('cardTransactions_chunk_', ''), 10);
-            if (!isNaN(idx) && Array.isArray(docData.items)) {
-              ctxChunks[idx] = docData.items;
-            }
+  try {
+    unsubscribe = onSnapshot(
+      storeRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const docData = snapshot.data();
+          if (docData) {
+            const parsedData: AppDatabase = {
+              settings: docData.settings || undefined,
+              stock: docData.stock || [],
+              customers: docData.customers || [],
+              transactions: docData.transactions || [],
+              purchases: docData.purchases || [],
+              dealers: docData.dealers || [],
+              dealerPayments: docData.dealerPayments || [],
+              cardMembers: docData.cardMembers || [],
+              cardTransactions: docData.cardTransactions || [],
+              staff: docData.staff || [],
+              expenses: docData.expenses || [],
+            };
+            onDataReceived(parsedData);
+            if (onStatusChange) onStatusChange('connected');
           }
-        });
-
-        // Assemble transactions in index order
-        const transactions: any[] = [];
-        Object.keys(txChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          transactions.push(...txChunks[k]);
-        });
-
-        // Assemble card members in index order
-        const cardMembers: any[] = [];
-        Object.keys(cmChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          cardMembers.push(...cmChunks[k]);
-        });
-
-        // Assemble card transactions in index order
-        const cardTransactions: any[] = [];
-        Object.keys(ctxChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          cardTransactions.push(...ctxChunks[k]);
-        });
-
-        const parsedData: AppDatabase = {
-          settings,
-          stock,
-          customers,
-          transactions,
-          purchases,
-          dealers,
-          dealerPayments,
-          cardMembers,
-          cardTransactions,
-          staff,
-          expenses,
-        };
-
-        onDataReceived(parsedData);
-        if (onStatusChange) onStatusChange('connected');
-      } else {
-        // Subcollection empty: fallback to root doc or initialFallback
-        try {
-          const rootRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
-          const rootSnap = await getDoc(rootRef);
-          if (rootSnap.exists() && rootSnap.data()?.transactions) {
-            const rootData = rootSnap.data()!;
-            onDataReceived({
-              settings: rootData.settings,
-              stock: rootData.stock || [],
-              customers: rootData.customers || [],
-              transactions: rootData.transactions || [],
-              purchases: rootData.purchases || [],
-              dealers: rootData.dealers || [],
-              dealerPayments: rootData.dealerPayments || [],
-              cardMembers: rootData.cardMembers || [],
-              cardTransactions: rootData.cardTransactions || [],
-              staff: rootData.staff || [],
-              expenses: rootData.expenses || [],
-            });
-          } else if (initialFallback) {
+        } else {
+          if (onStatusChange) onStatusChange('connected');
+          if (initialFallback && !isCloudQuotaExhausted) {
             syncDatabaseToCloud(initialFallback, onStatusChange, true);
           }
-        } catch (e) {
-          console.warn('Fallback read error:', e);
         }
-        if (onStatusChange) onStatusChange('connected');
+      },
+      (error) => {
+        const isQuota = 
+          error?.code === 'resource-exhausted' || 
+          error?.message?.includes('Quota') || 
+          error?.message?.includes('resource-exhausted');
+
+        if (isQuota) {
+          try {
+            unsubscribe();
+          } catch (e) {}
+          markQuotaExhausted();
+          console.warn('Firestore: Daily write quota reached. Switched to safe Local Storage.');
+          if (onStatusChange) onStatusChange('offline', 'Operating in safe Local Storage mode.');
+        } else {
+          console.warn('Firestore subscription notice:', error.message);
+          if (onStatusChange) onStatusChange('offline', error.message);
+        }
       }
-    },
-    (error) => {
-      console.warn('Firestore subscription error:', error);
-      if (onStatusChange) onStatusChange('offline', error.message);
-    }
-  );
+    );
+  } catch (err: any) {
+    console.warn('Firestore listener notice:', err);
+    if (onStatusChange) onStatusChange('offline', err?.message || 'Offline mode');
+  }
 
   return unsubscribe;
 }

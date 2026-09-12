@@ -35,6 +35,7 @@ import {
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
 import { CardPassbookModal } from './CardPassbookModal';
+import { CollectionSlipModal } from './CollectionSlipModal';
 
 interface CardSchemeViewProps {
   cardMembers?: CardMember[];
@@ -59,7 +60,6 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   onAddMember,
   onRecordTransaction,
   onNavigateCsv,
-  salesBills = [],
 }) => {
   // Safe resolution of data arrays to prevent any undefined error
   const members = useMemo(
@@ -96,6 +96,10 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedMemberForPassbook, setSelectedMemberForPassbook] = useState<CardMember | null>(null);
+  const [activeCollectionSlipTx, setActiveCollectionSlipTx] = useState<{
+    transaction: CardTransaction;
+    member?: CardMember;
+  } | null>(null);
 
   // New Card Form state
   const [newCardScheme, setNewCardScheme] = useState<CardSchemeId>('scheme1');
@@ -118,7 +122,6 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentAgentName, setPaymentAgentName] = useState(activeAgent);
   const [paymentRemarks, setPaymentRemarks] = useState('');
-  const [sendWhatsAppOnPayment, setSendWhatsAppOnPayment] = useState(true);
 
   // Refund Form state
   const [refundCardSearch, setRefundCardSearch] = useState('');
@@ -308,7 +311,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     const date = new Date().toISOString().split('T')[0];
     const finalAgent = paymentAgentName.trim() || activeAgent;
 
-    onRecordTransaction({
+    const txData: Omit<CardTransaction, 'id'> = {
       cardId: paymentSelectedCard.id,
       cardNumber: paymentSelectedCard.cardNumber,
       schemeId: paymentSelectedCard.schemeId,
@@ -323,28 +326,20 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       agentName: finalAgent,
       remarks: paymentRemarks || `Week ${paymentWeekNo} Installment collected by ${finalAgent}`,
       balanceAfter: newBalance,
-    });
+      createdAt: new Date().toISOString(),
+    };
 
-    // Auto-send WhatsApp receipt if customer has mobile number
-    if (sendWhatsAppOnPayment && paymentSelectedCard.phone && paymentSelectedCard.phone.trim().length >= 10) {
-      const cleanPhone = paymentSelectedCard.phone.replace(/[^0-9]/g, '');
-      const waMessage = encodeURIComponent(
-        `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
-        `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
-        `--------------------------------\n` +
-        `पावती क्र.: *${receiptNo}*\n` +
-        `तारीख: ${date}\n` +
-        `कार्ड क्र.: *#${paymentSelectedCard.cardNumber}* (${paymentSelectedCard.schemeName})\n` +
-        `नाव: *${paymentSelectedCard.customerName}*\n` +
-        `जमा रक्कम: *₹${paymentAmount.toLocaleString()}* (Week ${paymentWeekNo})\n` +
-        `पेमेंट मोड: ${paymentMode} | एजंट: ${finalAgent}\n` +
-        `खात्यात एकूण शिल्लक जमा: *₹${newBalance.toLocaleString()}*\n` +
-        `--------------------------------\n` +
-        `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
-        `📞 संपर्क: ${settings.phone || '8766486915'}`
-      );
-      window.open(`https://wa.me/91${cleanPhone}?text=${waMessage}`, '_blank');
-    }
+    onRecordTransaction(txData);
+
+    // If customer has a number or whenever payment is collected, immediately open Collection Slip for Print & WhatsApp
+    setActiveCollectionSlipTx({
+      transaction: {
+        ...txData,
+        id: `ctx-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      },
+      member: paymentSelectedCard,
+    });
 
     // Success flash notification
     setLastActionMessage({
@@ -964,6 +959,40 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       </button>
 
                       <button
+                        onClick={() => {
+                          const lastTx = transactions
+                            .filter((t) => t.cardId === member.id || t.cardNumber === member.cardNumber)
+                            .slice(-1)[0];
+                          if (lastTx) {
+                            setActiveCollectionSlipTx({ transaction: lastTx, member });
+                          } else {
+                            setActiveCollectionSlipTx({
+                              transaction: {
+                                id: `slip-${member.id}`,
+                                cardId: member.id,
+                                cardNumber: member.cardNumber,
+                                schemeId: member.schemeId,
+                                customerName: member.customerName,
+                                customerPhone: member.phone,
+                                receiptNo: `REC-${member.cardNumber}-${member.sheetNo || 'OPN'}`,
+                                date: new Date().toISOString().split('T')[0],
+                                type: 'WeeklyPayment',
+                                amount: member.totalDeposited || member.netBalance || 50,
+                                paymentMode: 'Cash',
+                                balanceAfter: member.netBalance,
+                                createdAt: new Date().toISOString(),
+                              },
+                              member,
+                            });
+                          }
+                        }}
+                        className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                        title="Print Collection Slip / पावती प्रिंट करा"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
                         onClick={() => handleShareWhatsApp(member)}
                         className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
                         title="Share on WhatsApp"
@@ -1578,11 +1607,22 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {selectedMemberForPassbook && (
         <CardPassbookModal
-          salesBills={salesBills || []}
           member={selectedMemberForPassbook}
           transactions={transactions}
           settings={settings}
           onClose={() => setSelectedMemberForPassbook(null)}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: WEEKLY COLLECTION SLIP (PRINT & WHATSAPP TO CUSTOMER) */}
+      {/* ========================================================================= */}
+      {activeCollectionSlipTx && (
+        <CollectionSlipModal
+          transaction={activeCollectionSlipTx.transaction}
+          member={activeCollectionSlipTx.member}
+          settings={settings}
+          onClose={() => setActiveCollectionSlipTx(null)}
         />
       )}
     </div>

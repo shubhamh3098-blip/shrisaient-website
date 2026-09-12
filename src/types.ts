@@ -1,4 +1,4 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5' | 'scheme6' | string;
+export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3';
 
 export interface CardSchemeConfig {
   id: CardSchemeId;
@@ -226,6 +226,7 @@ export type ActiveTab =
   | 'purchases'
   | 'dealer-ledger'
   | 'csv-import'
+  | 'uploaded-data'
   | 'staff'
   | 'expenses'
   | 'settings';

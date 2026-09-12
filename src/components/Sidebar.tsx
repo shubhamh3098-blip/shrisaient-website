@@ -22,10 +22,14 @@ import {
   Crown,
   LogOut,
   Lock,
-  Download
+  Download,
+  Database,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { ActiveTab, BusinessSettings, AuthUser } from '../types';
 import { AppLogo } from './AppLogo';
+import { useTheme } from '../context/ThemeContext';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -56,6 +60,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onViewCustomerShop,
   onOpenInstallModal,
 }) => {
+  const { theme, toggleTheme } = useTheme();
+
   const mainNav = [
     { id: 'dashboard' as ActiveTab, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'add-entry' as ActiveTab, label: 'Add Entry', icon: PlusCircle, hasDot: true },
@@ -66,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'purchases' as ActiveTab, label: 'Purchases (खरीद)', icon: ShoppingCart },
     { id: 'dealer-ledger' as ActiveTab, label: 'All Ledgers (खाता बही)', icon: Building2, badge: 'Dealers & Cards' },
     { id: 'csv-import' as ActiveTab, label: 'CSV Data Import', icon: FileSpreadsheet },
+    { id: 'uploaded-data' as ActiveTab, label: 'Uploaded Data (सर्व डेटा)', icon: Database, badge: 'All Data' },
     { id: 'staff' as ActiveTab, label: 'Staff', icon: UserCheck },
     { id: 'expenses' as ActiveTab, label: 'Expenses', icon: ReceiptIndianRupee },
   ];
@@ -118,6 +125,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Day / Night Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'} Mode`}
+              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-amber-300 transition-colors border border-slate-700/60 cursor-pointer flex items-center justify-center shrink-0"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-300 animate-spin-slow" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-300" />
+              )}
+            </button>
           </div>
 
           {/* Navigation links */}
@@ -260,13 +281,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="truncate">
                 <p className="text-[11px] font-semibold text-slate-200 truncate flex items-center gap-1">
                   <Cloud className="w-3 h-3 text-blue-400" />
-                  {cloudStatus === 'connected' && 'Cloud Synced'}
+                  {cloudStatus === 'connected' && 'Cloud Synced (Live)'}
                   {cloudStatus === 'syncing' && 'Syncing Live...'}
                   {cloudStatus === 'offline' && 'Offline (Local)'}
                   {cloudStatus === 'error' && 'Sync Paused'}
                 </p>
                 <p className="text-[9px] text-slate-400 truncate">
-                  Google Firestore • {lastSyncedTime ? `Synced ${lastSyncedTime}` : 'Real-time'}
+                  Firestore Blaze Cloud • {lastSyncedTime ? `Synced ${lastSyncedTime}` : 'Real-time'}
                 </p>
               </div>
             </div>

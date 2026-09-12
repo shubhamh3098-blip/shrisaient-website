@@ -6,8 +6,7 @@ import {
   Users,
   Store,
   Download,
-  CloudCheck,
-  CloudOff
+  Zap
 } from 'lucide-react';
 import { ActiveTab } from '../types';
 
@@ -16,6 +15,7 @@ interface MobileBottomNavProps {
   setActiveTab: (tab: ActiveTab) => void;
   onOpenShopView: () => void;
   onOpenInstallModal?: () => void;
+  onOpenFieldActions?: () => void;
   cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
   isInstallable?: boolean;
 }
@@ -25,6 +25,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   setActiveTab,
   onOpenShopView,
   onOpenInstallModal,
+  onOpenFieldActions,
   cloudStatus = 'connected',
   isInstallable = false,
 }) => {
@@ -36,10 +37,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B1528]/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 lg:hidden safe-area-pb"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto text-[10px]">
+        {/* Field Quick Staff Actions Hub */}
+        {onOpenFieldActions && (
+          <button
+            type="button"
+            onClick={onOpenFieldActions}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] text-amber-400 hover:text-amber-300 active:scale-95"
+            title="Field Staff Quick Actions (कलेक्शन / बिल / पावती)"
+          >
+            <div className="relative">
+              <Zap className="w-5 h-5 mb-0.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-[#0B1528]" />
+            </div>
+            <span className="font-extrabold text-[9px] text-amber-300">क्विक स्टाफ</span>
+          </button>
+        )}
+
         {/* Dashboard */}
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[48px] ${
             activeTab === 'dashboard'
               ? 'text-amber-400 font-bold'
               : 'text-slate-400 hover:text-slate-200'
@@ -52,7 +69,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         {/* Card Scheme */}
         <button
           onClick={() => setActiveTab('card-scheme')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[48px] ${
             activeTab === 'card-scheme'
               ? 'text-amber-400 font-bold'
               : 'text-slate-400 hover:text-slate-200'
@@ -76,7 +93,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         {/* Customers / Khata */}
         <button
           onClick={() => setActiveTab('customers')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[48px] ${
             activeTab === 'customers'
               ? 'text-amber-400 font-bold'
               : 'text-slate-400 hover:text-slate-200'
@@ -90,7 +107,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         {isInstallable && onOpenInstallModal ? (
           <button
             onClick={onOpenInstallModal}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-amber-300 hover:text-amber-200 transition-all cursor-pointer min-w-[54px]"
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-amber-300 hover:text-amber-200 transition-all cursor-pointer min-w-[48px]"
             title="Install App"
           >
             <Download className="w-5 h-5 mb-0.5 animate-bounce" />
@@ -99,7 +116,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         ) : (
           <button
             onClick={onOpenShopView}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-slate-400 hover:text-amber-300 transition-all cursor-pointer min-w-[54px]"
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-slate-400 hover:text-amber-300 transition-all cursor-pointer min-w-[48px]"
             title="Open Public Customer Shop"
           >
             <Store className="w-5 h-5 mb-0.5" />

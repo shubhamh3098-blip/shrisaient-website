@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Globe, Store, PlusCircle, Cloud, RefreshCw, CheckCircle2, Crown, UserCheck, LogOut, Lock, Download } from 'lucide-react';
+import { Menu, Globe, Store, PlusCircle, Cloud, RefreshCw, CheckCircle2, Crown, UserCheck, LogOut, Lock, Download, Search, Database, CreditCard, Zap, Sun, Moon } from 'lucide-react';
+import { useTheme } from './context/ThemeContext';
 import {
   ActiveTab,
   BusinessSettings,
@@ -33,10 +34,12 @@ import {
   INITIAL_CARD_MEMBERS,
   INITIAL_CARD_TRANSACTIONS
 } from './utils/storage';
+import { loadDatabaseFromIndexedDB } from './utils/indexedDb';
 import {
   subscribeToCloudDatabase,
   syncDatabaseToCloud,
   logAuthEventToCloud,
+  resetFirestoreQuotaFlag,
   CloudSyncStatus
 } from './lib/firebase';
 import { Sidebar } from './components/Sidebar';
@@ -53,11 +56,13 @@ import { InvoiceModal } from './components/InvoiceModal';
 import { CardSchemeView } from './components/CardSchemeView';
 import { DealerLedgerView } from './components/DealerLedgerView';
 import { CsvImportView } from './components/CsvImportView';
+import { UploadedDataView } from './components/UploadedDataView';
 import { LoginModal } from './components/LoginModal';
 import { ShopLandingView } from './components/ShopLandingView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { PWAInstallModal } from './components/PWAInstallModal';
 import { usePWAInstall } from './utils/usePWAInstall';
+import { FieldStaffQuickActions, FieldActionTab } from './components/FieldStaffQuickActions';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(() => loadDatabase());
@@ -112,83 +117,74 @@ export default function App() {
   });
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showInstallModal, setShowInstallModal] = useState<boolean>(false);
-  const [newOrderAlert, setNewOrderAlert] = useState<{
-    customerName: string;
-    customerPhone?: string;
-    totalAmount: number;
-    invoiceNo: string;
-    date: string;
-    itemsSummary?: string;
-  } | null>(null);
+  const [showFieldQuickActions, setShowFieldQuickActions] = useState<boolean>(false);
+  const [fieldQuickActionTab, setFieldQuickActionTab] = useState<FieldActionTab>('card-collection');
   const { isInstallable } = usePWAInstall();
+  const { theme, toggleTheme } = useTheme();
   
   const isRemoteUpdateRef = useRef(false);
 
-  // Play audio chime when customer places an order
-  const playOrderSound = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.5);
-      }
-    } catch (e) {}
-  };
+  // Auto-detect PWA standalone mode and URL shortcut parameters for Field Staff
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  // Trigger system notification if permitted
-  const triggerBrowserNotification = (title: string, body: string) => {
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        try {
-          new Notification(title, { body, icon: '/favicon.ico' });
-        } catch (e) {}
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then((perm) => {
-          if (perm === 'granted') {
-            try {
-              new Notification(title, { body, icon: '/favicon.ico' });
-            } catch (e) {}
-          }
-        });
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    const actionParam = params.get('action');
+
+    // Check if launched as PWA shortcut or has action params
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+
+    if (tabParam) {
+      if (
+        tabParam === 'dashboard' ||
+        tabParam === 'add-entry' ||
+        tabParam === 'all-entries' ||
+        tabParam === 'customers' ||
+        tabParam === 'stock' ||
+        tabParam === 'purchases' ||
+        tabParam === 'staff' ||
+        tabParam === 'expenses' ||
+        tabParam === 'settings' ||
+        tabParam === 'card-scheme' ||
+        tabParam === 'dealer-ledger' ||
+        tabParam === 'csv-import' ||
+        tabParam === 'uploaded-data'
+      ) {
+        setActiveTab(tabParam as ActiveTab);
+        setAppMode('erp');
       }
     }
-  };
 
-  // Real-time listener for orders placed in shop mode or other tabs
-  useEffect(() => {
-    const handleOnlineOrder = (e: any) => {
-      const order = e.detail;
-      if (order) {
-        playOrderSound();
-        triggerBrowserNotification(
-          `🛍️ नवीन ऑर्डर प्राप्त! ₹${order.grandTotal || order.totalAmount}`,
-          `ग्राहक: ${order.customerName} (${order.customerPhone || 'Wardha'})`
-        );
-        setNewOrderAlert({
-          customerName: order.customerName,
-          customerPhone: order.customerPhone,
-          totalAmount: order.grandTotal || order.totalAmount,
-          invoiceNo: order.invoiceNo,
-          date: order.date,
-          itemsSummary: order.items ? order.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ') : '',
-        });
+    // Direct action routing from PWA shortcuts
+    if (actionParam === 'collection') {
+      setFieldQuickActionTab('card-collection');
+      setShowFieldQuickActions(true);
+    } else if (actionParam === 'receipt') {
+      setFieldQuickActionTab('receipt');
+      setShowFieldQuickActions(true);
+    } else if (actionParam === 'sales') {
+      setFieldQuickActionTab('sales');
+      setShowFieldQuickActions(true);
+    } else if (actionParam === 'ledger') {
+      setFieldQuickActionTab('ledger');
+      setShowFieldQuickActions(true);
+    } else if (isStandalone) {
+      // When opened from home screen icon:
+      // If user is staff or prefers card collection/entry, bring to card-scheme or show quick actions
+      const savedUser = localStorage.getItem('shri_sai_auth_user');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed.role === 'staff') {
+            setActiveTab('card-scheme');
+            setAppMode('erp');
+          }
+        } catch (e) {}
       }
-    };
-
-    window.addEventListener('shri_sai_order_placed', handleOnlineOrder);
-    return () => {
-      window.removeEventListener('shri_sai_order_placed', handleOnlineOrder);
-    };
+    }
   }, []);
 
   // Clear demo data handler - resets customers, transactions, card members to a clean slate
@@ -201,54 +197,54 @@ export default function App() {
     );
   };
 
+  // 0. Load comprehensive state from IndexedDB on startup (bypasses localStorage 5MB quota)
+  useEffect(() => {
+    let isMounted = true;
+    loadDatabaseFromIndexedDB().then((idbData) => {
+      if (!isMounted || !idbData) return;
+      setDb((prev) => {
+        // If IndexedDB has more complete datasets, merge them in
+        const idbCustCount = idbData.customers?.length || 0;
+        const prevCustCount = prev.customers?.length || 0;
+        const idbTxCount = idbData.transactions?.length || 0;
+        const prevTxCount = prev.transactions?.length || 0;
+        const idbCardTxCount = idbData.cardTransactions?.length || 0;
+        const prevCardTxCount = prev.cardTransactions?.length || 0;
+
+        if (idbCustCount >= prevCustCount || idbTxCount >= prevTxCount || idbCardTxCount >= prevCardTxCount) {
+          return {
+            ...prev,
+            ...idbData,
+            settings: { ...prev.settings, ...(idbData.settings || {}) },
+          };
+        }
+        return prev;
+      });
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // 1. Real-time Cloud Firestore Listener (Across All Devices & shrisaient.in)
   useEffect(() => {
     const unsubscribe = subscribeToCloudDatabase(
       (remoteData) => {
         if (remoteData) {
           isRemoteUpdateRef.current = true;
-          setDb((prev) => {
-            // CRITICAL SAFETY CHECK:
-            // Never wipe out freshly imported local bills or cards if remote snapshot is empty or partial
-            const mergedTransactions =
-              remoteData.transactions && remoteData.transactions.length > 0
-                ? remoteData.transactions
-                : (prev.transactions && prev.transactions.length > 0 ? prev.transactions : []);
-
-            const mergedCardMembers =
-              remoteData.cardMembers && remoteData.cardMembers.length > 0
-                ? remoteData.cardMembers
-                : (prev.cardMembers && prev.cardMembers.length > 0 ? prev.cardMembers : []);
-
-            const mergedCardTransactions =
-              remoteData.cardTransactions && remoteData.cardTransactions.length > 0
-                ? remoteData.cardTransactions
-                : (prev.cardTransactions && prev.cardTransactions.length > 0 ? prev.cardTransactions : []);
-
-            const mergedCustomers =
-              remoteData.customers && remoteData.customers.length > 0
-                ? remoteData.customers
-                : (prev.customers && prev.customers.length > 0 ? prev.customers : []);
-
-            const mergedStock =
-              remoteData.stock && remoteData.stock.length > 0
-                ? remoteData.stock
-                : (prev.stock && prev.stock.length > 0 ? prev.stock : []);
-
-            return {
-              settings: remoteData.settings ? { ...prev.settings, ...remoteData.settings } : prev.settings,
-              stock: mergedStock,
-              customers: mergedCustomers,
-              transactions: mergedTransactions,
-              purchases: remoteData.purchases !== undefined && remoteData.purchases.length > 0 ? remoteData.purchases : prev.purchases,
-              dealers: remoteData.dealers !== undefined && remoteData.dealers.length > 0 ? remoteData.dealers : prev.dealers,
-              dealerPayments: remoteData.dealerPayments !== undefined && remoteData.dealerPayments.length > 0 ? remoteData.dealerPayments : prev.dealerPayments,
-              cardMembers: mergedCardMembers,
-              cardTransactions: mergedCardTransactions,
-              staff: remoteData.staff !== undefined && remoteData.staff.length > 0 ? remoteData.staff : prev.staff,
-              expenses: remoteData.expenses !== undefined && remoteData.expenses.length > 0 ? remoteData.expenses : prev.expenses,
-            };
-          });
+          setDb((prev) => ({
+            settings: remoteData.settings ? { ...prev.settings, ...remoteData.settings } : prev.settings,
+            stock: remoteData.stock !== undefined ? remoteData.stock : prev.stock,
+            customers: remoteData.customers !== undefined ? remoteData.customers : prev.customers,
+            transactions: remoteData.transactions !== undefined ? remoteData.transactions : prev.transactions,
+            purchases: remoteData.purchases !== undefined ? remoteData.purchases : prev.purchases,
+            dealers: remoteData.dealers !== undefined ? remoteData.dealers : prev.dealers,
+            dealerPayments: remoteData.dealerPayments !== undefined ? remoteData.dealerPayments : prev.dealerPayments,
+            cardMembers: remoteData.cardMembers !== undefined ? remoteData.cardMembers : prev.cardMembers,
+            cardTransactions: remoteData.cardTransactions !== undefined ? remoteData.cardTransactions : prev.cardTransactions,
+            staff: remoteData.staff !== undefined ? remoteData.staff : prev.staff,
+            expenses: remoteData.expenses !== undefined ? remoteData.expenses : prev.expenses,
+          }));
           setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
       },
@@ -267,8 +263,13 @@ export default function App() {
   }, []);
 
   // 2. Sync with localStorage AND sync with Cloud on local edits
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
     saveDatabase(db);
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
     if (isRemoteUpdateRef.current) {
       isRemoteUpdateRef.current = false;
       return;
@@ -281,14 +282,15 @@ export default function App() {
     });
   }, [db]);
 
-  const handleManualCloudSync = () => {
+  const handleManualCloudSync = async () => {
+    await resetFirestoreQuotaFlag();
     setCloudStatus('syncing');
     syncDatabaseToCloud(db, (status) => {
       setCloudStatus(status);
       if (status === 'connected') {
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
-    });
+    }, true);
   };
 
   // Handler: Add transaction entry (From Add Entry Form)
@@ -298,22 +300,6 @@ export default function App() {
       id: `tx-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-
-    if (entryData.itemDetails && entryData.itemDetails.includes('Online Store Order')) {
-      playOrderSound();
-      triggerBrowserNotification(
-        `🛍️ नवीन ऑनलाइन ऑर्डर! ₹${entryData.totalAmount}`,
-        `ग्राहक: ${entryData.customerName}`
-      );
-      setNewOrderAlert({
-        customerName: entryData.customerName,
-        customerPhone: entryData.customerPhone,
-        totalAmount: entryData.totalAmount,
-        invoiceNo: entryData.invoiceNo || 'INV-ORD',
-        date: entryData.date,
-        itemsSummary: entryData.itemDetails,
-      });
-    }
 
     setDb((prev) => {
       // 1. Update or create Customer
@@ -440,6 +426,100 @@ export default function App() {
         transactions: [paymentReceipt, ...prev.transactions],
       };
     });
+  };
+
+  const handleRecheckLedgers = () => {
+    setDb((prev) => {
+      // Reconcile each customer's purchased, paid, and balanceDue based on their transactions
+      const customerMap = new Map<string, { totalPurchased: number; totalPaid: number }>();
+
+      (prev.transactions || []).forEach((t) => {
+        const normName = (t.customerName || '').trim().toLowerCase();
+        if (!normName) return;
+
+        const current = customerMap.get(normName) || { totalPurchased: 0, totalPaid: 0 };
+        if (t.invoiceNo?.startsWith('REC-') || t.itemDetails?.toLowerCase().includes('settlement')) {
+          current.totalPaid += Number(t.payingNow || t.totalAmount || 0);
+        } else {
+          current.totalPurchased += Number(t.totalAmount || 0);
+          current.totalPaid += Number(t.payingNow || 0);
+        }
+        customerMap.set(normName, current);
+      });
+
+      // Also reconcile card transactions
+      (prev.cardTransactions || []).forEach((ct) => {
+        const normName = (ct.memberName || '').trim().toLowerCase();
+        if (!normName) return;
+        const current = customerMap.get(normName) || { totalPurchased: 0, totalPaid: 0 };
+        current.totalPaid += Number(ct.amount || 0);
+        customerMap.set(normName, current);
+      });
+
+      const updatedCustomers = (prev.customers || []).map((c) => {
+        const normName = (c.name || '').trim().toLowerCase();
+        const stats = customerMap.get(normName);
+
+        let purchased = Number(c.totalPurchased || 0);
+        let paid = Number(c.totalPaid || 0);
+        let due = Number(c.balanceDue || 0);
+
+        if (stats) {
+          if (stats.totalPurchased > 0) purchased = Math.max(purchased, stats.totalPurchased);
+          if (stats.totalPaid > 0) paid = Math.max(paid, stats.totalPaid);
+        }
+
+        // Logical reconciliation: if purchased is 0 or less than (paid + due),
+        // the minimum total purchase must equal paid + due
+        if (purchased < (paid + due) || purchased === 0) {
+          purchased = paid + due;
+        }
+
+        // Recalculate balance due
+        due = Math.max(0, purchased - paid);
+
+        return {
+          ...c,
+          totalPurchased: purchased,
+          totalPaid: paid,
+          balanceDue: due,
+        };
+      });
+
+      return {
+        ...prev,
+        customers: updatedCustomers,
+      };
+    });
+  };
+
+  // Auto-heal customers who have totalPurchased = 0 but have paid or due amounts
+  useEffect(() => {
+    let needsHeal = false;
+    const healed = (db.customers || []).map((c) => {
+      const paid = Number(c.totalPaid || 0);
+      const due = Number(c.balanceDue || 0);
+      const pur = Number(c.totalPurchased || 0);
+      if (pur === 0 && (paid > 0 || due > 0)) {
+        needsHeal = true;
+        return { ...c, totalPurchased: paid + due };
+      }
+      return c;
+    });
+
+    if (needsHeal) {
+      setDb((prev) => ({
+        ...prev,
+        customers: healed,
+      }));
+    }
+  }, []);
+
+  const handleUpdateCustomers = (updatedCustomers: Customer[]) => {
+    setDb((prev) => ({
+      ...prev,
+      customers: updatedCustomers,
+    }));
   };
 
   // Stock Handlers
@@ -620,82 +700,128 @@ export default function App() {
   // CSV Bulk Import Handlers
   const handleImportBills = (newBills: TransactionEntry[]) => {
     setDb((prev) => {
-      // Also register or update customer records for Khata ledger
-      const currentCustomers = [...(prev.customers || [])];
-      newBills.forEach((b) => {
-        if (!b.customerName || b.customerName === 'Customer') return;
-        const existingIdx = currentCustomers.findIndex(
-          (c) => c.name.toLowerCase() === b.customerName.toLowerCase() || (b.customerPhone && c.phone === b.customerPhone)
+      // Also update or add to customers list so their totalPurchased & balanceDue are up to date
+      const updatedCustomers = [...(prev.customers || [])];
+      newBills.forEach((bill) => {
+        const normName = (bill.customerName || '').trim().toLowerCase();
+        const phone = (bill.customerPhone || '').replace(/\D/g, '');
+        const idx = updatedCustomers.findIndex(
+          (c) =>
+            (c.id && bill.customerId && c.id === bill.customerId) ||
+            (phone && c.phone && c.phone.replace(/\D/g, '') === phone) ||
+            c.name.trim().toLowerCase() === normName
         );
-        if (existingIdx >= 0) {
-          currentCustomers[existingIdx].totalPurchases += b.totalAmount;
-          currentCustomers[existingIdx].totalPaid += b.payingNow;
-          currentCustomers[existingIdx].balanceDue += b.dueAmount;
+
+        if (idx >= 0) {
+          const curr = updatedCustomers[idx];
+          const newPurchased = (curr.totalPurchased || 0) + bill.totalAmount;
+          const newPaid = (curr.totalPaid || 0) + bill.payingNow;
+          updatedCustomers[idx] = {
+            ...curr,
+            totalPurchased: newPurchased,
+            totalPaid: newPaid,
+            balanceDue: Math.max(0, newPurchased - newPaid),
+            village: bill.village || curr.village,
+          };
         } else {
-          currentCustomers.push({
-            id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: b.customerName,
-            phone: b.customerPhone || '',
-            totalPurchases: b.totalAmount,
-            totalPaid: b.payingNow,
-            balanceDue: b.dueAmount,
-            lastTransactionDate: b.date,
+          updatedCustomers.push({
+            id: bill.customerId || `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: bill.customerName,
+            phone: bill.customerPhone || '',
+            village: bill.village || '',
+            totalPurchased: bill.totalAmount,
+            totalPaid: bill.payingNow,
+            balanceDue: bill.dueAmount,
           });
         }
       });
 
-      const updatedDb = {
+      return {
         ...prev,
-        transactions: [...newBills, ...(prev.transactions || [])],
-        customers: currentCustomers,
+        transactions: [...newBills, ...prev.transactions],
+        customers: updatedCustomers,
       };
-      saveDatabase(updatedDb);
-      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
-      return updatedDb;
     });
   };
 
   const handleImportReceipts = (newReceipts: CardTransaction[]) => {
     setDb((prev) => {
-      // Update card member balances for receipts
-      const currentMembers = [...(prev.cardMembers || [])];
+      // 1. Credit receipts against matching bills (reduce dueAmount, increase payingNow)
+      const updatedTransactions = [...(prev.transactions || [])];
+      // 2. Also prepare payment entries for bills if needed and credit customer balanceDue
+      const updatedCustomers = [...(prev.customers || [])];
+
       newReceipts.forEach((rcpt) => {
-        const mIdx = currentMembers.findIndex(
-          (m) => m.cardNumber === rcpt.cardNumber && m.schemeId === rcpt.schemeId
+        const rcptNameNorm = (rcpt.customerName || '').trim().toLowerCase();
+        const rcptPhone = (rcpt.customerPhone || '').replace(/\D/g, '');
+        const rcptCard = rcpt.cardNumber;
+        const rcptAmount = Number(rcpt.amount || 0);
+
+        // Find matching customer
+        const custIdx = updatedCustomers.findIndex(
+          (c) =>
+            (c.id && (rcpt as any).customerId && c.id === (rcpt as any).customerId) ||
+            (rcptPhone && c.phone && c.phone.replace(/\D/g, '') === rcptPhone) ||
+            c.name.trim().toLowerCase() === rcptNameNorm
         );
-        if (mIdx >= 0) {
-          currentMembers[mIdx].totalDeposited += rcpt.amount;
-          currentMembers[mIdx].netBalance = Math.max(0, currentMembers[mIdx].totalDeposited - currentMembers[mIdx].totalRefunded);
+
+        if (custIdx >= 0) {
+          const cust = updatedCustomers[custIdx];
+          const newPaid = (cust.totalPaid || 0) + rcptAmount;
+          const effectivePurchased = Math.max(cust.totalPurchased || 0, newPaid);
+          const newDue = Math.max(0, (cust.balanceDue || 0) - rcptAmount);
+          updatedCustomers[custIdx] = {
+            ...cust,
+            totalPurchased: effectivePurchased,
+            totalPaid: newPaid,
+            balanceDue: newDue,
+          };
+        }
+
+        // Credit against customer's existing unpaid bills (by invoiceNo if specified, or by customer name / card)
+        let remainingCredit = rcptAmount;
+        const targetInvoice = (rcpt as any).invoiceNo;
+
+        for (let i = 0; i < updatedTransactions.length && remainingCredit > 0; i++) {
+          const bill = updatedTransactions[i];
+          const billNameNorm = (bill.customerName || '').trim().toLowerCase();
+          const billPhone = (bill.customerPhone || '').replace(/\D/g, '');
+          const isTargetBill = targetInvoice
+            ? bill.invoiceNo?.toLowerCase() === targetInvoice.toLowerCase()
+            : (bill.dueAmount > 0) &&
+              (billNameNorm === rcptNameNorm ||
+               (rcptPhone && billPhone === rcptPhone) ||
+               (rcptCard && bill.cardNumber === rcptCard));
+
+          if (isTargetBill && bill.dueAmount > 0) {
+            const creditToApply = Math.min(bill.dueAmount, remainingCredit);
+            updatedTransactions[i] = {
+              ...bill,
+              payingNow: bill.payingNow + creditToApply,
+              dueAmount: Math.max(0, bill.dueAmount - creditToApply),
+              notes: bill.notes
+                ? `${bill.notes} • Credited ₹${creditToApply} via Receipt #${rcpt.receiptNo}`
+                : `Credited ₹${creditToApply} via Receipt #${rcpt.receiptNo}`,
+            };
+            remainingCredit -= creditToApply;
+          }
         }
       });
 
-      const updatedDb = {
+      return {
         ...prev,
+        transactions: updatedTransactions,
         cardTransactions: [...newReceipts, ...(prev.cardTransactions || [])],
-        cardMembers: currentMembers,
+        customers: updatedCustomers,
       };
-      saveDatabase(updatedDb);
-      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
-      return updatedDb;
     });
   };
 
-  const handleImportCardMembers = (newCards: CardMember[], autoReceipts?: CardTransaction[]) => {
-    setDb((prev) => {
-      const updatedMembers = [...newCards, ...(prev.cardMembers || [])];
-      const updatedReceipts = autoReceipts && autoReceipts.length > 0
-        ? [...autoReceipts, ...(prev.cardTransactions || [])]
-        : (prev.cardTransactions || []);
-
-      const updatedDb = {
-        ...prev,
-        cardMembers: updatedMembers,
-        cardTransactions: updatedReceipts,
-      };
-      saveDatabase(updatedDb);
-      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
-      return updatedDb;
-    });
+  const handleImportCardMembers = (newCards: CardMember[]) => {
+    setDb((prev) => ({
+      ...prev,
+      cardMembers: [...newCards, ...(prev.cardMembers || [])],
+    }));
   };
 
   const handleImportPurchases = (newPurchases: PurchaseEntry[], importedDealers: Dealer[]) => {
@@ -718,76 +844,6 @@ export default function App() {
         purchases: [...newPurchases, ...prev.purchases],
         dealers: currentDealers,
       };
-    });
-  };
-
-  const handleUniversalImport = (data: {
-    bills: TransactionEntry[];
-    cardMembers: CardMember[];
-    cardTransactions: CardTransaction[];
-    customers: Customer[];
-  }) => {
-    setDb((prev) => {
-      // 1. Merge customers for Khata Ledger
-      const currentCustomers = [...(prev.customers || [])];
-      data.customers.forEach((nc) => {
-        const idx = currentCustomers.findIndex((c) => c.name.toLowerCase() === nc.name.toLowerCase());
-        if (idx >= 0) {
-          currentCustomers[idx].totalPurchases += nc.totalPurchases;
-          currentCustomers[idx].totalPaid += nc.totalPaid;
-          currentCustomers[idx].balanceDue = Math.max(0, currentCustomers[idx].totalPurchases - currentCustomers[idx].totalPaid);
-          if (!currentCustomers[idx].phone && nc.phone) currentCustomers[idx].phone = nc.phone;
-          if (!currentCustomers[idx].address && nc.address) currentCustomers[idx].address = nc.address;
-        } else {
-          currentCustomers.push(nc);
-        }
-      });
-
-      // 2. Merge card members
-      const currentMembers = [...(prev.cardMembers || [])];
-      data.cardMembers.forEach((nm) => {
-        const idx = currentMembers.findIndex((m) => m.cardNumber === nm.cardNumber && m.schemeId === nm.schemeId);
-        if (idx >= 0) {
-          currentMembers[idx] = {
-            ...currentMembers[idx],
-            ...nm,
-            totalDeposited: Math.max(currentMembers[idx].totalDeposited, nm.totalDeposited),
-            netBalance: Math.max(currentMembers[idx].netBalance, nm.netBalance),
-          };
-        } else {
-          currentMembers.push(nm);
-        }
-      });
-
-      // 3. Merge transactions & receipts
-      const currentCardTx = [...data.cardTransactions, ...(prev.cardTransactions || [])];
-      const currentBills = [...data.bills, ...(prev.transactions || [])];
-
-      // Re-calculate card member balances
-      currentMembers.forEach((m) => {
-        const txs = currentCardTx.filter((t) => t.cardNumber === m.cardNumber && t.schemeId === m.schemeId);
-        let dep = m.openingAmt || 0;
-        let ref = 0;
-        txs.forEach((t) => {
-          if (t.type === 'WeeklyPayment') dep += t.amount;
-          else if (t.type === 'Refund') ref += t.amount;
-        });
-        m.totalDeposited = dep;
-        m.totalRefunded = ref;
-        m.netBalance = Math.max(0, dep - ref);
-      });
-
-      const updatedDb = {
-        ...prev,
-        transactions: currentBills,
-        customers: currentCustomers,
-        cardMembers: currentMembers,
-        cardTransactions: currentCardTx,
-      };
-
-      saveDatabase(updatedDb);
-      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
-      return updatedDb;
     });
   };
 
@@ -911,66 +967,6 @@ export default function App() {
   if (appMode === 'shop') {
     return (
       <>
-        {/* Real-time New Order Floating Notification Banner */}
-        {newOrderAlert && (
-          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4 no-print animate-fade-in">
-            <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 p-3 rounded-2xl shadow-2xl border-2 border-amber-300 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-8 h-8 rounded-full bg-slate-950 text-amber-300 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                  🔔
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-xs sm:text-sm text-slate-950">
-                      नवीन कस्टमर ऑर्डर प्राप्त!
-                    </span>
-                    <span className="bg-slate-900 text-amber-300 text-[11px] font-mono font-bold px-2 py-0.2 rounded-full">
-                      ₹{newOrderAlert.totalAmount.toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-800 truncate">
-                    ग्राहक: {newOrderAlert.customerName} {newOrderAlert.customerPhone ? `• ${newOrderAlert.customerPhone}` : ''}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {newOrderAlert.customerPhone && (
-                  <a
-                    href={`https://wa.me/91${newOrderAlert.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                      `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेसमध्ये आपली ऑनलाइन ऑर्डर प्राप्त झाली आहे.`
-                    )}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1"
-                  >
-                    WA
-                  </a>
-                )}
-                {currentUser && (
-                  <button
-                    onClick={() => {
-                      setAppMode('erp');
-                      setActiveTab('entries');
-                      setNewOrderAlert(null);
-                    }}
-                    className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
-                  >
-                    नोंदी पहा
-                  </button>
-                )}
-                <button
-                  onClick={() => setNewOrderAlert(null)}
-                  className="p-1 rounded-lg text-slate-800 hover:text-black hover:bg-black/10 transition cursor-pointer"
-                  title="Dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <ShopLandingView
           settings={db.settings}
           stock={db.stock}
@@ -985,7 +981,37 @@ export default function App() {
           onAddStockItem={handleAddStockItem}
           onDeleteStockItem={handleDeleteStockItem}
           onRecordOrder={handleSaveEntry}
+          onOpenFieldActions={() => {
+            if (!currentUser) {
+              setShowLoginModal(true);
+            } else {
+              setFieldQuickActionTab('card-collection');
+              setShowFieldQuickActions(true);
+            }
+          }}
         />
+
+        {/* Field Staff Quick Actions Hub (also accessible from shop mode for authenticated staff) */}
+        {showFieldQuickActions && (
+          <FieldStaffQuickActions
+            isOpen={showFieldQuickActions}
+            onClose={() => setShowFieldQuickActions(false)}
+            initialTab={fieldQuickActionTab}
+            cardMembers={db.cardMembers || []}
+            cardTransactions={db.cardTransactions || []}
+            customers={db.customers || []}
+            stock={db.stock || []}
+            settings={db.settings}
+            currentAgentName={currentUser?.name || 'Staff Agent'}
+            onRecordCardPayment={handleRecordCardTransaction}
+            onSaveSalesEntry={handleSaveEntry}
+            onSettleCustomerPayment={handleSettlePayment}
+            onNavigateTab={(tabName) => {
+              setActiveTab(tabName);
+              setAppMode('erp');
+            }}
+          />
+        )}
 
         {showLoginModal && (
           <LoginModal
@@ -1036,7 +1062,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800 antialiased font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1120] flex text-slate-800 dark:text-slate-100 antialiased font-sans">
       {/* Sidebar navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -1059,65 +1085,21 @@ export default function App() {
 
       {/* Main Content View */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto pb-20 lg:pb-0">
-        {/* Real-time Online Order Banner in ERP */}
-        {newOrderAlert && (
-          <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 px-4 py-2.5 shadow-md flex items-center justify-between gap-3 border-b-2 border-amber-300 no-print animate-fade-in">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
-              <span className="text-base">🔔</span>
-              <span>नवीन ग्राहक ऑर्डर प्राप्त:</span>
-              <span className="bg-slate-950 text-amber-300 text-xs px-2 py-0.5 rounded-full font-mono font-bold">
-                ₹{newOrderAlert.totalAmount.toLocaleString()}
-              </span>
-              <span className="hidden sm:inline font-semibold text-slate-900 truncate">
-                {newOrderAlert.customerName} ({newOrderAlert.customerPhone || 'Wardha'})
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 text-xs">
-              {newOrderAlert.customerPhone && (
-                <a
-                  href={`https://wa.me/91${newOrderAlert.customerPhone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow-xs"
-                >
-                  WhatsApp
-                </a>
-              )}
-              <button
-                onClick={() => {
-                  setActiveTab('entries');
-                  setNewOrderAlert(null);
-                }}
-                className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-white rounded-lg font-bold transition shadow-xs"
-              >
-                नोंदी पहा
-              </button>
-              <button
-                onClick={() => setNewOrderAlert(null)}
-                className="p-1 text-slate-800 hover:text-black font-bold text-sm"
-                title="Dismiss"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Top Navbar */}
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between no-print">
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between no-print">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileOpen(true)}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden cursor-pointer"
+              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden cursor-pointer"
             >
               <Menu className="w-5 h-5" />
             </button>
 
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-sm sm:text-base tracking-tight truncate">
+              <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
                 {db.settings.businessName}
               </span>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-mono font-medium border border-slate-200">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-mono font-medium border border-slate-200 dark:border-slate-700">
                 Cloud ERP
               </span>
             </div>
@@ -1182,6 +1164,49 @@ export default function App() {
                 {cloudStatus === 'offline' && 'Offline'}
                 {cloudStatus === 'error' && 'Sync Error'}
               </span>
+            </button>
+
+            {/* All Uploaded Data Quick Access Button (from Screenshot) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('uploaded-data')}
+              title="अपलोड झालेला सर्व २,५०२+ डेटा शोधा व तपासा"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer shadow-2xs ${
+                activeTab === 'uploaded-data'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Search className={`w-3.5 h-3.5 ${activeTab === 'uploaded-data' ? 'text-white' : 'text-blue-600'}`} />
+              <span className="hidden sm:inline">सर्व डेटा शोधा</span>
+            </button>
+
+            {/* Day / Night Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'} Mode`}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-amber-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer shadow-2xs"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
+
+            {/* Field Staff Quick Actions Modal Launcher Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setFieldQuickActionTab('card-collection');
+                setShowFieldQuickActions(true);
+              }}
+              title="फिल्ड स्टाफ क्विक काउंटर: साप्ताहिक हफ्ता, नवीन बिल, पावती जमा व खातेवही"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition cursor-pointer shadow-sm active:scale-95"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+              <span>स्टाफ काउंटर</span>
             </button>
 
             {activeTab !== 'add-entry' && (
@@ -1309,10 +1334,28 @@ export default function App() {
               onImportReceipts={handleImportReceipts}
               onImportCardMembers={handleImportCardMembers}
               onImportPurchases={handleImportPurchases}
-              onUniversalImport={handleUniversalImport}
               existingCardMembers={db.cardMembers || []}
               existingDealers={db.dealers || []}
+              existingCustomers={db.customers || []}
+              existingBills={db.transactions || []}
+              existingReceipts={db.cardTransactions || []}
               onSwitchTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'uploaded-data' && (
+            <UploadedDataView
+              customers={db.customers}
+              cardMembers={db.cardMembers || []}
+              transactions={db.transactions}
+              purchases={db.purchases}
+              dealers={db.dealers || []}
+              cardTransactions={db.cardTransactions || []}
+              settings={db.settings}
+              onUpdateCustomers={handleUpdateCustomers}
+              onRecheckLedgers={handleRecheckLedgers}
+              onNavigateTab={setActiveTab}
+              onSettlePayment={handleSettlePayment}
             />
           )}
 
@@ -1329,8 +1372,12 @@ export default function App() {
           {activeTab === 'customers' && (
             <CustomersView
               customers={db.customers}
+              transactions={db.transactions}
+              cardTransactions={db.cardTransactions || []}
               onAddCustomer={handleAddCustomer}
               onSettlePayment={handleSettlePayment}
+              onRecheckLedgers={handleRecheckLedgers}
+              onNavigateUploadedData={() => setActiveTab('uploaded-data')}
               settings={db.settings}
             />
           )}
@@ -1443,9 +1490,35 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenShopView={() => setAppMode('shop')}
         onOpenInstallModal={() => setShowInstallModal(true)}
+        onOpenFieldActions={() => {
+          setFieldQuickActionTab('card-collection');
+          setShowFieldQuickActions(true);
+        }}
         cloudStatus={cloudStatus}
         isInstallable={isInstallable}
       />
+
+      {/* Field Staff Quick Actions Hub (Sales, Receipt, Card Collection, Ledger) */}
+      {showFieldQuickActions && (
+        <FieldStaffQuickActions
+          isOpen={showFieldQuickActions}
+          onClose={() => setShowFieldQuickActions(false)}
+          initialTab={fieldQuickActionTab}
+          cardMembers={db.cardMembers || []}
+          cardTransactions={db.cardTransactions || []}
+          customers={db.customers || []}
+          stock={db.stock || []}
+          settings={db.settings}
+          currentAgentName={currentUser?.name || 'Staff Agent'}
+          onRecordCardPayment={handleRecordCardTransaction}
+          onSaveSalesEntry={handleSaveEntry}
+          onSettleCustomerPayment={handleSettlePayment}
+          onNavigateTab={(tabName) => {
+            setActiveTab(tabName);
+            setAppMode('erp');
+          }}
+        />
+      )}
 
       {/* PWA Install Modal Dialog */}
       <PWAInstallModal
