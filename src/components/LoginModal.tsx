@@ -13,16 +13,10 @@ import {
   RefreshCw, 
   X, 
   Store, 
-  User,
-  Check,
-  KeyRound,
-  ShieldCheck,
-  TrendingUp,
-  Users,
-  Activity
+  ShieldCheck
 } from 'lucide-react';
 import { AuthUser, UserRole, StaffMember } from '../types';
-import { AppLogo } from './AppLogo';
+import { supabase } from '../lib/supabase';
 
 interface LoginModalProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -46,23 +40,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onClose,
   canClose = true,
 }) => {
-  // Role switcher: Staff vs Admin (as shown in Screenshot segmented toggle)
   const [role, setRole] = useState<UserRole>('admin');
-  
-  // Method: Password vs Original OTP Verification
   const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password');
-
-  // Business ID field (Given at registration)
   const [businessId, setBusinessId] = useState<string>('shri-sai-enterprises');
-
-  // Identifier: Email / Phone / Username
   const [identifier, setIdentifier] = useState<string>(adminEmail);
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  // Original OTP Flow States
+  // OTP Flow States
   const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
-  const [generatedOtp, setGeneratedOtp] = useState<string>('');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpTimer, setOtpTimer] = useState<number>(60);
   const [otpSentNotice, setOtpSentNotice] = useState<string>('');
@@ -74,13 +60,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Keep identifier synced when switching between Staff and Admin
   useEffect(() => {
     setErrorMsg('');
     setSuccessMsg('');
     setPasswordInput('');
     setOtpStep('request');
-    setGeneratedOtp('');
     setOtpDigits(['', '', '', '', '', '']);
 
     if (role === 'admin') {
@@ -94,7 +78,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   }, [role, adminEmail, staffList]);
 
-  // Countdown timer for OTP resend
+  // Countdown timer
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     if (authMethod === 'otp' && otpStep === 'verify' && otpTimer > 0) {
@@ -107,7 +91,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     };
   }, [authMethod, otpStep, otpTimer]);
 
-  // --- 1. PASSWORD SUBMISSION HANDLER ---
+  // --- 1. PASSWORD SUBMISSION ---
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -133,7 +117,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       let isValid = false;
 
       if (role === 'admin') {
-        // Match configured admin password or authorized owner credentials
         const validAdminPasswords = [
           (adminPassword || 'admin').toLowerCase(),
           'admin',
@@ -146,7 +129,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           isValid = true;
         }
       } else {
-        // Staff password
         const validStaffPasswords = [
           (staffPassword || 'staff').toLowerCase(),
           'staff',
@@ -186,34 +168,44 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }, 400);
   };
 
-  // --- 2. ORIGINAL OTP REQUEST HANDLER ---
-  const handleSendOtp = (e?: React.FormEvent) => {
+  // --- 2. SUPABASE GMAIL OTP SEND HANDLER ---
+  const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    const trimmedIdentifier = identifier.trim();
-    if (!trimmedIdentifier) {
-      setErrorMsg('कृपया OTP मिळवण्यासाठी Email किंवा Mobile Number टाका');
+    const targetEmail = identifier.trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setErrorMsg('कृपया OTP साठी वैध ईमेल (Gmail) टाका');
       return;
     }
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      // Generate genuine 6-digit verification code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(code);
-      setOtpStep('verify');
-      setOtpTimer(60);
-      setOtpDigits(['', '', '', '', '', '']);
-      setOtpSentNotice(`6-अंकी सुरक्षा कोड ${trimmedIdentifier} वर पाठवला आहे`);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: targetEmail,
+        options: {
+          shouldCreateUser: true
+        }
+      });
 
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 150);
-    }, 600);
+      if (error) {
+        setErrorMsg(`OTP पाठवण्यात अडचण: ${error.message}`);
+      } else {
+        setOtpStep('verify');
+        setOtpTimer(60);
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpSentNotice(`६-अंकी सुरक्षा कोड ${targetEmail} वर पाठवला आहे`);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 150);
+      }
+    } catch (err: any) {
+      setErrorMsg('सर्व्हर एरर: कृपया थोड्या वेळाने प्रयत्न करा.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // OTP Digit changes
@@ -259,52 +251,71 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const verifyOtpCode = (codeToVerify?: string) => {
+  // --- 3. SUPABASE GMAIL OTP VERIFICATION ---
+  const verifyOtpCode = async (codeToVerify?: string) => {
     const entered = codeToVerify || otpDigits.join('');
     if (entered.length !== 6) {
       setErrorMsg('कृपया 6-अंकी OTP पूर्ण टाका');
       return;
     }
 
-    // Check code matches generated OTP or master security fallback
-    if (entered !== generatedOtp && entered !== '123456') {
-      setErrorMsg('चुकीचा OTP! कृपया पुन्हा तपासा किंवा नवीन कोड मागवा.');
-      return;
-    }
-
     setIsLoading(true);
+    setErrorMsg('');
+
+    try {
+      // Master developer bypass fallback
+      if (entered === '123456') {
+        handleSuccessfulLogin();
+        return;
+      }
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: identifier.trim(),
+        token: entered,
+        type: 'email'
+      });
+
+      if (error) {
+        setErrorMsg('चुकीचा OTP किंवा मुदत संपली आहे. पुन्हा तपासा.');
+        setIsLoading(false);
+      } else if (data.session || data.user) {
+        handleSuccessfulLogin();
+      } else {
+        setErrorMsg('पडताळणी अयशस्वी. कृपया नवीन OTP मागवा.');
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      setErrorMsg('OTP पडताळणी करताना त्रुटी आली.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleSuccessfulLogin = () => {
+    setIsLoading(false);
+    setSuccessMsg('OTP पडताळणी यशस्वी! सिस्टम उघडत आहे...');
+
+    const authenticatedUser: AuthUser = {
+      id: role === 'admin' ? 'usr-admin' : `usr-staff-${Date.now()}`,
+      email: identifier.trim().toLowerCase(),
+      name: role === 'admin' ? (adminName || 'Shubham (Admin)') : 'Store Staff',
+      role,
+      loggedInAt: new Date().toISOString(),
+    };
 
     setTimeout(() => {
-      setIsLoading(false);
-      setSuccessMsg('OTP पडताळणी यशस्वी! सिस्टम उघडत आहे...');
-
-      const authenticatedUser: AuthUser = {
-        id: role === 'admin' ? 'usr-admin' : `usr-staff-${Date.now()}`,
-        email: identifier.trim().toLowerCase(),
-        name: role === 'admin' ? (adminName || 'Shubham (Admin)') : 'Store Staff',
-        role,
-        loggedInAt: new Date().toISOString(),
-      };
-
-      setTimeout(() => {
-        onLoginSuccess(authenticatedUser);
-      }, 300);
-    }, 350);
+      onLoginSuccess(authenticatedUser);
+    }, 300);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[580px] border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
         
-        {/* ========================================================= */}
-        {/* LEFT COLUMN: Deep Navy Brand Showcase (From Screenshot)   */}
-        {/* ========================================================= */}
+        {/* Left Column Brand Showcase */}
         <div className="hidden md:flex md:col-span-5 bg-[#0B1528] text-white p-8 flex-col justify-between relative overflow-hidden">
-          {/* Subtle geometric background decoration */}
           <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
           <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top Logo & Title */}
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30 border border-white/20">
@@ -320,7 +331,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
 
-            {/* Headline & Subtitle */}
             <div className="space-y-2 pt-4">
               <h2 className="text-2xl lg:text-3xl font-black text-white leading-snug tracking-tight">
                 Smart cash flow for modern businesses
@@ -330,7 +340,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </p>
             </div>
 
-            {/* 3 Metric Cards Grid */}
             <div className="grid grid-cols-3 gap-2 pt-3">
               <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
                 <span className="block text-base font-extrabold text-blue-400 font-mono">10K+</span>
@@ -346,7 +355,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
 
-            {/* Feature Bullet Points */}
             <div className="space-y-2.5 pt-4 text-xs text-slate-200">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
@@ -363,18 +371,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
           </div>
 
-          {/* Bottom Copyright */}
           <div className="relative z-10 pt-6 border-t border-white/10 text-[11px] text-slate-400">
             © 2026 Shri Sai Enterprises. All rights reserved.
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* RIGHT COLUMN: Clean Modern Sign-in Form                   */}
-        {/* ========================================================= */}
+        {/* Right Column Sign-in Form */}
         <div className="md:col-span-7 p-6 sm:p-10 flex flex-col justify-between bg-white relative">
-          
-          {/* Close Modal Button */}
           {canClose && onClose && (
             <button
               type="button"
@@ -387,8 +390,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           )}
 
           <div className="max-w-md mx-auto w-full space-y-6">
-            
-            {/* Header */}
             <div>
               <div className="md:hidden flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
@@ -406,7 +407,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </p>
             </div>
 
-            {/* Segmented Toggle: Staff vs Admin */}
+            {/* Role Switcher */}
             <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
               <button
                 type="button"
@@ -435,10 +436,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </button>
             </div>
 
-            {/* Form Fields */}
             <div className="space-y-4">
-              
-              {/* 1. Business ID */}
+              {/* Business ID */}
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
                   <label htmlFor="business-id-input">Business ID</label>
@@ -458,10 +457,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Email / Phone / Username */}
+              {/* Email / Identifier */}
               <div>
                 <label htmlFor="identifier-input" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Email / Phone / Username
+                  Gmail / Email
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -476,7 +475,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </div>
               </div>
 
-              {/* Auth Method Sub-Switcher: Password vs Original OTP */}
+              {/* Method Switcher */}
               <div className="flex items-center justify-between pt-1 text-xs">
                 <span className="font-semibold text-slate-600">प्रमाणीकरण पद्धत (Verification):</span>
                 <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
@@ -506,12 +505,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Original OTP
+                    Gmail OTP
                   </button>
                 </div>
               </div>
 
-              {/* MODE A: PASSWORD */}
+              {/* PASSWORD SECTION */}
               {authMethod === 'password' && (
                 <form onSubmit={handlePasswordSubmit} className="space-y-4 pt-1">
                   <div>
@@ -545,7 +544,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Feedback alerts */}
                   {errorMsg && (
                     <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
@@ -580,7 +578,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </form>
               )}
 
-              {/* MODE B: ORIGINAL OTP VERIFICATION */}
+              {/* SUPABASE GMAIL OTP SECTION */}
               {authMethod === 'otp' && (
                 <div className="space-y-4 pt-1">
                   {otpStep === 'request' ? (
@@ -588,10 +586,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 text-slate-700 text-xs space-y-1">
                         <div className="flex items-center gap-1.5 font-bold text-blue-900">
                           <ShieldCheck className="w-4 h-4 text-blue-600" />
-                          <span>Original OTP Verification</span>
+                          <span>Gmail OTP Verification</span>
                         </div>
                         <p className="text-slate-600 text-[11px] leading-relaxed">
-                          तुमच्या नोंदणीकृत संपर्क <strong>{identifier}</strong> वर सुरक्षित ६-अंकी OTP पाठवला जाईल.
+                          नोंदणीकृत <strong>{identifier}</strong> वर ६-अंकी सुरक्षित लॉगिन कोड पाठवला जाईल.
                         </p>
                       </div>
 
@@ -614,7 +612,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           </>
                         ) : (
                           <>
-                            <span>Send 6-Digit OTP</span>
+                            <span>Send OTP to Gmail</span>
                             <ArrowRight className="w-4 h-4" />
                           </>
                         )}
@@ -622,21 +620,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     </form>
                   ) : (
                     <div className="space-y-4">
-                      {/* OTP Sent Notification Header */}
                       <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 text-blue-950 font-semibold">
                           <Mail className="w-4 h-4 text-blue-600 shrink-0" />
-                          <span className="truncate max-w-[200px]">{otpSentNotice}</span>
+                          <span className="truncate max-w-[260px]">{otpSentNotice}</span>
                         </div>
-                        <span className="text-[10px] bg-blue-600 text-white font-mono px-2 py-0.5 rounded-full font-bold">
-                          OTP: {generatedOtp}
-                        </span>
                       </div>
 
-                      {/* 6 Digit Input Boxes */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-2 text-center">
-                          Enter 6-digit code
+                          Gmail वर आलेला ६-अंकी OTP टाका
                         </label>
                         <div className="flex justify-center gap-2 sm:gap-2.5" onPaste={handleOtpPaste}>
                           {otpDigits.map((digit, index) => (
@@ -655,7 +648,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Timer & Resend */}
                       <div className="flex items-center justify-between text-xs text-slate-500 px-1">
                         <button
                           type="button"
@@ -665,12 +657,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           }}
                           className="hover:text-slate-800 underline transition cursor-pointer"
                         >
-                          ईमेल/नंबर बदला
+                          ईमेल बदला
                         </button>
 
                         {otpTimer > 0 ? (
                           <span className="font-mono text-slate-500">
-                            Resend code: {otpTimer}s
+                            Resend in: {otpTimer}s
                           </span>
                         ) : (
                           <button
@@ -684,7 +676,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         )}
                       </div>
 
-                      {/* Feedback alerts */}
                       {errorMsg && (
                         <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
@@ -713,7 +704,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                         ) : (
                           <>
                             <CheckCircle2 className="w-4 h-4" />
-                            <span>Verify Code & Sign in</span>
+                            <span>Verify OTP & Open Dashboard</span>
                           </>
                         )}
                       </button>
@@ -721,16 +712,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   )}
                 </div>
               )}
-
             </div>
 
-            {/* Bottom Security Note */}
             <div className="pt-2 text-center">
               <p className="text-[11px] text-slate-400">
                 श्री साई एंटरप्रायझेस अधिकृत कर्मचारी व ॲडमिन पोर्टल • २-स्टेप व्हेरिफिकेशन सुरक्षीत
               </p>
             </div>
-
           </div>
         </div>
 
