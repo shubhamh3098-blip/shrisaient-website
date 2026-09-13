@@ -243,15 +243,15 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
       {/* 1. SERVICES & PRICING / QUOTATION SECTION */}
       <section id="services" className="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[#0D9488] dark:text-teal-300 text-xs font-semibold uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
-            <span className="font-marathi">आमच्या अधिकृत सेवा व दरपत्रक (Verified Services in Wardha)</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-xs font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-teal-600" />
+            आमच्या अधिकृत सेवा व दरपत्रक (Verified Services in Wardha)
           </div>
-          <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight font-marathi">
-            श्री साई एंटरप्रायझेस, वर्धा - प्रमुख सेवा
+          <h2 className="text-2xl sm:text-4xl font-black text-[var(--tactile-text-heading)] tracking-tight">
+            Best Enterprise Services in Wardha, Maharashtra
           </h2>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-marathi">
-            घरगुती इलेक्ट्रॉनिक्स विक्री, ३०-महिने साप्ताहिक बचत योजना, कन्सिल्ड वायरिंग व सर्व्हिसिंगची खात्रीशीर सेवा.
+          <p className="text-sm sm:text-base text-[var(--tactile-text-muted)] leading-relaxed">
+            श्री साई इंटरप्राइजेस - घरगुती इलेक्ट्रॉनिक्स विक्री, ३०-महिने साप्ताहिक बचत योजना, वायरिंग व रिपेअरिंगची विश्वासू सेवा.
           </p>
         </div>
 
@@ -262,41 +262,41 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
             return (
               <div
                 key={srv.id}
-                className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-6 shadow-xs hover:shadow-lg hover:border-teal-500/50 transition-all duration-300 flex flex-col justify-between group"
+                className="tactile-card rounded-3xl border border-[var(--tactile-border)] p-6 shadow-xs hover:border-[var(--tactile-primary)] transition-all duration-300 flex flex-col justify-between group"
               >
                 <div className="space-y-4">
                   {/* Header with Icon & Category */}
                   <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/50 text-[#0D9488] dark:text-teal-300 flex items-center justify-center group-hover:bg-[#0D9488] group-hover:text-white transition-colors duration-300 shadow-xs">
+                    <div className="w-12 h-12 rounded-2xl tactile-inset text-[var(--tactile-primary)] flex items-center justify-center group-hover:bg-[var(--tactile-primary)] group-hover:text-white transition-colors duration-300 shadow-xs">
                       <Icon className="w-6 h-6 stroke-[2]" />
                     </div>
-                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-marathi">
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg tactile-inset text-[var(--tactile-text-muted)]">
                       {srv.category}
                     </span>
                   </div>
 
                   {/* Service Title */}
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-[#0D9488] transition-colors font-marathi">
+                    <h3 className="text-lg font-black text-[var(--tactile-text-heading)] group-hover:text-[var(--tactile-primary)] transition-colors">
                       {srv.nameMr}
                     </h3>
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mt-0.5">
+                    <span className="text-xs font-medium text-[var(--tactile-text-dim)] block mt-0.5">
                       {srv.nameEn}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-marathi">
+                  <p className="text-xs text-[var(--tactile-text-muted)] leading-relaxed">
                     {srv.description}
                   </p>
 
                   {/* Advantages bullet points */}
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3.5 space-y-2 border border-slate-100 dark:border-slate-700">
-                    <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block font-marathi">
+                  <div className="tactile-inset rounded-2xl p-3.5 space-y-2 border border-[var(--tactile-border-subtle)]">
+                    <span className="text-[10px] font-black uppercase text-[var(--tactile-text-dim)] tracking-wider block">
                       मुख्य वैशिष्ट्ये व फायदे (Key Advantages):
                     </span>
                     {srv.advantages.map((adv, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-marathi">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <div key={idx} className="flex items-start gap-2 text-xs text-[var(--tactile-text-main)]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                         <span className="leading-snug">{adv}</span>
                       </div>
                     ))}
@@ -304,20 +304,20 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
                 </div>
 
                 {/* Bottom Action & Quote Button */}
-                <div className="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="pt-5 mt-5 border-t border-[var(--tactile-border-subtle)] space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium font-marathi">दर स्वरूप:</span>
-                    <span className="font-bold text-slate-900 dark:text-white text-[11px] text-right font-marathi">
+                    <span className="text-[11px] text-[var(--tactile-text-muted)] font-medium">दर स्वरूप:</span>
+                    <span className="font-bold text-[var(--tactile-text-heading)] text-[11px] text-right">
                       {srv.pricingHint}
                     </span>
                   </div>
 
                   <button
                     onClick={() => handleSelectServiceForQuote(srv.nameMr)}
-                    className="w-full py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#0D9488] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                    className="w-full py-2.5 rounded-xl tactile-btn-primary text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                   >
-                    <span className="font-marathi">दरपत्रक मिळवा (Request a Quote)</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-teal-300" />
+                    <span>Request a Quote / दरपत्रक मिळवा</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-amber-300 group-hover:text-white" />
                   </button>
                 </div>
               </div>
@@ -466,14 +466,14 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
       {/* 3. SOCIAL PROOF & TRUST FACTORS (समाधानी ग्राहकांचे अभिप्राय व ५-स्टार रिव्ह्यूज) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto space-y-2 mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800/60">
             <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
             ग्राहकांचा विश्वास (100% Verified Customer Reviews)
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
             वर्धा जिल्ह्यातील समाधानी ग्राहकांचे अभिप्राय
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
             श्री साई इंटरप्राइजेसने गेल्या अनेक वर्षांत शेकडो कुटुंबांचा विश्वास संपादन केला आहे.
           </p>
         </div>
@@ -482,7 +482,7 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
           {testimonials.map((t, idx) => (
             <div
               key={idx}
-              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-300 transition"
+              className="bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-400 dark:hover:border-amber-500 transition"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -494,21 +494,21 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
                   <span className="text-[10px] text-slate-400">{t.date}</span>
                 </div>
 
-                <p className="text-xs text-slate-700 leading-relaxed italic">
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
                   "{t.review}"
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-slate-100">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-slate-900 text-xs">{t.name}</h4>
-                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <MapPin className="w-2.5 h-2.5 text-blue-600" />
+                    <h4 className="font-bold text-slate-900 dark:text-white text-xs">{t.name}</h4>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <MapPin className="w-2.5 h-2.5 text-blue-500" />
                       {t.location}
                     </span>
                   </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">
+                  <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
                     सत्यापित ग्राहक
                   </span>
                 </div>
@@ -521,13 +521,13 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
       {/* 4. PROJECT GALLERY / WORK SHOWCASE (पूर्ण झालेल्या कामांचे व डिलिव्हरीचे फोटो) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto space-y-2 mb-8">
-          <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">
+          <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
             Work Showcase & Delivery Gallery
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
             कामांचे फोटो व डिलिव्हरीचे क्षण
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
             आमच्या दर्जेदार उत्पादने, कुलर स्टॉक व वर्धा परिसरातील यशस्वी डिलिव्हरीची काही क्षणचित्रे.
           </p>
         </div>
@@ -536,9 +536,9 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
           {galleryItems.map((item, idx) => (
             <div
               key={idx}
-              className="group bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col"
+              className="group bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col"
             >
-              <div className="relative h-48 overflow-hidden bg-slate-100">
+              <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-[#0F172A]">
                 <img
                   src={item.imageUrl}
                   alt={`Shri Sai Enterprises Wardha - ${item.title}`}
@@ -550,10 +550,10 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
                 </span>
               </div>
               <div className="p-4 space-y-1">
-                <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-blue-600 transition">
+                <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm leading-snug group-hover:text-blue-500 transition">
                   {item.title}
                 </h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   {item.subtitle}
                 </p>
               </div>
@@ -564,17 +564,17 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
 
       {/* 5. GOOGLE BUSINESS PROFILE (GOOGLE MAP) & LOCATION GUIDE */}
       <section id="location" className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-xs space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+        <div className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-10 shadow-xs space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-2">
-                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold mb-2">
+                <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 Google Business Profile • Wardha Location
               </div>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                 Shri Sai Enterprises (Google Map वर थेट शोधा)
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                 मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - 442001
               </p>
             </div>
@@ -591,7 +591,7 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
               </a>
               <a
                 href="tel:8766486915"
-                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-amber-400 hover:bg-slate-800 dark:hover:bg-amber-300 text-amber-300 dark:text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5" />
                 8766486915 वर कॉल करा
@@ -600,24 +600,24 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="font-bold text-slate-900 block">दुकान उघडे असण्याची वेळ:</span>
-              <p className="text-slate-600">सोमवार ते रविवार: सकाळी ९:०० ते रात्री ९:००</p>
-              <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
+              <span className="font-bold text-slate-900 dark:text-white block">दुकान उघडे असण्याची वेळ:</span>
+              <p className="text-slate-600 dark:text-slate-300">सोमवार ते रविवार: सकाळी ९:०० ते रात्री ९:००</p>
+              <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-[10px]">
                 आठवड्याचे ७ दिवस सुरू
               </span>
             </div>
 
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="font-bold text-slate-900 block">जवळचा महत्त्वाचा लँडमार्क:</span>
-              <p className="text-slate-600">मातोश्री सभागृहाच्या अगदी समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा.</p>
+            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
+              <span className="font-bold text-slate-900 dark:text-white block">जवळचा महत्त्वाचा लँडमार्क:</span>
+              <p className="text-slate-600 dark:text-slate-300">मातोश्री सभागृहाच्या अगदी समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा.</p>
               <span className="text-[10px] text-slate-400">पिनकोड: 442001</span>
             </div>
 
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="font-bold text-slate-900 block">अधिकृत व्यवसाय नोंदणी:</span>
-              <p className="text-slate-600 font-mono">GSTIN: 27ALOPL0030G2ZC</p>
-              <p className="text-slate-600 font-mono">Udyam: UDYAM-MH-33-0012948</p>
+            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
+              <span className="font-bold text-slate-900 dark:text-white block">अधिकृत व्यवसाय नोंदणी:</span>
+              <p className="text-slate-600 dark:text-slate-300 font-mono">GSTIN: 27ALOPL0030G2ZC</p>
+              <p className="text-slate-600 dark:text-slate-300 font-mono">Udyam: UDYAM-MH-33-0012948</p>
             </div>
           </div>
         </div>
@@ -625,31 +625,31 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
 
       {/* 6. TRUST LINKS & LEGAL PAGES BAR (About Us, Contact Us, Privacy Policy & Warranty) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="bg-slate-100 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600 border border-slate-200">
+        <div className="bg-slate-100 dark:bg-[#1E293B] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
           <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={() => setActiveModal('about')}
-              className="font-semibold text-slate-800 hover:text-blue-700 transition cursor-pointer"
+              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
             >
               आमच्याबद्दल (About Us)
             </button>
             <span>•</span>
             <button
               onClick={() => setActiveModal('contact')}
-              className="font-semibold text-slate-800 hover:text-blue-700 transition cursor-pointer"
+              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
             >
               संपर्क व पत्ता (Contact Us)
             </button>
             <span>•</span>
             <button
               onClick={() => setActiveModal('privacy')}
-              className="font-semibold text-slate-800 hover:text-blue-700 transition cursor-pointer"
+              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
             >
               गोपनीयता धोरण व वॉरंटी नियम (Privacy Policy & Warranty)
             </button>
           </div>
 
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
             Shri Sai Enterprises © 2026 • shrisaient.in
           </div>
         </div>
@@ -658,30 +658,30 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
       {/* LEGAL / INFO MODALS */}
       {activeModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 animate-fade-in max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-black text-slate-900 text-base">
+          <div className="bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 animate-fade-in max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-black text-slate-900 dark:text-white text-base">
                 {activeModal === 'about' && 'आमच्याबद्दल (About Shri Sai Enterprises)'}
                 {activeModal === 'contact' && 'संपर्क व पत्ता (Contact Us)'}
                 {activeModal === 'privacy' && 'गोपनीयता धोरण आणि वॉरंटी अटी'}
               </h3>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {activeModal === 'about' && (
-              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                 <p>
                   <strong>श्री साई इंटरप्राइजेस (Shri Sai Enterprises)</strong> ही वर्धा शहरातील अग्रगण्य इलेक्ट्रॉनिक्स व घरगुती उपकरणे विक्री, इलेक्ट्रिकल वायरिंग आणि ३०-महिने साप्ताहिक बचत कार्ड योजना चालवणारी अधिकृत व नोंदणीकृत संस्था आहे.
                 </p>
                 <p>
                   आमचे मुख्य ध्येय म्हणजे वर्धा व लगतच्या ग्रामीण भागातील प्रत्येक कुटुंबाला वाजवी दरात उच्च दर्जाचे ब्रँडेड इलेक्ट्रॉनिक्स साहित्य पुरवणे.
                 </p>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1 font-mono">
+                <div className="bg-slate-50 dark:bg-[#0F172A] p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1 font-mono">
                   <p>नोंदणीकृत नाव: Shri Sai Enterprises</p>
                   <p>GSTIN: 27ALOPL0030G2ZC</p>
                   <p>उद्योग आधार: UDYAM-MH-33-0012948</p>
@@ -691,9 +691,9 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
             )}
 
             {activeModal === 'contact' && (
-              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                 <p>आपण आम्हाला खालील पत्त्यावर किंवा फोनवर थेट संपर्क साधू शकता:</p>
-                <div className="space-y-2 font-mono text-slate-800">
+                <div className="space-y-2 font-mono text-slate-800 dark:text-slate-200">
                   <p>📞 WhatsApp व कॉल 1: <strong>8766486915</strong></p>
                   <p>📞 WhatsApp व कॉल 2: <strong>8600122798</strong></p>
                   <p>📞 इतर फोन: 9175534365, 7822859073</p>
@@ -713,13 +713,13 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
             )}
 
             {activeModal === 'privacy' && (
-              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
-                <p className="font-bold text-slate-900">१. गोपनीयता धोरण (Privacy Policy):</p>
+              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p className="font-bold text-slate-900 dark:text-white">१. गोपनीयता धोरण (Privacy Policy):</p>
                 <p>
                   ग्राहकाने दिलेले नाव, पत्ता आणि मोबाईल क्रमांक केवळ ऑर्डर डिलिव्हरी, वॉरंटी नोंद आणि बचत योजनेच्या पासबुक नोंदीसाठीच वापरले जातात. ग्राहकांची वैयक्तिक माहिती कोणत्याही तृतीय पक्षाला विकली जात नाही.
                 </p>
-                <p className="font-bold text-slate-900 pt-2">२. वॉरंटी व विक्री अटी (Official Disclaimer):</p>
-                <p className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-amber-950">
+                <p className="font-bold text-slate-900 dark:text-white pt-2">२. वॉरंटी व विक्री अटी (Official Disclaimer):</p>
+                <p className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-800/60 text-amber-950 dark:text-amber-200">
                   दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस कंपनीच्या सर्व्हिस सेण्टरचा मोबाईल नंबर घ्यावा.
                 </p>
                 <p>
@@ -728,10 +728,10 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
               <button
                 onClick={() => setActiveModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950 font-bold text-xs cursor-pointer"
               >
                 बंद करा (Close)
               </button>

@@ -35,7 +35,6 @@ import {
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
 import { CardPassbookModal } from './CardPassbookModal';
-import { CollectionSlipModal } from './CollectionSlipModal';
 
 interface CardSchemeViewProps {
   cardMembers?: CardMember[];
@@ -48,6 +47,8 @@ interface CardSchemeViewProps {
   onRecordTransaction: (tx: Omit<CardTransaction, 'id' | 'createdAt'>) => void;
   onNavigateCsv?: () => void;
   salesBills?: any;
+  initialAction?: 'payment' | 'add-card' | null;
+  onClearInitialAction?: () => void;
 }
 
 export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
@@ -60,6 +61,9 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   onAddMember,
   onRecordTransaction,
   onNavigateCsv,
+  salesBills = [],
+  initialAction,
+  onClearInitialAction,
 }) => {
   // Safe resolution of data arrays to prevent any undefined error
   const members = useMemo(
@@ -96,10 +100,17 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedMemberForPassbook, setSelectedMemberForPassbook] = useState<CardMember | null>(null);
-  const [activeCollectionSlipTx, setActiveCollectionSlipTx] = useState<{
-    transaction: CardTransaction;
-    member?: CardMember;
-  } | null>(null);
+
+  // Trigger quick modal actions from top shortcut buttons
+  useEffect(() => {
+    if (initialAction === 'payment') {
+      setShowPaymentModal(true);
+      onClearInitialAction?.();
+    } else if (initialAction === 'add-card') {
+      setShowAddCardModal(true);
+      onClearInitialAction?.();
+    }
+  }, [initialAction, onClearInitialAction]);
 
   // New Card Form state
   const [newCardScheme, setNewCardScheme] = useState<CardSchemeId>('scheme1');
@@ -122,6 +133,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentAgentName, setPaymentAgentName] = useState(activeAgent);
   const [paymentRemarks, setPaymentRemarks] = useState('');
+  const [sendWhatsAppOnPayment, setSendWhatsAppOnPayment] = useState(true);
 
   // Refund Form state
   const [refundCardSearch, setRefundCardSearch] = useState('');
@@ -311,7 +323,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     const date = new Date().toISOString().split('T')[0];
     const finalAgent = paymentAgentName.trim() || activeAgent;
 
-    const txData: Omit<CardTransaction, 'id'> = {
+    onRecordTransaction({
       cardId: paymentSelectedCard.id,
       cardNumber: paymentSelectedCard.cardNumber,
       schemeId: paymentSelectedCard.schemeId,
@@ -326,25 +338,33 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       agentName: finalAgent,
       remarks: paymentRemarks || `Week ${paymentWeekNo} Installment collected by ${finalAgent}`,
       balanceAfter: newBalance,
-      createdAt: new Date().toISOString(),
-    };
-
-    onRecordTransaction(txData);
-
-    // If customer has a number or whenever payment is collected, immediately open Collection Slip for Print & WhatsApp
-    setActiveCollectionSlipTx({
-      transaction: {
-        ...txData,
-        id: `ctx-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      },
-      member: paymentSelectedCard,
     });
+
+    // Auto-send WhatsApp receipt if customer has mobile number
+    if (sendWhatsAppOnPayment && paymentSelectedCard.phone && paymentSelectedCard.phone.trim().length >= 10) {
+      const cleanPhone = paymentSelectedCard.phone.replace(/[^0-9]/g, '');
+      const waMessage = encodeURIComponent(
+        `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
+        `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
+        `--------------------------------\n` +
+        `पावती क्र.: *${receiptNo}*\n` +
+        `तारीख: ${date}\n` +
+        `कार्ड क्र.: *#${paymentSelectedCard.cardNumber}* (${paymentSelectedCard.schemeName})\n` +
+        `नाव: *${paymentSelectedCard.customerName}*\n` +
+        `जमा रक्कम: *₹${(Number(paymentAmount) || 0).toLocaleString()}* (Week ${paymentWeekNo})\n` +
+        `पेमेंट मोड: ${paymentMode} | एजंट: ${finalAgent}\n` +
+        `खात्यात एकूण शिल्लक जमा: *₹${(Number(newBalance) || 0).toLocaleString()}*\n` +
+        `--------------------------------\n` +
+        `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
+        `📞 संपर्क: ${settings.phone || '8766486915'}`
+      );
+      window.open(`https://wa.me/91${cleanPhone}?text=${waMessage}`, '_blank');
+    }
 
     // Success flash notification
     setLastActionMessage({
-      title: `₹${paymentAmount.toLocaleString()} Weekly Payment Deposited!`,
-      text: `Card #${paymentSelectedCard.cardNumber} (${paymentSelectedCard.customerName}) | New Balance: ₹${newBalance.toLocaleString()} | Agent: ${finalAgent}`,
+      title: `₹${(Number(paymentAmount) || 0).toLocaleString()} Weekly Payment Deposited!`,
+      text: `Card #${paymentSelectedCard.cardNumber} (${paymentSelectedCard.customerName}) | New Balance: ₹${(Number(newBalance) || 0).toLocaleString()} | Agent: ${finalAgent}`,
       card: { ...paymentSelectedCard, netBalance: newBalance },
     });
 
@@ -390,8 +410,8 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
 
     // Success flash notification
     setLastActionMessage({
-      title: `₹${refundAmount.toLocaleString()} Refund Processed!`,
-      text: `Card #${refundSelectedCard.cardNumber} (${refundSelectedCard.customerName}) | Remaining Balance: ₹${newBalance.toLocaleString()} | Agent: ${finalAgent}`,
+      title: `₹${(Number(refundAmount) || 0).toLocaleString()} Refund Processed!`,
+      text: `Card #${refundSelectedCard.cardNumber} (${refundSelectedCard.customerName}) | Remaining Balance: ₹${(Number(newBalance) || 0).toLocaleString()} | Agent: ${finalAgent}`,
       card: { ...refundSelectedCard, netBalance: newBalance },
     });
 
@@ -733,7 +753,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       </div>
 
       {/* Search & Filter Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+      <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-2xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
           {/* Universal Search */}
           <div className="sm:col-span-4 relative">
@@ -743,7 +763,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search Card # (e.g. 4107), Customer, Village, Sheet #, Agent..."
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm sm:text-xs bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-blue-500"
             />
           </div>
 
@@ -752,7 +772,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <select
               value={selectedSchemeFilter}
               onChange={(e) => setSelectedSchemeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
             >
               <option value="all">All Schemes (सभी योजनाएं)</option>
               {SCHEMES_CONFIG.map((sc) => (
@@ -768,7 +788,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <select
               value={selectedVillageFilter}
               onChange={(e) => setSelectedVillageFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
             >
               <option value="all">All Villages (सभी गांव)</option>
               {villageList.map((v) => (
@@ -784,7 +804,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <select
               value={selectedAgentFilter}
               onChange={(e) => setSelectedAgentFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
             >
               <option value="all">All Agents (सभी एजेंट)</option>
               {agentList.map((a) => (
@@ -797,10 +817,10 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
         </div>
 
         {/* Quick Filter Status Bar */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 flex-wrap gap-2">
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span>
-              Showing <strong>{filteredMembers.length}</strong> of <strong>{members.length}</strong> card members
+              Showing <strong className="text-slate-900 dark:text-white">{filteredMembers.length}</strong> of <strong className="text-slate-900 dark:text-white">{members.length}</strong> card members
             </span>
             {(selectedSchemeFilter !== 'all' || selectedVillageFilter !== 'all' || selectedAgentFilter !== 'all' || searchQuery) && (
               <button
@@ -810,23 +830,23 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                   setSelectedAgentFilter('all');
                   setSearchQuery('');
                 }}
-                className="text-blue-600 underline font-semibold text-[11px] cursor-pointer"
+                className="text-blue-600 dark:text-blue-400 underline font-semibold text-[11px] cursor-pointer"
               >
                 Clear all filters
               </button>
             )}
           </div>
-          <span className="text-[11px] text-slate-400">
-            Current Agent in Session: <strong>{activeAgent}</strong>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            Current Agent in Session: <strong className="text-slate-700 dark:text-slate-300">{activeAgent}</strong>
           </span>
         </div>
       </div>
 
       {/* Card Members Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+          <table className="w-full text-left text-sm sm:text-xs">
+            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700 text-xs sm:text-[11px]">
               <tr>
                 <th className="py-3 px-4">Card # / Scheme</th>
                 <th className="py-3 px-4">Customer Name & Phone</th>
@@ -839,16 +859,16 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                 <th className="py-3 px-4 text-center">Quick Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-slate-50/80 transition">
+                <tr key={member.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-750 transition">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-mono font-bold text-xs border border-blue-200">
+                      <span className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-mono font-bold text-sm sm:text-xs border border-blue-200 dark:border-blue-800">
                         #{member.cardNumber}
                       </span>
                       <div>
-                        <span className="text-[11px] text-slate-500 font-medium block">
+                        <span className="text-xs sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium block">
                           {member.schemeName}
                         </span>
                       </div>
@@ -856,29 +876,29 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                   </td>
 
                   <td className="py-3 px-4">
-                    <p className="font-bold text-slate-900">{member.customerName}</p>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm sm:text-xs">{member.customerName}</p>
                     {member.phone ? (
-                      <p className="text-slate-500 font-mono text-[11px] flex items-center gap-1 mt-0.5">
+                      <p className="text-slate-500 dark:text-slate-400 font-mono text-xs sm:text-[11px] flex items-center gap-1 mt-0.5">
                         <Phone className="w-2.5 h-2.5" />
                         {member.phone}
                       </p>
                     ) : (
-                      <span className="text-slate-400 text-[10px]">No mobile</span>
+                      <span className="text-slate-400 dark:text-slate-500 text-xs sm:text-[10px]">No mobile</span>
                     )}
                   </td>
 
                   <td className="py-3 px-4">
                     <div className="flex flex-col gap-0.5">
                       {member.village ? (
-                        <span className="inline-flex items-center gap-1 font-semibold text-slate-800 text-xs">
-                          <MapPin className="w-3 h-3 text-emerald-600" />
+                        <span className="inline-flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200 text-sm sm:text-xs">
+                          <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                           {member.village}
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-[11px]">-</span>
+                        <span className="text-slate-400 dark:text-slate-500 text-xs sm:text-[11px]">-</span>
                       )}
                       {member.sheetNo && (
-                        <span className="text-[10px] font-mono font-medium text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded w-fit border border-blue-100">
+                        <span className="text-xs sm:text-[10px] font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.2 rounded w-fit border border-blue-100 dark:border-blue-800">
                           Sheet #{member.sheetNo}
                         </span>
                       )}
@@ -888,15 +908,15 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                   <td className="py-3 px-4">
                     <div className="flex flex-col gap-0.5">
                       {member.agentName ? (
-                        <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 text-[11px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 w-fit">
+                        <span className="inline-flex items-center gap-1 font-semibold text-indigo-700 dark:text-indigo-300 text-xs sm:text-[11px] bg-indigo-50 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 w-fit">
                           <UserCheck className="w-2.5 h-2.5" />
                           {member.agentName}
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-[11px]">-</span>
+                        <span className="text-slate-400 dark:text-slate-500 text-xs sm:text-[11px]">-</span>
                       )}
                       {member.uniqueId && (
-                        <span className="text-[10px] font-mono text-slate-400">
+                        <span className="text-xs sm:text-[10px] font-mono text-slate-400 dark:text-slate-500">
                           {member.uniqueId}
                         </span>
                       )}
@@ -904,22 +924,22 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                   </td>
 
                   <td className="py-3 px-4 text-center">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs sm:text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                       <CheckCircle2 className="w-3 h-3" />
                       ₹50 Paid
                     </span>
                   </td>
 
-                  <td className="py-3 px-4 text-right font-bold text-emerald-600">
+                  <td className="py-3 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono-num text-base sm:text-xs">
                     ₹{(member.totalDeposited ?? 0).toLocaleString()}
                   </td>
 
-                  <td className="py-3 px-4 text-right font-semibold text-rose-600">
+                  <td className="py-3 px-4 text-right font-semibold text-rose-600 dark:text-rose-400 font-mono-num text-base sm:text-xs">
                     {(member.totalRefunded ?? 0) > 0 ? `₹${(member.totalRefunded ?? 0).toLocaleString()}` : '₹0'}
                   </td>
 
                   <td className="py-3 px-4 text-right">
-                    <span className="font-bold text-slate-900 text-sm">
+                    <span className="font-bold text-slate-900 dark:text-white font-mono-num text-base sm:text-sm">
                       ₹{(member.netBalance ?? 0).toLocaleString()}
                     </span>
                   </td>
@@ -928,7 +948,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => setSelectedMemberForPassbook(member)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs transition cursor-pointer border border-blue-200"
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 font-bold text-xs transition cursor-pointer border border-blue-200 dark:border-blue-800"
                         title="View Passbook / Ledger"
                       >
                         Passbook
@@ -940,7 +960,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           setPaymentAgentName(activeAgent);
                           setShowPaymentModal(true);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition cursor-pointer border border-emerald-200"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition cursor-pointer border border-emerald-200 dark:border-emerald-800"
                         title="Deposit Weekly Payment"
                       >
                         + Pay
@@ -952,49 +972,15 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           setRefundAgentName(activeAgent);
                           setShowRefundModal(true);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition cursor-pointer border border-rose-200"
+                        className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer border border-rose-200 dark:border-rose-800"
                         title="Refund / Return"
                       >
                         Refund
                       </button>
 
                       <button
-                        onClick={() => {
-                          const lastTx = transactions
-                            .filter((t) => t.cardId === member.id || t.cardNumber === member.cardNumber)
-                            .slice(-1)[0];
-                          if (lastTx) {
-                            setActiveCollectionSlipTx({ transaction: lastTx, member });
-                          } else {
-                            setActiveCollectionSlipTx({
-                              transaction: {
-                                id: `slip-${member.id}`,
-                                cardId: member.id,
-                                cardNumber: member.cardNumber,
-                                schemeId: member.schemeId,
-                                customerName: member.customerName,
-                                customerPhone: member.phone,
-                                receiptNo: `REC-${member.cardNumber}-${member.sheetNo || 'OPN'}`,
-                                date: new Date().toISOString().split('T')[0],
-                                type: 'WeeklyPayment',
-                                amount: member.totalDeposited || member.netBalance || 50,
-                                paymentMode: 'Cash',
-                                balanceAfter: member.netBalance,
-                                createdAt: new Date().toISOString(),
-                              },
-                              member,
-                            });
-                          }
-                        }}
-                        className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                        title="Print Collection Slip / पावती प्रिंट करा"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
                         onClick={() => handleShareWhatsApp(member)}
-                        className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                        className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
                         title="Share on WhatsApp"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -1006,7 +992,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
 
               {filteredMembers.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm sm:text-xs">
                     No card members found matching your search or filter.
                   </td>
                 </tr>
@@ -1021,24 +1007,24 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {showAddCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Issue New Scheme Card (नया कार्ड बनाएं)</h3>
-                <p className="text-xs text-slate-500">
-                  Fixed Registration Fee: ₹50 • Agent: <strong className="text-blue-600 font-bold">{newAgentName || activeAgent}</strong>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Issue New Scheme Card (नया कार्ड बनाएं)</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Fixed Registration Fee: ₹50 • Agent: <strong className="text-blue-600 dark:text-blue-400 font-bold">{newAgentName || activeAgent}</strong>
                 </p>
               </div>
               <button
                 onClick={() => setShowAddCardModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {newCardError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{newCardError}</span>
               </div>
@@ -1047,7 +1033,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <form onSubmit={handleCreateCard} className="space-y-3.5">
               {/* Scheme Select */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Select Card Scheme *
                 </label>
                 <select
@@ -1060,7 +1046,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       setNewCardNumber(cfg.startCardNo + members.filter((m) => m.schemeId === sId).length);
                     }
                   }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                 >
                   {SCHEMES_CONFIG.map((sc) => (
                     <option key={sc.id} value={sc.id}>
@@ -1073,7 +1059,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               {/* Card No & Unique ID */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Card Number (कार्ड नं.) *
                   </label>
                   <input
@@ -1081,16 +1067,16 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     required
                     value={newCardNumber}
                     onChange={(e) => setNewCardNumber(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   />
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
                     Range: {SCHEMES_CONFIG.find((s) => s.id === newCardScheme)?.startCardNo} -{' '}
                     {SCHEMES_CONFIG.find((s) => s.id === newCardScheme)?.endCardNo}
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Unique ID (यूनिक आईडी) *
                   </label>
                   <input
@@ -1098,7 +1084,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     required
                     value={newUniqueId}
                     onChange={(e) => setNewUniqueId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono bg-slate-50"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -1106,7 +1092,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               {/* Customer Name & Phone */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Customer Name (ग्राहक का नाम) *
                   </label>
                   <input
@@ -1115,12 +1101,12 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     placeholder="e.g. Ramesh Patil"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Mobile Number (मोबाइल नं.) *
                   </label>
                   <input
@@ -1129,7 +1115,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
                     placeholder="e.g. 9823012345"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -1137,13 +1123,13 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               {/* Village & Sheet No */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Village (गांव) *
                   </label>
                   <select
                     value={newVillage}
                     onChange={(e) => setNewVillage(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     {villageList.map((v) => (
                       <option key={v} value={v}>
@@ -1160,13 +1146,13 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       value={newCustomVillage}
                       onChange={(e) => setNewCustomVillage(e.target.value)}
                       placeholder="Enter village name..."
-                      className="w-full mt-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                      className="w-full mt-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                     />
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Sheet No (शीट नंबर) *
                   </label>
                   <input
@@ -1175,7 +1161,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={newSheetNo}
                     onChange={(e) => setNewSheetNo(e.target.value)}
                     placeholder="e.g. 21 or Sheet-A"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
@@ -1183,7 +1169,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               {/* Agent Name & Registration Fee */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Agent Name (एजेंट का नाम) *
                   </label>
                   <input
@@ -1192,16 +1178,16 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={newAgentName}
                     onChange={(e) => setNewAgentName(e.target.value)}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium bg-blue-50/50"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium bg-blue-50/50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Registration Fee (Fixed)
                   </label>
-                  <div className="flex items-center gap-2 px-3 py-2 border border-emerald-200 bg-emerald-50 rounded-lg text-sm font-bold text-emerald-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="flex items-center gap-2 px-3 py-2 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span>₹50 (Compulsory Paid)</span>
                   </div>
                 </div>
@@ -1209,7 +1195,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
 
               {/* Optional Initial Installment */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Optional Initial Deposit / Week 1 Installment (₹)
                 </label>
                 <div className="flex items-center gap-2">
@@ -1221,7 +1207,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
                         newInitialDeposit === amt
                           ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
                       {amt === 0 ? 'None' : `₹${amt}`}
@@ -1230,11 +1216,11 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddCardModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1255,17 +1241,17 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl my-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Weekly Installment Collection</h3>
-                <p className="text-xs text-slate-500">
-                  Agent in charge: <strong className="text-emerald-700">{paymentAgentName || activeAgent}</strong>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Weekly Installment Collection</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Agent in charge: <strong className="text-emerald-700 dark:text-emerald-400">{paymentAgentName || activeAgent}</strong>
                 </p>
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -1274,7 +1260,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <form onSubmit={handlePaymentSubmit} className="space-y-4">
               {!paymentSelectedCard ? (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Search Card # or Customer Name *
                   </label>
                   <input
@@ -1282,10 +1268,10 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={paymentCardSearch}
                     onChange={(e) => setPaymentCardSearch(e.target.value)}
                     placeholder="Search Card # (e.g. 4107) or Name..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm mb-2"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
 
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                     {members
                       .filter(
                         (m) =>
@@ -1299,47 +1285,47 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                         <div
                           key={m.id}
                           onClick={() => setPaymentSelectedCard(m)}
-                          className="p-2.5 text-xs hover:bg-blue-50 cursor-pointer flex items-center justify-between transition"
+                          className="p-2.5 text-xs hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition"
                         >
                           <div>
-                            <span className="font-bold text-blue-600 font-mono">#{m.cardNumber}</span> -{' '}
-                            <span className="font-bold text-slate-800">{m.customerName}</span>
-                            <span className="text-slate-500 text-[11px] block">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">#{m.cardNumber}</span> -{' '}
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{m.customerName}</span>
+                            <span className="text-slate-500 dark:text-slate-400 text-[11px] block">
                               {m.village ? `📍 ${m.village}` : ''} {m.sheetNo ? `• Sheet #${m.sheetNo}` : ''}
                             </span>
                           </div>
-                          <span className="font-bold text-emerald-700">₹{(m.netBalance ?? 0).toLocaleString()}</span>
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400">₹{(m.netBalance ?? 0).toLocaleString()}</span>
                         </div>
                       ))}
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+                  <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-mono font-bold text-emerald-700">
+                      <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300">
                         Card #{paymentSelectedCard.cardNumber} ({paymentSelectedCard.schemeName})
                       </span>
                       <button
                         type="button"
                         onClick={() => setPaymentSelectedCard(null)}
-                        className="text-[11px] text-emerald-600 underline font-medium cursor-pointer"
+                        className="text-[11px] text-emerald-600 dark:text-emerald-400 underline font-medium cursor-pointer"
                       >
                         Change Card
                       </button>
                     </div>
-                    <p className="font-bold text-slate-900 text-sm">{paymentSelectedCard.customerName}</p>
-                    <p className="text-xs text-slate-600">
+                    <p className="font-bold text-slate-900 dark:text-white text-sm">{paymentSelectedCard.customerName}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
                       Village: {paymentSelectedCard.village || 'N/A'} • Sheet: {paymentSelectedCard.sheetNo || 'N/A'}
                     </p>
-                    <p className="text-xs font-semibold text-emerald-800">
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                       Current Deposited Balance: ₹{(paymentSelectedCard.netBalance ?? 0).toLocaleString()}
                     </p>
                   </div>
 
                   {/* Payment Amount Fast Selector */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Installment Amount (₹) *
                     </label>
                     <div className="grid grid-cols-4 gap-2 mb-2">
@@ -1351,7 +1337,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           className={`py-2 rounded-lg font-bold text-xs transition cursor-pointer ${
                             paymentAmount === amt
                               ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
                           ₹{amt}
@@ -1363,14 +1349,14 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       required
                       value={paymentAmount || ''}
                       onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-emerald-700"
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-800"
                     />
                   </div>
 
                   {/* Week Number & Mode */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                         Week Number
                       </label>
                       <input
@@ -1379,17 +1365,17 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                         max="52"
                         value={paymentWeekNo}
                         onChange={(e) => setPaymentWeekNo(parseInt(e.target.value) || 1)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold"
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                         Payment Mode
                       </label>
                       <select
                         value={paymentMode}
                         onChange={(e) => setPaymentMode(e.target.value as any)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       >
                         <option value="Cash">Cash (नकद)</option>
                         <option value="Online">Online / UPI (फोनपे/GPay)</option>
@@ -1398,22 +1384,22 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Collecting Agent Name
                     </label>
                     <input
                       type="text"
                       value={paymentAgentName}
                       onChange={(e) => setPaymentAgentName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={() => setShowPaymentModal(false)}
-                      className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                      className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -1436,17 +1422,17 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {showRefundModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl my-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Return / Refund to Card Member</h3>
-                <p className="text-xs text-slate-500">
-                  Deduct from card deposits (e.g. ₹10,000 me se ₹5,000 wapas diye)
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Return / Refund to Card Member</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Deduct from card deposits (e.g. ₹10,000 me se ₹5,000 wapas दिए)
                 </p>
               </div>
               <button
                 onClick={() => setShowRefundModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -1455,7 +1441,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             <form onSubmit={handleRefundSubmit} className="space-y-4">
               {!refundSelectedCard ? (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Select Member Card *
                   </label>
                   <input
@@ -1463,9 +1449,9 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     value={refundCardSearch}
                     onChange={(e) => setRefundCardSearch(e.target.value)}
                     placeholder="Search Card # or Name..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm mb-2"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                     {members
                       .filter(
                         (m) =>
@@ -1482,46 +1468,46 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                             setRefundSelectedCard(m);
                             setRefundAmount(Math.min(5000, m.netBalance));
                           }}
-                          className="p-2.5 text-xs hover:bg-rose-50 cursor-pointer flex items-center justify-between transition"
+                          className="p-2.5 text-xs hover:bg-rose-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition"
                         >
                           <div>
-                            <span className="font-bold text-rose-600 font-mono">#{m.cardNumber}</span> -{' '}
-                            <span className="font-bold text-slate-800">{m.customerName}</span>
-                            <span className="text-slate-500 text-[11px] block">
+                            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">#{m.cardNumber}</span> -{' '}
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{m.customerName}</span>
+                            <span className="text-slate-500 dark:text-slate-400 text-[11px] block">
                               {m.village ? `📍 ${m.village}` : ''}
                             </span>
                           </div>
-                          <span className="font-bold text-slate-900">Balance: ₹{m.netBalance}</span>
+                          <span className="font-bold text-slate-900 dark:text-white">Balance: ₹{m.netBalance}</span>
                         </div>
                       ))}
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="p-3 bg-rose-50/70 border border-rose-200 rounded-xl space-y-1">
+                  <div className="p-3 bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl space-y-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-mono font-bold text-rose-700">
+                      <span className="text-xs font-mono font-bold text-rose-700 dark:text-rose-300">
                         Card #{refundSelectedCard.cardNumber} ({refundSelectedCard.schemeName})
                       </span>
                       <button
                         type="button"
                         onClick={() => setRefundSelectedCard(null)}
-                        className="text-[11px] text-rose-600 underline font-medium cursor-pointer"
+                        className="text-[11px] text-rose-600 dark:text-rose-400 underline font-medium cursor-pointer"
                       >
                         Change Card
                       </button>
                     </div>
-                    <p className="font-bold text-slate-900 text-sm">{refundSelectedCard.customerName}</p>
-                    <p className="text-xs text-slate-600">
+                    <p className="font-bold text-slate-900 dark:text-white text-sm">{refundSelectedCard.customerName}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
                       Current Deposited Balance:{' '}
-                      <strong className="text-rose-700 font-bold">
+                      <strong className="text-rose-700 dark:text-rose-300 font-bold">
                         ₹{(refundSelectedCard.netBalance ?? 0).toLocaleString()}
                       </strong>
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Refund Amount to Return (₹) *
                     </label>
                     <input
@@ -1530,45 +1516,45 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       max={refundSelectedCard.netBalance}
                       value={refundAmount || ''}
                       onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-rose-300 rounded-lg text-sm font-bold text-rose-700"
+                      className="w-full px-3 py-2 border border-rose-300 dark:border-rose-700 rounded-lg text-sm font-bold text-rose-700 dark:text-rose-300 bg-white dark:bg-slate-800"
                     />
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                       <span>Max refundable: ₹{(refundSelectedCard.netBalance ?? 0).toLocaleString()}</span>
-                      <span className="font-semibold text-slate-700">
-                        Balance after refund: ₹{Math.max(0, (refundSelectedCard.netBalance ?? 0) - refundAmount).toLocaleString()}
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        Balance after refund: ₹{Math.max(0, (Number(refundSelectedCard.netBalance) || 0) - (Number(refundAmount) || 0)).toLocaleString()}
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                         Refund Mode
                       </label>
                       <select
                         value={refundMode}
                         onChange={(e) => setRefundMode(e.target.value as any)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       >
                         <option value="Cash">Cash (नकद)</option>
                         <option value="Online">Online / UPI</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                         Processing Agent
                       </label>
                       <input
                         type="text"
                         value={refundAgentName}
                         onChange={(e) => setRefundAgentName(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50"
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Reason / Remarks
                     </label>
                     <input
@@ -1576,11 +1562,11 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       value={refundRemarks}
                       onChange={(e) => setRefundRemarks(e.target.value)}
                       placeholder="e.g. ₹5,000 returned to member upon request"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={() => setShowRefundModal(false)}
@@ -1607,22 +1593,11 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {selectedMemberForPassbook && (
         <CardPassbookModal
+          salesBills={salesBills || []}
           member={selectedMemberForPassbook}
           transactions={transactions}
           settings={settings}
           onClose={() => setSelectedMemberForPassbook(null)}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL 5: WEEKLY COLLECTION SLIP (PRINT & WHATSAPP TO CUSTOMER) */}
-      {/* ========================================================================= */}
-      {activeCollectionSlipTx && (
-        <CollectionSlipModal
-          transaction={activeCollectionSlipTx.transaction}
-          member={activeCollectionSlipTx.member}
-          settings={settings}
-          onClose={() => setActiveCollectionSlipTx(null)}
         />
       )}
     </div>

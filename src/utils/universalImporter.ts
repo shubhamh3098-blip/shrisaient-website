@@ -3,6 +3,7 @@ import {
   CardSchemeId,
   CardTransaction,
   Customer,
+  StockItem,
   TransactionEntry
 } from '../types';
 import {
@@ -23,9 +24,11 @@ export interface ImportAuditIssue {
 export interface UniversalImportResult {
   detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'unknown';
   bills: TransactionEntry[];
+  salesReceipts: TransactionEntry[];
   cardMembers: CardMember[];
   cardTransactions: CardTransaction[];
   customers: Customer[];
+  stockItems: StockItem[];
   auditIssues: ImportAuditIssue[];
   summaryText: string;
 }
@@ -74,9 +77,11 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
     return {
       detectedType: 'unknown',
       bills: [],
+      salesReceipts: [],
       cardMembers: [],
       cardTransactions: [],
       customers: [],
+      stockItems: [],
       auditIssues,
       summaryText: 'CSV file contains no data or is empty.',
     };
@@ -88,20 +93,49 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
   // Detect File Type
   let detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'unknown' = 'unknown';
 
-  if (headerJoined.includes('billno') || headerJoined.includes('grandtotal') || headerJoined.includes('amountpaid')) {
-    detectedType = 'bills';
-  } else if (headerJoined.includes('receiptno') || headerJoined.includes('refbillno') || headerJoined.includes('againstbillno')) {
+  // Receipt indicators (e.g. Receipt No, Amount Received, Against Bill No, Ref Bill No)
+  const hasReceiptIndicator =
+    headerJoined.includes('receiptno') ||
+    headerJoined.includes('amountreceived') ||
+    headerJoined.includes('againstbillno') ||
+    headerJoined.includes('refbillno') ||
+    headerJoined.includes('receivedby');
+
+  const hasGrandTotal =
+    headerJoined.includes('grandtotal') ||
+    headerJoined.includes('totalamount') ||
+    headerJoined.includes('subtotal') ||
+    headerJoined.includes('billamount');
+
+  // If receipt indicator is present and not an explicit multi-product bill with grand total
+  if (hasReceiptIndicator && !hasGrandTotal) {
     detectedType = 'receipts';
-  } else if (headerJoined.includes('agentname') || (headerJoined.includes('cardno') && headerJoined.includes('savingbalance'))) {
+  } else if (
+    headerLine.includes('billno') ||
+    headerLine.includes('invoiceno') ||
+    hasGrandTotal ||
+    headerJoined.includes('amountpaid')
+  ) {
+    detectedType = 'bills';
+  } else if (
+    headerJoined.includes('agentname') ||
+    (headerJoined.includes('cardno') && headerJoined.includes('savingbalance'))
+  ) {
     detectedType = 'cards_master';
-  } else if (headerJoined.includes('openingamt') || headerJoined.includes('sheetno') || (headerJoined.includes('name') && headerJoined.includes('cardno'))) {
+  } else if (
+    headerJoined.includes('openingamt') ||
+    headerJoined.includes('sheetno') ||
+    (headerJoined.includes('name') && headerJoined.includes('cardno'))
+  ) {
     detectedType = 'cards_raw';
   }
 
   const bills: TransactionEntry[] = [];
+  const salesReceipts: TransactionEntry[] = [];
   const cardMembers: CardMember[] = [];
   const cardTransactions: CardTransaction[] = [];
   const customerMap = new Map<string, Customer>();
+  const productMap = new Map<string, StockItem>();
 
   const getColIdx = (candidates: string[]): number => {
     for (const cand of candidates) {
@@ -117,11 +151,31 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
     const idxCust = getColIdx(['customername', 'name', 'customer']);
     const idxPhone = getColIdx(['mobile', 'phone', 'contact']);
     const idxVillage = getColIdx(['village', 'villege', 'city', 'town', 'address']);
-    const idxTotal = getColIdx(['grandtotal', 'totalamount', 'subtotal', 'total']);
-    const idxPaid = getColIdx(['amountpaid', 'paidamount', 'paid']);
+    const idxTotal = getColIdx(['grandtotal', 'totalamount', 'subtotal', 'total', 'billamount']);
+    const idxPaid = getColIdx(['amountpaid', 'paidamount', 'paid', 'cashpaid']);
     const idxDue = getColIdx(['balancedue', 'dueamount', 'due']);
     const idxMode = getColIdx(['paymentmode', 'mode']);
-    const idxRemarks = getColIdx(['remarks', 'agent', 'itemssummary']);
+    const idxProduct = getColIdx([
+      'product',
+      'productname',
+      'item',
+      'items',
+      'itemname',
+      'particulars',
+      'description',
+      'goods',
+      'article',
+      'model',
+      'itemdetails',
+      'products',
+      'itemdescription',
+      'sahitya',
+      'vastu'
+    ]);
+    const idxQty = getColIdx(['quantity', 'qty', 'qnty', 'pieces', 'nos', 'count', 'units', 'nag']);
+    const idxRate = getColIdx(['rate', 'price', 'unitprice', 'mrp', 'itemrate', 'cost', 'bhav', 'dar']);
+    const idxCategory = getColIdx(['category', 'brand', 'type', 'productcategory']);
+    const idxRemarks = getColIdx(['remarks', 'agent', 'itemssummary', 'notes']);
 
     for (let r = 1; r < parsed.length; r++) {
       const row = parsed[r];
@@ -211,7 +265,32 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       }
 
       const mode = (idxMode !== -1 && row[idxMode]?.toLowerCase().includes('credit')) ? 'Credit / Udhari' : 'Cash';
-      const items = (idxRemarks !== -1 && row[idxRemarks]) || 'Sales Invoice';
+      
+      // Extract Product Details
+      let productName = '';
+      if (idxProduct !== -1 && row[idxProduct]) {
+        productName = row[idxProduct].trim();
+      } else if (idxRemarks !== -1 && row[idxRemarks]) {
+        const cand = row[idxRemarks].trim();
+        if (cand && !['sales invoice', 'cash', 'credit', 'bill', 'direct', 'udhari', 'deposit'].includes(cand.toLowerCase())) {
+          productName = cand;
+        }
+      }
+
+      const rawQty = idxQty !== -1 && row[idxQty] ? row[idxQty] : '';
+      const quantity = Math.max(1, parseInt(rawQty.replace(/[^0-9]/g, ''), 10) || 1);
+
+      const rawRate = idxRate !== -1 && row[idxRate] ? row[idxRate] : '';
+      let unitPrice = parseFloat(rawRate.replace(/[^0-9.-]/g, '')) || 0;
+      if (unitPrice === 0 && total > 0 && quantity > 0) {
+        unitPrice = Math.round(total / quantity);
+      }
+
+      const rawCategory = idxCategory !== -1 && row[idxCategory] ? row[idxCategory].trim() : '';
+      const category = rawCategory || 'इलेक्ट्रॉनिक्स & घरगुती उपकरणे';
+
+      const displayItemName = productName || (idxRemarks !== -1 && row[idxRemarks] ? row[idxRemarks].trim() : 'विक्री बिल');
+      const itemDetails = `${displayItemName}${quantity > 1 ? ` (${quantity} नग)` : ''}${village ? ` - ${village}` : ''}`;
 
       bills.push({
         id: `bill-imp-${invoiceNo.replace(/[^a-zA-Z0-9-]/g, '')}`,
@@ -220,14 +299,43 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         customerName: cleanName,
         customerPhone: phone || undefined,
         village: village || undefined,
-        itemDetails: `${items}${village ? ` (${village})` : ''}`,
+        stockItemName: productName || undefined,
+        quantity,
+        unitPrice: unitPrice > 0 ? unitPrice : undefined,
+        category: category || undefined,
+        itemDetails,
         totalAmount: total,
         payingNow: paid,
         dueAmount: due,
         paymentMode: mode as any,
-        notes: `Bill: Total ₹${total}, Paid ₹${paid}, Due ₹${due}`,
+        notes: `Bill: Total ₹${total}, Paid ₹${paid}, Due ₹${due}${productName ? ` | प्रॉडक्ट: ${productName}` : ''}`,
         createdAt: new Date().toISOString(),
       });
+
+      // Accumulate into Product Catalog / Stock Items
+      if (productName && productName.length > 1 && !['sales invoice', 'bill', 'invoice', 'sales'].includes(productName.toLowerCase())) {
+        const prodKey = productName.toLowerCase().trim();
+        const existingProd = productMap.get(prodKey);
+        if (existingProd) {
+          existingProd.quantity += quantity;
+          if (unitPrice > 0) {
+            existingProd.sellingPrice = Math.max(existingProd.sellingPrice, unitPrice);
+          }
+        } else {
+          productMap.set(prodKey, {
+            id: `prod-${prodKey.replace(/[^a-z0-9]/g, '-') || Date.now()}`,
+            name: productName,
+            code: `PRD-${(productMap.size + 1).toString().padStart(3, '0')}`,
+            category: category,
+            quantity: quantity,
+            unit: 'नग (Piece)',
+            sellingPrice: unitPrice > 0 ? unitPrice : total,
+            purchasePrice: Math.round((unitPrice > 0 ? unitPrice : total) * 0.75),
+            minStockLevel: 5,
+            description: `Bill Import वरून आपोआप जोडलेली वस्तू (${invoiceNo})`,
+          });
+        }
+      }
 
       // Update customer map for Khata
       const custKey = cleanName.toLowerCase();
@@ -253,13 +361,19 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       }
     }
   } else if (detectedType === 'receipts') {
-    const idxRcptNo = getColIdx(['receiptno']);
-    const idxDate = getColIdx(['date']);
-    const idxCardNo = getColIdx(['cardno']);
-    const idxCust = getColIdx(['customername', 'name']);
-    const idxAmount = getColIdx(['amountreceived', 'amount']);
-    const idxBillNo = getColIdx(['refbillno', 'againstbillno']);
-    const idxRemarks = getColIdx(['remarks']);
+    const idxRcptNo = getColIdx(['receiptno', 'receipt', 'voucherno', 'rcptno', 'pavtino', 'pawtino']);
+    const idxDate = getColIdx(['date', 'receiptdate', 'voucherdate', 'billdate']);
+    const idxCardNo = getColIdx([
+      'cardno', 'cardnumber', 'card', 'cardnum', 'cno', 'crdno', 'card_no',
+      'schemecard', 'schemecardno', 'memberno', 'member_no', 'acno', 'accountno',
+      'passbookno', 'passbook', 'khatano', 'schemeno'
+    ]);
+    const idxCust = getColIdx(['customername', 'name', 'customer', 'partyname', 'clientname', 'grahak']);
+    const idxAmount = getColIdx(['amountreceived', 'amount', 'paid', 'totalreceived', 'receivedamount', 'jama']);
+    const idxRefBill = getColIdx(['refbillno', 'refbill', 'billno', 'bill']);
+    const idxAgainstBill = getColIdx(['againstbillno', 'againstbill', 'againstbill_no']);
+    const idxRemarks = getColIdx(['remarks', 'remark', 'note', 'notes', 'receivedby', 'details', 'particulars', 'narration']);
+    const idxMode = getColIdx(['paymentmode', 'mode', 'type']);
 
     for (let r = 1; r < parsed.length; r++) {
       const row = parsed[r];
@@ -279,9 +393,28 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       const { cleanName, extractedVillage } = cleanCustomerName(rawCust);
       const amount = parseFloat((idxAmount !== -1 && row[idxAmount]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
       const cardNoStr = idxCardNo !== -1 && row[idxCardNo] ? row[idxCardNo].trim() : '';
-      const cardNo = parseInt(cardNoStr, 10);
-      const againstBill = idxBillNo !== -1 && row[idxBillNo] ? row[idxBillNo].trim() : '';
+      let cardNo = parseInt(cardNoStr.replace(/[^0-9]/g, ''), 10);
+
+      const againstBill =
+        (idxAgainstBill !== -1 && row[idxAgainstBill] ? row[idxAgainstBill].trim() : '') ||
+        (idxRefBill !== -1 && row[idxRefBill] ? row[idxRefBill].trim() : '');
+      const rawMode = idxMode !== -1 && row[idxMode] ? row[idxMode].trim() : 'Cash';
+      const paymentMode: 'Cash' | 'Online' =
+        rawMode.toLowerCase().includes('online') ||
+        rawMode.toLowerCase().includes('upi') ||
+        rawMode.toLowerCase().includes('gpay')
+          ? 'Online'
+          : 'Cash';
       const remarks = (idxRemarks !== -1 && row[idxRemarks]) || '';
+
+      // If cardNo is not directly in card column, inspect text for 4-digit card number (1001-6999)
+      if (isNaN(cardNo) || cardNo <= 0) {
+        const textToScan = `${remarks} ${rcptNo} ${rawCust}`;
+        const cardMatch = textToScan.match(/(?:card|scheme|c|no|#)\s*[:#-]?\s*([1-6]\d{3})\b/i);
+        if (cardMatch) {
+          cardNo = parseInt(cardMatch[1], 10);
+        }
+      }
 
       // Check if this is a Card Scheme deposit receipt
       if ((!isNaN(cardNo) && cardNo > 0) || remarks.toLowerCase().includes('scheme') || rcptNo.includes('SCHEME')) {
@@ -298,24 +431,32 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
           date,
           type: 'WeeklyPayment',
           amount,
-          paymentMode: 'Cash',
+          paymentMode,
           remarks: remarks || `Scheme Payment Receipt: ${rcptNo}`,
           balanceAfter: amount,
           createdAt: new Date().toISOString(),
         });
       } else {
-        // Sales bill receipt! Register into bills transaction ledger
-        bills.push({
+        // Customer credit recovery / Sales payment receipt (NOT a bill!)
+        salesReceipts.push({
           id: `rcpt-entry-${rcptNo.replace(/[^a-zA-Z0-9-]/g, '')}`,
           invoiceNo: rcptNo,
           date,
           customerName: cleanName,
-          itemDetails: againstBill ? `Payment Receipt against Bill #${againstBill}` : `Sale Payment Receipt (${remarks || 'Cash'})`,
+          village: extractedVillage || undefined,
+          itemDetails: againstBill
+            ? `उधारी जमा पावती #${rcptNo} (संदर्भ बिल #${againstBill})`
+            : `उधारी जमा पावती #${rcptNo} (${remarks || paymentMode})`,
           totalAmount: 0, // payment receipt does not add to bill amount
           payingNow: amount,
           dueAmount: 0,
-          paymentMode: 'Cash',
-          notes: `Receipt No: ${rcptNo} | Against Bill: ${againstBill || 'Direct'}`,
+          paymentMode,
+          refBillNo: againstBill || undefined,
+          againstBillNo: againstBill || undefined,
+          entryType: 'Receipt',
+          notes: remarks
+            ? `पावती: ${rcptNo} | संदर्भ बिल: ${againstBill || 'Direct'} | ${remarks}`
+            : `पावती: ${rcptNo} | संदर्भ बिल: ${againstBill || 'Direct'}`,
           createdAt: new Date().toISOString(),
         });
 
@@ -326,6 +467,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
           if (existing) {
             existing.totalPaid += amount;
             existing.balanceDue = Math.max(0, existing.balanceDue - amount);
+            if (date) existing.lastVisit = date;
           } else {
             customerMap.set(custKey, {
               id: `cust-${custKey.replace(/[^a-z0-9]/g, '-')}`,
@@ -441,14 +583,26 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
   }
 
   const customers = Array.from(customerMap.values());
-  const summaryText = `सफलता: ${detectedType.toUpperCase()} ओळखले गेले! ${bills.length} बिले, ${cardMembers.length} कार्ड्स, ${cardTransactions.length} पावत्या/डिपॉझिट, आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+  const stockItems = Array.from(productMap.values());
+  const totalReceipts = salesReceipts.length + cardTransactions.length;
+  let summaryText = '';
+
+  if (detectedType === 'receipts') {
+    summaryText = `सफलता: RECEIPTS (पावत्या) फाईल ओळखली गेली! एकूण ${totalReceipts} जमा पावत्या (${cardTransactions.length > 0 ? `${cardTransactions.length} कार्ड योजना पावत्या + ` : ''}${salesReceipts.length} ग्राहक उधारी जमा पावत्या), ० विक्री बिले, आणि ${customers.length} ग्राहक खाती सुरक्षित अपडेट झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+  } else if (detectedType === 'bills') {
+    summaryText = `सफलता: BILLS (विक्री बिले) फाईल ओळखली गेली! ${bills.length} विक्री बिले, ${stockItems.length > 0 ? `${stockItems.length} प्रॉडक्ट्स/वस्तू (Products), ` : ''}${totalReceipts > 0 ? `${totalReceipts} जमा पावत्या, ` : ''}आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+  } else {
+    summaryText = `सफलता: ${detectedType.toUpperCase()} ओळखले गेले! ${bills.length} बिले, ${stockItems.length > 0 ? `${stockItems.length} वस्तू, ` : ''}${cardMembers.length} कार्ड्स, ${totalReceipts} पावत्या/डिपॉझिट, आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+  }
 
   return {
     detectedType,
     bills,
+    salesReceipts,
     cardMembers,
     cardTransactions,
     customers,
+    stockItems,
     auditIssues,
     summaryText,
   };

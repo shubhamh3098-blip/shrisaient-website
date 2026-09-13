@@ -33,9 +33,11 @@ import {
   CardMember,
   CardTransaction,
   Customer,
-  CardSchemeId
+  CardSchemeId,
+  TransactionEntry
 } from '../types';
 import { CardPassbookModal } from './CardPassbookModal';
+import { CustomerLedgerModal } from './CustomerLedgerModal';
 
 interface DealerLedgerViewProps {
   dealers: Dealer[];
@@ -44,6 +46,7 @@ interface DealerLedgerViewProps {
   cardMembers?: CardMember[];
   cardTransactions?: CardTransaction[];
   customers?: Customer[];
+  transactions?: TransactionEntry[];
   settings: BusinessSettings;
   onAddDealer: (dealer: Omit<Dealer, 'id'>) => void;
   onAddPurchase: (purchase: Omit<PurchaseEntry, 'id'>) => void;
@@ -61,6 +64,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   cardMembers = [],
   cardTransactions = [],
   customers = [],
+  transactions = [],
   settings,
   onAddDealer,
   onAddPurchase,
@@ -69,6 +73,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   initialDealerName,
 }) => {
   const [activeMainTab, setActiveMainTab] = useState<LedgerMainTab>('dealers');
+  const [selectedCustomerForLedger, setSelectedCustomerForLedger] = useState<Customer | null>(null);
 
   // DEALER TAB STATES
   const [selectedDealerId, setSelectedDealerId] = useState<string>(() => {
@@ -1184,20 +1189,29 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         {cust.lastVisit}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        {cust.phone && (cust.balanceDue ?? 0) > 0 && (
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
-                            onClick={() => {
-                              const text = encodeURIComponent(
-                                `Namaste ${cust.name}, aapka ${settings.businessName} par baaki hisab ₹${(cust.balanceDue ?? 0).toLocaleString()} hai. Kripya dukan par aakar hisab clear kare. Dhanyawad!`
-                              );
-                              window.open(`https://wa.me/91${cust.phone}?text=${text}`, '_blank');
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                            onClick={() => setSelectedCustomerForLedger(cust)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer shadow-2xs"
                           >
-                            <Share2 className="w-3 h-3" />
-                            Reminder
+                            <FileText className="w-3 h-3 text-amber-300" />
+                            खातेवही / Ledger
                           </button>
-                        )}
+                          {cust.phone && (cust.balanceDue ?? 0) > 0 && (
+                            <button
+                              onClick={() => {
+                                const text = encodeURIComponent(
+                                  `Namaste ${cust.name}, aapka ${settings.businessName} par baaki hisab ₹${(cust.balanceDue ?? 0).toLocaleString()} hai. Kripya dukan par aakar hisab clear kare. Dhanyawad!`
+                                );
+                                window.open(`https://wa.me/91${cust.phone}?text=${text}`, '_blank');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Share2 className="w-3 h-3" />
+                              Reminder
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1440,6 +1454,17 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           transactions={cardTransactions}
           settings={settings}
           onClose={() => setSelectedCardForPassbook(null)}
+        />
+      )}
+
+      {/* Modal: Customer Ledger Statement (खातेवही) */}
+      {selectedCustomerForLedger && (
+        <CustomerLedgerModal
+          customer={selectedCustomerForLedger}
+          transactions={transactions}
+          cardTransactions={cardTransactions}
+          settings={settings}
+          onClose={() => setSelectedCustomerForLedger(null)}
         />
       )}
 

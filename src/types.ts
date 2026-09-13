@@ -1,4 +1,4 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3';
+export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5' | 'scheme6' | string;
 
 export interface CardSchemeConfig {
   id: CardSchemeId;
@@ -91,11 +91,16 @@ export interface TransactionEntry {
   stockItemId?: string;
   stockItemName?: string;
   quantity?: number;
+  unitPrice?: number;
+  category?: string;
   itemDetails: string;
   totalAmount: number;
   payingNow: number;
   dueAmount: number; // totalAmount - payingNow
   paymentMode: 'Cash' | 'Online';
+  refBillNo?: string;
+  againstBillNo?: string;
+  entryType?: 'Bill' | 'Receipt';
   notes?: string;
   createdAt: string;
 }

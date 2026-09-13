@@ -29,9 +29,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       `Customer: ${entry.customerName}\n` +
       `Items: ${entry.itemDetails}\n` +
       `--------------------------------\n` +
-      `Total Amount: ₹${entry.totalAmount.toLocaleString()}\n` +
-      `Amount Paid: ₹${entry.payingNow.toLocaleString()} (${entry.paymentMode})\n` +
-      (entry.dueAmount > 0 ? `Remaining Due / Udhar: ₹${entry.dueAmount.toLocaleString()}\n` : `Status: FULLY PAID\n`) +
+      `Total Amount: ₹${(Number(entry.totalAmount) || 0).toLocaleString()}\n` +
+      `Amount Paid: ₹${(Number(entry.payingNow) || 0).toLocaleString()} (${entry.paymentMode})\n` +
+      ((Number(entry.dueAmount) || 0) > 0 ? `Remaining Due / Udhar: ₹${(Number(entry.dueAmount) || 0).toLocaleString()}\n` : `Status: FULLY PAID\n`) +
       `--------------------------------\n` +
       `🔗 Digital Bill Slip: ${invoiceUrl}\n` +
       `GSTIN: ${settings.gstin}\n` +
@@ -44,9 +44,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 animate-fade-in my-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-fade-in my-auto">
         {/* Top action header (hidden in print) */}
-        <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+        <div className="no-print bg-slate-900 dark:bg-slate-950 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-2 text-xs">
             <span className="font-semibold text-emerald-400">Invoice Ready</span>
             <span className="text-slate-400">•</span>
@@ -158,10 +158,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-700">
-                      ₹{entry.totalAmount.toLocaleString()}
+                      ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right font-bold font-mono text-slate-900">
-                      ₹{entry.totalAmount.toLocaleString()}
+                      ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
                     </td>
                   </tr>
                 </tbody>
@@ -173,19 +173,19 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <div className="flex justify-between text-slate-700 font-medium">
                 <span>एकूण / Total Amount:</span>
                 <span className="font-bold text-slate-900 text-sm font-mono">
-                  ₹{entry.totalAmount.toLocaleString()}
+                  ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between text-slate-700 font-medium">
                 <span>अ‍ॅडव्हान्स / Paid Now:</span>
                 <span className="font-bold text-emerald-600 text-sm font-mono">
-                  ₹{entry.payingNow.toLocaleString()}
+                  ₹{(Number(entry.payingNow) || 0).toLocaleString()}
                 </span>
               </div>
-              {entry.dueAmount > 0 ? (
+              {(Number(entry.dueAmount) || 0) > 0 ? (
                 <div className="flex justify-between text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg font-bold">
                   <span>बाकी / Balance Due:</span>
-                  <span className="font-mono">₹{entry.dueAmount.toLocaleString()}</span>
+                  <span className="font-mono">₹{(Number(entry.dueAmount) || 0).toLocaleString()}</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold pt-1">

@@ -1,51 +1,191 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  /* Ultra-Modern Fintech Design Tokens */
-  --brand-navy: #0F172A;
-  --tech-teal: #0D9488;
-  --accent-indigo: #4F46E5;
-  --bg-app: #F8FAFC;
-  --card-surface: #FFFFFF;
-  --border-subtle: #E2E8F0;
-  --text-body: #334155;
-  --text-muted: #64748B;
-  --status-success: #10B981;
-  --status-warning: #F59E0B;
-  --status-danger: #EF4444;
+  /* Day Mode (Crisp High-Precision Professional Slate & Deep Emerald ERP Theme) */
+  --tactile-bg: #F8FAFC;
+  --tactile-bg-canvas: #F1F5F9;
+  --tactile-surface: #FFFFFF;
+  --tactile-surface-raised: #FFFFFF;
+  --tactile-surface-inset: #F8FAFC;
+  --tactile-border: #E2E8F0;
+  --tactile-border-subtle: #EDF2F7;
+  --tactile-border-focus: #0D5C4D;
+  --tactile-shadow-light: #FFFFFF;
+  --tactile-shadow-dark: rgba(15, 23, 42, 0.04);
+  --tactile-text-main: #1E293B;
+  --tactile-text-heading: #0F172A;
+  --tactile-text-muted: #64748B;
+  --tactile-text-dim: #94A3B8;
+  --tactile-primary: #0D5C4D;
+  --tactile-primary-hover: #084337;
+  --tactile-primary-text: #FFFFFF;
+  --tactile-accent-teal: #0D5C4D;
+  --tactile-accent-gold: #D97706;
+  --tactile-success: #059669;
+  --tactile-danger: #DC2626;
+  --tactile-warning: #D97706;
 }
 
-html {
-  font-family: 'Inter', 'Noto Sans Devanagari', 'Yantramanav', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  letter-spacing: -0.01em;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.dark, [data-theme="night"], body.dark {
+  /* Night Mode (Tactile Obsidian Slate / Professional Emerald ERP Claymorphism) */
+  --tactile-bg: #0F172A;
+  --tactile-bg-canvas: #090D16;
+  --tactile-surface: #1E293B;
+  --tactile-surface-raised: #243044;
+  --tactile-surface-inset: #0F172A;
+  --tactile-border: rgba(255, 255, 255, 0.1);
+  --tactile-border-subtle: rgba(255, 255, 255, 0.06);
+  --tactile-border-focus: #10B981;
+  --tactile-shadow-light: rgba(255, 255, 255, 0.05);
+  --tactile-shadow-dark: rgba(0, 0, 0, 0.6);
+  --tactile-text-main: #E2E8F0;
+  --tactile-text-heading: #F8FAFC;
+  --tactile-text-muted: #94A3B8;
+  --tactile-text-dim: #64748B;
+  --tactile-primary: #0D5C4D;
+  --tactile-primary-hover: #107562;
+  --tactile-primary-text: #FFFFFF;
+  --tactile-accent-teal: #10B981;
+  --tactile-accent-gold: #F59E0B;
+  --tactile-success: #10B981;
+  --tactile-danger: #EF4444;
+  --tactile-warning: #F59E0B;
 }
 
-/* Day Mode (Default) */
+/* Global transitions for theme toggling */
 body {
-  background-color: #F8FAFC;
-  color: #334155;
+  background-color: var(--tactile-bg);
+  color: var(--tactile-text-main);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Night / Dark Mode */
-.dark body {
-  background-color: #0B1120;
-  color: #E2E8F0;
+/* FIX: Ensure input text is ALWAYS crisp, high-contrast, and visible on mobile and desktop */
+input, select, textarea {
+  color: #111827;
+  background-color: #ffffff;
 }
 
-.dark {
-  --bg-app: #0B1120;
-  --card-surface: #0F172A;
-  --border-subtle: #1E293B;
-  --text-body: #CBD5E1;
-  --text-muted: #94A3B8;
+.dark input, .dark select, .dark textarea {
+  color: #F8FAFC !important;
+  background-color: #1E2533 !important;
 }
 
-/* Refined Typography for Marathi & Devanagari numerals/text */
-.font-marathi {
-  font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;
-  letter-spacing: 0.01em;
+/* Tactile Input Class for perfect visibility in light and dark mode */
+.tactile-input {
+  background-color: var(--tactile-surface-raised) !important;
+  color: var(--tactile-text-main) !important;
+  border: 1px solid var(--tactile-border) !important;
+  box-shadow: inset 1px 1px 3px var(--tactile-shadow-dark);
+}
+.tactile-input:focus {
+  border-color: var(--tactile-border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(15, 76, 92, 0.2) !important;
+}
+.tactile-input::placeholder {
+  color: var(--tactile-text-muted) !important;
+  opacity: 0.85;
+}
+
+/* Typography pairing */
+.font-display {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-serif-luxury {
+  font-family: 'Playfair Display', Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.font-mono-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Tactile Foundations Classes */
+.tactile-canvas {
+  background-color: var(--tactile-bg);
+  color: var(--tactile-text-main);
+}
+
+.tactile-card {
+  background-color: var(--tactile-surface);
+  border: 1px solid var(--tactile-border);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+  border-radius: 1rem;
+}
+
+.tactile-card-raised {
+  background-color: var(--tactile-surface-raised);
+  border: 1px solid var(--tactile-border);
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  border-radius: 1rem;
+}
+
+.tactile-card-hover {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tactile-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+}
+
+.tactile-card-modal {
+  background-color: var(--tactile-surface);
+  border: 1px solid var(--tactile-border);
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
+  border-radius: 1.25rem;
+}
+
+.tactile-inset {
+  background-color: var(--tactile-surface-inset);
+  border: 1px solid var(--tactile-border-subtle);
+}
+
+.tactile-pressed {
+  background-color: var(--tactile-surface-inset);
+}
+
+.tactile-btn-primary {
+  background-color: var(--tactile-primary);
+  color: var(--tactile-primary-text);
+  box-shadow: 0 1px 2px 0 rgba(13, 92, 77, 0.2);
+  transition: all 0.15s ease;
+}
+.tactile-btn-primary:hover {
+  background-color: var(--tactile-primary-hover);
+  box-shadow: 0 4px 6px -1px rgba(13, 92, 77, 0.25);
+  transform: translateY(-1px);
+}
+.tactile-btn-primary:active {
+  transform: translateY(0);
+}
+
+.tactile-btn-secondary {
+  background-color: var(--tactile-surface);
+  color: var(--tactile-text-main);
+  border: 1px solid var(--tactile-border);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  transition: all 0.15s ease;
+}
+.tactile-btn-secondary:hover {
+  background-color: var(--tactile-surface-inset);
+  transform: translateY(-1px);
+}
+.tactile-btn-secondary:active {
+  transform: translateY(0);
+}
+
+.tactile-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 2px 2px 5px var(--tactile-shadow-dark), -1px -1px 3px var(--tactile-shadow-light);
 }
 
 @keyframes fadeIn {
@@ -75,11 +215,10 @@ body {
     display: none !important;
   }
 
-  #printable-invoice,
-  #printable-ledger,
-  #printable-receipt {
+  #printable-invoice {
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
   }
 }
+

@@ -95,46 +95,43 @@ export const FloatingCallAndWhatsApp: React.FC<FloatingCallAndWhatsAppProps> = (
         </div>
       )}
 
-      {/* Floating Action Buttons: Left = Call Now, Right = WhatsApp */}
-      {/* Mobile: bottom-20 (just above fixed bottom nav) | Desktop: bottom-6 */}
-      <div className="fixed bottom-20 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
+      {/* Floating Action Buttons: Left = Call Us, Right = WhatsApp Instant Chat */}
+      <div className="fixed bottom-16 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
         <a
           href={`tel:${primaryPhone}`}
-          className="group flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-blue-700 to-indigo-700 text-white shadow-xl shadow-blue-700/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
-          title="श्री साई इंटरप्राइजेसला थेट कॉल करा"
+          className="group flex items-center gap-2.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[#0B1528] hover:bg-slate-800 text-white shadow-xl shadow-slate-900/30 hover:scale-105 active:scale-95 transition-all duration-200 border border-slate-700/60 cursor-pointer"
+          title="Direct Call to Shri Sai Enterprises"
         >
-          <div className="relative flex items-center justify-center">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 animate-ping" />
-            <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
+          <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <Phone className="w-3.5 h-3.5" />
           </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[11px] sm:text-xs font-black tracking-tight leading-none">
-              Call Now
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Call Us
             </span>
-            <span className="text-[9px] text-blue-200 hidden sm:inline leading-tight font-mono">
+            <span className="text-xs font-mono font-bold text-white tracking-tight">
               {primaryPhone}
             </span>
           </div>
         </a>
       </div>
 
-      <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
+      <div className="fixed bottom-16 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
         <button
           onClick={() => setShowWhatsAppPicker(true)}
-          className="group flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-xl shadow-emerald-600/35 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 cursor-pointer"
-          title="WhatsApp वर चॅट करा"
+          className="group flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[#0D5C4D] hover:bg-[#094539] text-white shadow-xl shadow-emerald-900/30 hover:scale-105 active:scale-95 transition-all duration-200 border border-emerald-600/40 cursor-pointer"
+          title="Chat with Shri Sai Enterprises on WhatsApp"
         >
-          <div className="flex flex-col text-right">
-            <span className="text-[11px] sm:text-xs font-black tracking-tight leading-none">
+          <div className="flex flex-col text-right leading-tight">
+            <span className="text-xs font-bold text-white tracking-tight">
               WhatsApp
             </span>
-            <span className="text-[9px] text-emerald-100 hidden sm:inline leading-tight">
-              चॅट सुरू करा
+            <span className="text-[10px] text-emerald-200 font-medium">
+              Instant Chat
             </span>
           </div>
-          <div className="relative flex items-center justify-center">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10" />
+          <div className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
+            <MessageCircle className="w-4 h-4 text-white" />
           </div>
         </button>
       </div>
