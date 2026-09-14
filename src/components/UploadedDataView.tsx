@@ -25,7 +25,9 @@ import {
   ChevronRight,
   LayoutGrid,
   Table as TableIcon,
-  X
+  X,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import {
   TransactionEntry,
@@ -34,9 +36,11 @@ import {
   Customer,
   PurchaseEntry,
   Dealer,
+  StockItem,
   BusinessSettings,
   ActiveTab
 } from '../types';
+import { EditRecordModal, EditableRecordData } from './EditRecordModal';
 
 interface UploadedDataViewProps {
   transactions: TransactionEntry[];
@@ -45,10 +49,13 @@ interface UploadedDataViewProps {
   customers: Customer[];
   purchases: PurchaseEntry[];
   dealers: Dealer[];
+  stock?: StockItem[];
   settings: BusinessSettings;
   onOpenInvoiceModal: (entry: TransactionEntry) => void;
   onOpenPassbookModal: (member: CardMember) => void;
   onNavigateTab: (tab: ActiveTab, filterParam?: string) => void;
+  onUpdateRecord?: (category: 'bill' | 'receipt' | 'card' | 'customer' | 'purchase' | 'dealer', id: string, updatedData: any) => void;
+  onDeleteRecord?: (category: 'bill' | 'receipt' | 'card' | 'customer' | 'purchase' | 'dealer', id: string) => void;
 }
 
 type FilterCategory = 'all' | 'receipts' | 'bills' | 'cards' | 'customers' | 'purchases' | 'dealers';
@@ -60,16 +67,20 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
   customers = [],
   purchases = [],
   dealers = [],
+  stock = [],
   settings,
   onOpenInvoiceModal,
   onOpenPassbookModal,
   onNavigateTab,
+  onUpdateRecord,
+  onDeleteRecord,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<FilterCategory>('all');
   const [selectedDate, setSelectedDate] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedRecordDetail, setSelectedRecordDetail] = useState<any | null>(null);
+  const [editingRecord, setEditingRecord] = useState<EditableRecordData | null>(null);
 
   // 1. Build lookup for card members by card number
   const memberMap = useMemo(() => {
@@ -109,9 +120,11 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     badgeColor: string;
     title: string;
     subtitle: string;
+    productName?: string;
     date?: string;
     referenceNo?: string;
     amount?: number;
+    paidAmount?: number;
     secondaryAmount?: number;
     amountLabel?: string;
     phone?: string;
@@ -126,25 +139,25 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     // A. Card Scheme Deposit Receipts
     (cardTransactions || []).forEach((ct) => {
       if (!ct) return;
-      const member = memberMap.get(ct.cardNumber);
+      const member = ct.cardNumber ? memberMap.get(ct.cardNumber) : undefined;
       const custName = member?.customerName || (member as any)?.name || ct.customerName || (ct as any).memberName || 'ग्राहक';
       const phone = member?.phone || ct.customerPhone || (ct as any).memberPhone || '';
       const village = member?.village || (ct as any).village || '';
       list.push({
-        id: `card-tx-${ct.id}`,
+        id: `card-tx-${ct.id || Math.random()}`,
         category: 'receipt',
         categoryLabel: 'कार्ड योजना पावती (Scheme Deposit)',
         badgeColor: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800',
-        title: `${custName} (कार्ड #${ct.cardNumber})`,
+        title: `${custName} (कार्ड #${ct.cardNumber ?? '-'})`,
         subtitle: ct.receiptNo
           ? `पावती #${ct.receiptNo} • हप्ता #${ct.weekNumber || (ct as any).installmentNumber || '-'}`
           : `हप्ता #${ct.weekNumber || (ct as any).installmentNumber || '-'} • ${ct.paymentMode || 'Cash'}`,
-        date: ct.date,
-        referenceNo: ct.receiptNo || `TX-${ct.id}`,
-        amount: ct.amount || 0,
+        date: ct.date || '',
+        referenceNo: ct.receiptNo || (ct.id ? `TX-${ct.id}` : ''),
+        amount: Number(ct.amount) || 0,
         amountLabel: 'जमा रक्कम',
-        phone,
-        village,
+        phone: String(phone || ''),
+        village: String(village || ''),
         status: 'जमा',
         rawItem: { ...ct, member },
       });
@@ -154,18 +167,18 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     (paymentReceipts || []).forEach((pr) => {
       if (!pr) return;
       list.push({
-        id: `bill-rcpt-${pr.id}`,
+        id: `bill-rcpt-${pr.id || Math.random()}`,
         category: 'receipt',
         categoryLabel: 'उधारी जमा पावती (Khata Payment)',
         badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
-        title: `${pr.customerName || 'ग्राहक'}`,
-        subtitle: pr.itemDetails || 'उधारी जमा पावती',
-        date: pr.date,
-        referenceNo: pr.invoiceNo,
-        amount: pr.payingNow || 0,
+        title: String(pr.customerName || 'ग्राहक'),
+        subtitle: String(pr.itemDetails || 'उधारी जमा पावती'),
+        date: pr.date || '',
+        referenceNo: pr.invoiceNo || '',
+        amount: Number(pr.payingNow) || 0,
         amountLabel: 'जमा पावती रक्कम',
-        phone: pr.customerPhone,
-        village: pr.village,
+        phone: String(pr.customerPhone || ''),
+        village: String(pr.village || ''),
         status: 'जमा',
         rawItem: pr,
       });
@@ -174,22 +187,27 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     // C. Sales Bills (विक्री बिले)
     (salesBills || []).forEach((sb) => {
       if (!sb) return;
-      const due = sb.dueAmount ?? Math.max(0, (sb.totalAmount || 0) - (sb.payingNow || 0));
+      const totalAmt = Number(sb.totalAmount) || 0;
+      const payingAmt = Number(sb.payingNow) || 0;
+      const due = sb.dueAmount !== undefined ? Number(sb.dueAmount) : Math.max(0, totalAmt - payingAmt);
+      const prodName = sb.stockItemName || sb.itemDetails || 'खरेदी बिल';
       list.push({
-        id: `bill-${sb.id}`,
+        id: `bill-${sb.id || Math.random()}`,
         category: 'bill',
         categoryLabel: 'विक्री बिल (Sales Bill)',
         badgeColor: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
-        title: `${sb.customerName || 'ग्राहक'} - ${sb.itemDetails || 'खरेदी बिल'}`,
-        subtitle: `बिल #${sb.invoiceNo} • मोड: ${sb.paymentMode || 'Cash'}`,
-        date: sb.date,
-        referenceNo: sb.invoiceNo,
-        amount: sb.totalAmount || 0,
+        title: `${sb.customerName || 'ग्राहक'} - ${prodName}`,
+        subtitle: `बिल #${sb.invoiceNo || '-'} • प्रॉडक्ट: ${prodName} • मोड: ${sb.paymentMode || 'Cash'}`,
+        productName: prodName,
+        date: sb.date || '',
+        referenceNo: sb.invoiceNo || '',
+        amount: totalAmt,
+        paidAmount: payingAmt,
         secondaryAmount: due,
-        amountLabel: 'बिल रक्कम',
-        phone: sb.customerPhone,
-        village: sb.village,
-        status: due > 0 ? `उधारी: ₹${due.toLocaleString()}` : 'पूर्ण पेड',
+        amountLabel: 'एकूण बिल (Total)',
+        phone: String(sb.customerPhone || ''),
+        village: String(sb.village || ''),
+        status: due > 0 ? `बाकी: ₹${due.toLocaleString()}` : 'पूर्ण पेड',
         rawItem: sb,
       });
     });
@@ -197,23 +215,23 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     // D. Card Scheme Members (कार्ड सभासद)
     (cardMembers || []).forEach((cm) => {
       if (!cm) return;
-      const custName = cm.customerName || (cm as any).name || `कार्ड #${cm.cardNumber}`;
-      const totalDep = cm.totalDeposited ?? (cm as any).totalPaid ?? 0;
-      const netBal = cm.netBalance ?? totalDep;
+      const custName = cm.customerName || (cm as any).name || `कार्ड #${cm.cardNumber ?? '-'}`;
+      const totalDep = Number(cm.totalDeposited ?? (cm as any).totalPaid ?? 0);
+      const netBal = Number(cm.netBalance ?? totalDep);
       list.push({
-        id: `card-member-${cm.id}`,
+        id: `card-member-${cm.id || Math.random()}`,
         category: 'card',
-        categoryLabel: `कार्ड सभासद (कार्ड #${cm.cardNumber})`,
+        categoryLabel: `कार्ड सभासद (कार्ड #${cm.cardNumber ?? '-'})`,
         badgeColor: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
-        title: `${custName} - कार्ड #${cm.cardNumber}`,
+        title: `${custName} - कार्ड #${cm.cardNumber ?? '-'}`,
         subtitle: `${cm.schemeName || 'योजना'} • जमा: ₹${totalDep.toLocaleString()}`,
         date: cm.joiningDate || (cm as any).startDate || '',
-        referenceNo: `कार्ड #${cm.cardNumber}`,
+        referenceNo: cm.cardNumber !== undefined ? `कार्ड #${cm.cardNumber}` : '',
         amount: totalDep,
         secondaryAmount: netBal,
         amountLabel: 'एकूण बचत जमा',
-        phone: cm.phone,
-        village: cm.village,
+        phone: String(cm.phone || ''),
+        village: String(cm.village || ''),
         status: cm.status === 'Completed' ? 'पूर्ण' : 'सुरू',
         rawItem: cm,
       });
@@ -222,22 +240,22 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     // E. Customer Khata Ledger Accounts (ग्राहक खाती)
     (customers || []).forEach((cust) => {
       if (!cust) return;
-      const totalPurch = cust.totalPurchases ?? cust.totalPurchased ?? 0;
-      const totalPaid = cust.totalPaid ?? 0;
-      const balDue = cust.balanceDue ?? Math.max(0, totalPurch - totalPaid);
+      const totalPurch = Number(cust.totalPurchases ?? cust.totalPurchased ?? 0);
+      const totalPaid = Number(cust.totalPaid ?? 0);
+      const balDue = Number(cust.balanceDue !== undefined ? cust.balanceDue : Math.max(0, totalPurch - totalPaid));
       list.push({
-        id: `cust-${cust.id}`,
+        id: `cust-${cust.id || Math.random()}`,
         category: 'customer',
         categoryLabel: 'ग्राहक खातावही (Khata Ledger)',
         badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800',
-        title: cust.name || 'ग्राहक',
+        title: String(cust.name || 'ग्राहक'),
         subtitle: `एकूण खरेदी: ₹${totalPurch.toLocaleString()} • जमा: ₹${totalPaid.toLocaleString()}`,
-        referenceNo: cust.phone || cust.id,
+        referenceNo: String(cust.phone || cust.id || ''),
         amount: balDue,
         secondaryAmount: totalPurch,
         amountLabel: 'शिल्लक येणेबाकी (Due)',
-        phone: cust.phone,
-        village: cust.address || cust.village,
+        phone: String(cust.phone || ''),
+        village: String(cust.address || cust.village || ''),
         status: balDue > 0 ? `येणेबाकी: ₹${balDue.toLocaleString()}` : 'हिशोब निरंक',
         rawItem: cust,
       });
@@ -248,19 +266,19 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
       if (!p) return;
       const supName = p.supplierName || (p as any).dealerName || 'सप्लायर';
       const itm = p.items || (p as any).itemDetails || 'खरेदी बिल';
-      const bNo = p.billNo || (p as any).invoiceNo || `PUR-${p.id}`;
-      const tot = p.totalAmount || 0;
-      const paid = p.paidAmount || 0;
+      const bNo = p.billNo || (p as any).invoiceNo || `PUR-${p.id || ''}`;
+      const tot = Number(p.totalAmount) || 0;
+      const paid = Number(p.paidAmount) || 0;
       const due = Math.max(0, tot - paid);
       list.push({
-        id: `purchase-${p.id}`,
+        id: `purchase-${p.id || Math.random()}`,
         category: 'purchase',
         categoryLabel: 'खरेदी नोंद (Purchase)',
         badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
         title: `${supName} - ${itm}`,
         subtitle: `बिल #${bNo} • मोड: ${p.paymentMode || 'Cash'}`,
-        date: p.date,
-        referenceNo: bNo,
+        date: p.date || '',
+        referenceNo: String(bNo),
         amount: tot,
         secondaryAmount: due,
         amountLabel: 'खरेदी रक्कम',
@@ -272,21 +290,21 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
     // G. Dealers (सप्लायर्स / डीलर्स)
     (dealers || []).forEach((dlr) => {
       if (!dlr) return;
-      const totPurch = dlr.totalPurchases || 0;
-      const totPaid = dlr.totalPaid || 0;
-      const balDue = dlr.balanceDue ?? Math.max(0, totPurch - totPaid);
+      const totPurch = Number(dlr.totalPurchases) || 0;
+      const totPaid = Number(dlr.totalPaid) || 0;
+      const balDue = Number(dlr.balanceDue !== undefined ? dlr.balanceDue : Math.max(0, totPurch - totPaid));
       list.push({
-        id: `dealer-${dlr.id}`,
+        id: `dealer-${dlr.id || Math.random()}`,
         category: 'dealer',
         categoryLabel: 'डीलर / सप्लायर (Supplier)',
         badgeColor: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800',
-        title: dlr.name || 'डीलर',
+        title: String(dlr.name || 'डीलर'),
         subtitle: `एकूण खरेदी: ₹${totPurch.toLocaleString()} • पेड: ₹${totPaid.toLocaleString()}`,
-        referenceNo: dlr.phone || dlr.id,
+        referenceNo: String(dlr.phone || dlr.id || ''),
         amount: balDue,
         amountLabel: 'देणेबाकी (To Pay)',
-        phone: dlr.phone,
-        village: dlr.address,
+        phone: String(dlr.phone || ''),
+        village: String(dlr.address || ''),
         status: balDue > 0 ? `देणेबाकी: ₹${balDue.toLocaleString()}` : 'हिशोब निरंक',
         rawItem: dlr,
       });
@@ -297,9 +315,11 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
 
   // 4. Live Filtering across all fields
   const filteredRecords = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = (searchQuery || '').trim().toLowerCase();
 
     return allRecords.filter((rec) => {
+      if (!rec) return false;
+
       // Category filter
       if (activeCategory === 'receipts' && rec.category !== 'receipt') return false;
       if (activeCategory === 'bills' && rec.category !== 'bill') return false;
@@ -314,46 +334,54 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
       // Search Query
       if (!q) return true;
 
-      const matchTitle = rec.title.toLowerCase().includes(q);
-      const matchSubtitle = rec.subtitle.toLowerCase().includes(q);
-      const matchRef = rec.referenceNo?.toLowerCase().includes(q);
-      const matchPhone = rec.phone?.toLowerCase().includes(q);
-      const matchVillage = rec.village?.toLowerCase().includes(q);
-      const matchLabel = rec.categoryLabel.toLowerCase().includes(q);
-      const matchAmount = rec.amount !== undefined && rec.amount.toString().includes(q);
+      const titleStr = String(rec.title || '').toLowerCase();
+      const subtitleStr = String(rec.subtitle || '').toLowerCase();
+      const refStr = String(rec.referenceNo || '').toLowerCase();
+      const phoneStr = String(rec.phone || '').toLowerCase();
+      const villageStr = String(rec.village || '').toLowerCase();
+      const labelStr = String(rec.categoryLabel || '').toLowerCase();
+      const amountStr = rec.amount !== undefined ? String(rec.amount) : '';
 
-      return matchTitle || matchSubtitle || matchRef || matchPhone || matchVillage || matchLabel || matchAmount;
+      return (
+        titleStr.includes(q) ||
+        subtitleStr.includes(q) ||
+        refStr.includes(q) ||
+        phoneStr.includes(q) ||
+        villageStr.includes(q) ||
+        labelStr.includes(q) ||
+        amountStr.includes(q)
+      );
     });
   }, [allRecords, activeCategory, selectedDate, searchQuery]);
 
   // Aggregate stats
   const totalReceiptsCount = (cardTransactions || []).length + (paymentReceipts || []).length;
   const totalReceiptsSum =
-    (cardTransactions || []).reduce((sum, c) => sum + (c?.amount || 0), 0) +
-    (paymentReceipts || []).reduce((sum, p) => sum + (p?.payingNow || 0), 0);
+    (cardTransactions || []).reduce((sum, c) => sum + (Number(c?.amount) || 0), 0) +
+    (paymentReceipts || []).reduce((sum, p) => sum + (Number(p?.payingNow) || 0), 0);
 
-  const totalBillsSum = (salesBills || []).reduce((sum, b) => sum + (b?.totalAmount || 0), 0);
-  const totalCustomerDues = (customers || []).reduce((sum, c) => sum + (c?.balanceDue || 0), 0);
+  const totalBillsSum = (salesBills || []).reduce((sum, b) => sum + (Number(b?.totalAmount) || 0), 0);
+  const totalCustomerDues = (customers || []).reduce((sum, c) => sum + (Number(c?.balanceDue) || 0), 0);
   const totalCardSavings = (cardMembers || []).reduce(
-    (sum, m) => sum + (m?.totalDeposited || (m as any)?.totalPaid || 0),
+    (sum, m) => sum + Number(m?.totalDeposited ?? (m as any)?.totalPaid ?? 0),
     0
   );
 
   // Scheme-specific card counts
-  const scheme1Cards = (cardMembers || []).filter((m) => m.schemeId === 'scheme1');
-  const scheme2Cards = (cardMembers || []).filter((m) => m.schemeId === 'scheme2');
-  const scheme3Cards = (cardMembers || []).filter((m) => m.schemeId === 'scheme3');
+  const scheme1Cards = (cardMembers || []).filter((m) => m && m.schemeId === 'scheme1');
+  const scheme2Cards = (cardMembers || []).filter((m) => m && m.schemeId === 'scheme2');
+  const scheme3Cards = (cardMembers || []).filter((m) => m && m.schemeId === 'scheme3');
 
   // Export to CSV
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return;
     const headers = ['प्रकार', 'तारीख', 'संदर्भ_क्रमांक', 'शीर्षक / नाव', 'तपशील', 'फोन', 'गाव', 'रक्कम', 'स्थिती'];
     const rows = filteredRecords.map((r) => [
-      `"${r.categoryLabel.replace(/"/g, '""')}"`,
+      `"${String(r.categoryLabel || '').replace(/"/g, '""')}"`,
       `"${r.date || ''}"`,
       `"${r.referenceNo || ''}"`,
-      `"${r.title.replace(/"/g, '""')}"`,
-      `"${r.subtitle.replace(/"/g, '""')}"`,
+      `"${String(r.title || '').replace(/"/g, '""')}"`,
+      `"${String(r.subtitle || '').replace(/"/g, '""')}"`,
       `"${r.phone || ''}"`,
       `"${r.village || ''}"`,
       r.amount || 0,
@@ -771,15 +799,15 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                 <tr>
                   <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">प्रकार</th>
                   <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">क्रमांक / तारीख</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs">नाव व तपशील</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs">नाव व प्रॉडक्ट तपशील</th>
                   <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">मोबाईल / गाव</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">रक्कम (₹)</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">रक्कम / अॅडव्हान्स / बाकी (₹)</th>
                   <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-center whitespace-nowrap">कृती (Action)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredRecords.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
+                {filteredRecords.map((item, idx) => (
+                  <tr key={`${item.id}-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
                     <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap">
                       <span className={`text-xs sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${item.badgeColor}`}>
                         {item.categoryLabel}
@@ -800,6 +828,13 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                       <div className="text-base sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                         {item.title}
                       </div>
+                      {item.productName && item.category === 'bill' && (
+                        <div className="mt-0.5">
+                          <span className="inline-flex items-center text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                            📦 {item.productName}
+                          </span>
+                        </div>
+                      )}
                       {item.subtitle && (
                         <div className="text-sm sm:text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                           {item.subtitle}
@@ -824,13 +859,40 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                       )}
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                      <div className="text-base sm:text-sm font-black text-slate-900 dark:text-white font-mono-num">
-                        {item.category === 'receipt' && '+ '}₹{(item.amount || 0).toLocaleString()}
-                      </div>
-                      {item.secondaryAmount !== undefined && item.secondaryAmount > 0 && (
-                        <div className="text-xs sm:text-[10px] text-amber-600 dark:text-amber-400 font-bold font-mono-num">
-                          बाकी: ₹{(item.secondaryAmount || 0).toLocaleString()}
+                      {item.category === 'bill' ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <div className="text-base sm:text-sm font-black text-slate-900 dark:text-white font-mono-num flex items-center gap-1">
+                            <span className="text-[10px] sm:text-[9px] font-bold text-slate-400">एकूण:</span>
+                            <span>₹{(item.amount || 0).toLocaleString()}</span>
+                          </div>
+                          {item.paidAmount !== undefined && item.paidAmount > 0 && (
+                            <div className="text-xs sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400 font-mono-num flex items-center gap-1">
+                              <span className="text-[10px] sm:text-[9px] font-medium text-emerald-500">अॅडव्हान्स/जमा:</span>
+                              <span>₹{item.paidAmount.toLocaleString()}</span>
+                            </div>
+                          )}
+                          {item.secondaryAmount !== undefined && (
+                            <div className={`text-xs sm:text-[11px] font-black font-mono-num flex items-center gap-1 ${
+                              item.secondaryAmount > 0
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-slate-400 dark:text-slate-500'
+                            }`}>
+                              <span className="text-[10px] sm:text-[9px] font-medium text-amber-500">बाकी:</span>
+                              <span>₹{item.secondaryAmount.toLocaleString()}</span>
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        <>
+                          <div className="text-base sm:text-sm font-black text-slate-900 dark:text-white font-mono-num">
+                            {item.category === 'receipt' && '+ '}₹{(item.amount || 0).toLocaleString()}
+                          </div>
+                          {item.secondaryAmount !== undefined && item.secondaryAmount > 0 && (
+                            <div className="text-xs sm:text-[10px] text-amber-600 dark:text-amber-400 font-bold font-mono-num">
+                              बाकी: ₹{(item.secondaryAmount || 0).toLocaleString()}
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
@@ -897,6 +959,16 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                           <span>लेजर</span>
                         </button>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingRecord(item)}
+                        className="ml-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 text-sm sm:text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer border border-amber-300 dark:border-amber-700"
+                        title="नोंद दुरुस्त करा (Edit Record)"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                        <span>एडिट</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -907,9 +979,9 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
       ) : (
         /* List Cards with Increased Base Font Size (<640px) */
         <div className="space-y-2.5">
-          {filteredRecords.map((item) => (
+          {filteredRecords.map((item, idx) => (
             <div
-              key={item.id}
+              key={`${item.id}-${idx}`}
               className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col md:flex-row md:items-center justify-between gap-3 group"
             >
               {/* Left Details */}
@@ -937,6 +1009,12 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                   {item.status && (
                     <span className="text-xs sm:text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-2.5 sm:px-2 py-1 sm:py-0.5 rounded border border-slate-200 dark:border-slate-700">
                       {item.status}
+                    </span>
+                  )}
+
+                  {item.productName && (
+                    <span className="text-xs sm:text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 sm:px-2 py-1 sm:py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                      📦 प्रॉडक्ट: {item.productName}
                     </span>
                   )}
                 </div>
@@ -972,26 +1050,53 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
               <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-2.5 md:pt-0 border-slate-100 dark:border-slate-800 shrink-0">
                 {item.amount !== undefined && (
                   <div className="text-left md:text-right">
-                    <div className="text-xs sm:text-[10px] text-slate-400 font-semibold">
-                      {item.amountLabel || 'रक्कम'}
-                    </div>
-                    <div
-                      className={`text-lg sm:text-base font-black font-mono-num ${
-                        item.category === 'receipt'
-                          ? 'text-emerald-700 dark:text-emerald-400'
-                          : item.category === 'customer'
-                          ? (item.amount || 0) > 0
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : 'text-slate-900 dark:text-white'
-                          : 'text-slate-900 dark:text-white'
-                      }`}
-                    >
-                      {item.category === 'receipt' && '+ '}₹{(item.amount || 0).toLocaleString()}
-                    </div>
-                    {item.secondaryAmount !== undefined && item.secondaryAmount > 0 && (
-                      <div className="text-xs sm:text-[10px] text-amber-600 dark:text-amber-400 font-bold font-mono-num">
-                        शिल्लक: ₹{(item.secondaryAmount || 0).toLocaleString()}
+                    {item.category === 'bill' ? (
+                      <div className="flex flex-col items-start md:items-end gap-0.5">
+                        <div className="text-xs sm:text-[10px] text-slate-400 font-semibold">
+                          {item.amountLabel || 'एकूण बिल (Total)'}
+                        </div>
+                        <div className="text-lg sm:text-base font-black text-slate-900 dark:text-white font-mono-num">
+                          ₹{(item.amount || 0).toLocaleString()}
+                        </div>
+                        {item.paidAmount !== undefined && item.paidAmount > 0 && (
+                          <div className="text-xs sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono-num">
+                            अॅडव्हान्स: ₹{item.paidAmount.toLocaleString()}
+                          </div>
+                        )}
+                        {item.secondaryAmount !== undefined && (
+                          <div className={`text-xs sm:text-[11px] font-bold font-mono-num ${
+                            item.secondaryAmount > 0
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-slate-400 dark:text-slate-500'
+                          }`}>
+                            बाकी: ₹{(item.secondaryAmount || 0).toLocaleString()}
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        <div className="text-xs sm:text-[10px] text-slate-400 font-semibold">
+                          {item.amountLabel || 'रक्कम'}
+                        </div>
+                        <div
+                          className={`text-lg sm:text-base font-black font-mono-num ${
+                            item.category === 'receipt'
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : item.category === 'customer'
+                              ? (item.amount || 0) > 0
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-slate-900 dark:text-white'
+                              : 'text-slate-900 dark:text-white'
+                          }`}
+                        >
+                          {item.category === 'receipt' && '+ '}₹{(item.amount || 0).toLocaleString()}
+                        </div>
+                        {item.secondaryAmount !== undefined && item.secondaryAmount > 0 && (
+                          <div className="text-xs sm:text-[10px] text-amber-600 dark:text-amber-400 font-bold font-mono-num">
+                            शिल्लक: ₹{(item.secondaryAmount || 0).toLocaleString()}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -1078,6 +1183,16 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
                     title="नोंदीचा संपूर्ण तपशील पाहा"
                   >
                     <Eye className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingRecord(item)}
+                    className="px-3 sm:px-2.5 py-2 sm:py-1.5 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    title="नोंद एडिट करा"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                    <span>एडिट</span>
                   </button>
                 </div>
               </div>
@@ -1211,6 +1326,17 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
               )}
               <button
                 type="button"
+                onClick={() => {
+                  setEditingRecord(selectedRecordDetail);
+                  setSelectedRecordDetail(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Edit2 className="w-4 h-4" />
+                <span>नोंद एडिट करा</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelectedRecordDetail(null)}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
               >
@@ -1219,6 +1345,29 @@ export const UploadedDataView: React.FC<UploadedDataViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Record Modal for Imported & Existing Data */}
+      {editingRecord && (
+        <EditRecordModal
+          isOpen={!!editingRecord}
+          record={editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSave={(category, id, updatedData) => {
+            if (onUpdateRecord) {
+              onUpdateRecord(category, id, updatedData);
+            }
+            setEditingRecord(null);
+          }}
+          onDelete={
+            onDeleteRecord
+              ? (category, id) => {
+                  onDeleteRecord(category, id);
+                  setEditingRecord(null);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

@@ -1080,6 +1080,64 @@ export interface AppDatabase {
   expenses: ExpenseEntry[];
 }
 
+export function deduplicateStock(items: StockItem[]): StockItem[] {
+  if (!Array.isArray(items)) return [];
+  const mergedMap = new Map<string, StockItem>();
+
+  items.forEach((item, index) => {
+    if (!item) return;
+    const name = (item.name || '').trim();
+    // Normalize name to alphanumeric slug to catch variations like "DIWAN 4*6" vs "DIWAN 4/6"
+    const nameSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const idSlug = (item.id || '').trim();
+
+    // Grouping key: if id exists and starts with prod-, use idSlug; otherwise use nameSlug or fallback
+    const groupKey = (idSlug && idSlug.startsWith('prod-'))
+      ? idSlug
+      : (nameSlug || idSlug || `item-${index}`);
+
+    if (mergedMap.has(groupKey)) {
+      const existing = mergedMap.get(groupKey)!;
+      existing.quantity = (Number(existing.quantity) || 0) + (Number(item.quantity) || 0);
+      if ((!existing.sellingPrice || existing.sellingPrice === 0) && item.sellingPrice) {
+        existing.sellingPrice = item.sellingPrice;
+      }
+      if ((!existing.purchasePrice || existing.purchasePrice === 0) && item.purchasePrice) {
+        existing.purchasePrice = item.purchasePrice;
+      }
+      if (!existing.imageUrl && item.imageUrl) {
+        existing.imageUrl = item.imageUrl;
+      }
+      if (!existing.category && item.category) {
+        existing.category = item.category;
+      }
+      if ((!existing.description || existing.description.length < (item.description || '').length) && item.description) {
+        existing.description = item.description;
+      }
+    } else {
+      mergedMap.set(groupKey, { ...item });
+    }
+  });
+
+  // Guarantee that every single item in the returned array has a strictly unique ID
+  const result: StockItem[] = [];
+  const seenIds = new Set<string>();
+
+  mergedMap.forEach((item, groupKey) => {
+    let finalId = item.id ? item.id.trim() : `prod-${groupKey}`;
+    if (!finalId || seenIds.has(finalId)) {
+      finalId = `${finalId || 'prod'}-${result.length + 1}`;
+    }
+    seenIds.add(finalId);
+    result.push({
+      ...item,
+      id: finalId,
+    });
+  });
+
+  return result;
+}
+
 export function loadDatabase(): AppDatabase {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1101,7 +1159,7 @@ export function loadDatabase(): AppDatabase {
         mergedSettings.additionalPhones = ['8600122798', '9175534365', '7822859073'];
       }
 
-      const loadedStock: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
+      const rawStockList: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
         ? parsed.stock.map((item: StockItem) => {
             if (!item.imageUrl) {
               const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
@@ -1112,6 +1170,8 @@ export function loadDatabase(): AppDatabase {
             return item;
           })
         : INITIAL_STOCK;
+
+      const loadedStock = deduplicateStock(rawStockList);
 
       return {
         settings: mergedSettings,
@@ -1163,9 +1223,33 @@ export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
   return clean;
 }
 
+export function clearCardsData(currentDb: AppDatabase): AppDatabase {
+  const clean: AppDatabase = {
+    ...currentDb,
+    cardMembers: [],
+    cardTransactions: [],
+  };
+  saveDatabase(clean);
+  return clean;
+}
+
+export function clearBillsData(currentDb: AppDatabase): AppDatabase {
+  const clean: AppDatabase = {
+    ...currentDb,
+    transactions: [],
+    customers: [],
+  };
+  saveDatabase(clean);
+  return clean;
+}
+
 export function saveDatabase(db: AppDatabase): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    const cleanDb = {
+      ...db,
+      stock: deduplicateStock(db.stock || []),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanDb));
   } catch (e) {
     console.error('Failed to save database to localStorage', e);
   }

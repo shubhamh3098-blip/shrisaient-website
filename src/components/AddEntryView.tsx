@@ -338,9 +338,9 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
               {isStockDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-30 max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredStock.length > 0 ? (
-                    filteredStock.map((item) => (
+                    filteredStock.map((item, idx) => (
                       <div
-                        key={item.id}
+                        key={`${item.id}-${idx}`}
                         onClick={() => handleSelectStock(item)}
                         className="p-2.5 hover:bg-blue-50/60 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition text-xs sm:text-sm"
                       >

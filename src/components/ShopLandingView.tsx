@@ -1153,9 +1153,9 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
 
           {/* Stock Items Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredStock.map((item) => (
+            {filteredStock.map((item, idx) => (
               <motion.div
-                key={item.id}
+                key={`${item.id}-${idx}`}
                 whileHover={{ y: -4, transition: { duration: 0.18 } }}
                 className="bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group relative"
               >
@@ -2009,13 +2009,12 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       {/* PRINTED BILL & WHATSAPP FORWARDING MODAL */}
       {showOrderBillModal && activeOrderBill && (
         <OrderBillModal
-          isOpen={showOrderBillModal}
+          order={activeOrderBill}
+          settings={settings}
           onClose={() => {
             setShowOrderBillModal(false);
             setActiveOrderBill(null);
           }}
-          bill={activeOrderBill}
-          shopSettings={settings}
         />
       )}
 

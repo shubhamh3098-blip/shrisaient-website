@@ -151,9 +151,9 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
     const idxCust = getColIdx(['customername', 'name', 'customer']);
     const idxPhone = getColIdx(['mobile', 'phone', 'contact']);
     const idxVillage = getColIdx(['village', 'villege', 'city', 'town', 'address']);
-    const idxTotal = getColIdx(['grandtotal', 'totalamount', 'subtotal', 'total', 'billamount']);
-    const idxPaid = getColIdx(['amountpaid', 'paidamount', 'paid', 'cashpaid']);
-    const idxDue = getColIdx(['balancedue', 'dueamount', 'due']);
+    const idxTotal = getColIdx(['grandtotal', 'totalamount', 'subtotal', 'total', 'billamount', 'amount']);
+    const idxPaid = getColIdx(['amountpaid', 'paidamount', 'paid', 'cashpaid', 'advance', 'adv', 'deposit', 'jama']);
+    const idxDue = getColIdx(['balancedue', 'dueamount', 'due', 'balance', 'shillak', 'baki']);
     const idxMode = getColIdx(['paymentmode', 'mode']);
     const idxProduct = getColIdx([
       'product',
@@ -179,10 +179,32 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
 
     for (let r = 1; r < parsed.length; r++) {
       const row = parsed[r];
-      let invoiceNo = idxBillNo !== -1 && row[idxBillNo] ? row[idxBillNo].trim() : `INV-${r}`;
+
+      let rawCustName = idxCust !== -1 && row[idxCust] ? row[idxCust].trim() : 'Customer';
+      let rawVillage = idxVillage !== -1 && row[idxVillage] ? row[idxVillage].trim() : '';
+      let rawDate = idxDate !== -1 && row[idxDate] ? row[idxDate].trim() : '';
+      let rawBillNo = idxBillNo !== -1 && row[idxBillNo] ? row[idxBillNo].trim() : '';
+
+      // Check if village column actually contains a date and date column contains bill number
+      // e.g. "ARUN BAWNE,03-04-2024,1816,,,BAJAJ FAN,..."
+      if ((!rawBillNo || rawBillNo === '') && /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(rawVillage) && /^\d+$/.test(rawDate)) {
+        rawBillNo = rawDate;
+        rawDate = rawVillage;
+        rawVillage = '';
+      }
+
+      let invoiceNo = rawBillNo;
+      if (!invoiceNo) {
+        if (bills.length > 0 && /^\d+$/.test(bills[bills.length - 1].invoiceNo)) {
+          invoiceNo = String(parseInt(bills[bills.length - 1].invoiceNo, 10) + 1);
+        } else {
+          invoiceNo = `INV-${r}`;
+        }
+      }
+
       // Clean Bill No space typos e.g. "B/ 95" -> "B-95", "B/22" -> "B-22"
-      if (invoiceNo.includes('B/') || invoiceNo.includes('B /')) {
-        const cleanInv = invoiceNo.replace(/B\s*\/\s*/g, 'B-');
+      if (invoiceNo.includes('B/') || invoiceNo.includes('B /') || invoiceNo.includes('B -')) {
+        const cleanInv = invoiceNo.replace(/B\s*[/ -]\s*/g, 'B-');
         auditIssues.push({
           type: 'spelling',
           description: 'Bill No prefix formatted to standard B-series',
@@ -192,12 +214,11 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         invoiceNo = cleanInv;
       }
 
-      const rawCustName = idxCust !== -1 && row[idxCust] ? row[idxCust] : 'Customer';
-      if (rawCustName.toUpperCase() === 'CANCEL' || rawCustName.toUpperCase() === 'CANCELLED') {
+      if (rawCustName.toUpperCase() === 'CANCEL' || rawCustName.toUpperCase() === 'CANCELLED' || (!rawCustName && row.some(c => c.toUpperCase().includes('CANCEL')))) {
         auditIssues.push({
           type: 'ignored_cancelled',
           description: `Skipped cancelled entry for bill ${invoiceNo}`,
-          original: rawCustName,
+          original: rawCustName || 'CANCEL',
           corrected: 'SKIPPED',
         });
         continue;
@@ -213,7 +234,9 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         });
       }
 
-      const rawVillage = (idxVillage !== -1 && row[idxVillage]) || extractedVillage || '';
+      if (!rawVillage && extractedVillage) {
+        rawVillage = extractedVillage;
+      }
       const village = cleanVillage(rawVillage);
       if (rawVillage && rawVillage !== village) {
         auditIssues.push({
@@ -235,7 +258,6 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         });
       }
 
-      const rawDate = idxDate !== -1 && row[idxDate] ? row[idxDate] : '';
       const date = cleanDate(rawDate);
       if (rawDate && rawDate !== date) {
         auditIssues.push({
@@ -249,6 +271,11 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       let total = parseFloat((idxTotal !== -1 && row[idxTotal]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
       let paid = parseFloat((idxPaid !== -1 && row[idxPaid]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
       let due = parseFloat((idxDue !== -1 && row[idxDue]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
+
+      // Handle total if zero but paid or due exist
+      if (total === 0 && (paid > 0 || due > 0)) {
+        total = paid + (due > 0 ? due : 0);
+      }
 
       // Handle negative due amount anomaly
       if (total === 0 && paid > 0 && due < 0) {
@@ -293,7 +320,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       const itemDetails = `${displayItemName}${quantity > 1 ? ` (${quantity} नग)` : ''}${village ? ` - ${village}` : ''}`;
 
       bills.push({
-        id: `bill-imp-${invoiceNo.replace(/[^a-zA-Z0-9-]/g, '')}`,
+        id: `bill-imp-${invoiceNo ? invoiceNo.replace(/[^a-zA-Z0-9-]/g, '') : 'inv'}-${r}`,
         invoiceNo,
         date,
         customerName: cleanName,
@@ -314,19 +341,20 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
 
       // Accumulate into Product Catalog / Stock Items
       if (productName && productName.length > 1 && !['sales invoice', 'bill', 'invoice', 'sales'].includes(productName.toLowerCase())) {
-        const prodKey = productName.toLowerCase().trim();
-        const existingProd = productMap.get(prodKey);
+        const cleanProdName = productName.trim();
+        const slugKey = cleanProdName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'item';
+        const existingProd = productMap.get(slugKey);
         if (existingProd) {
           existingProd.quantity += quantity;
           if (unitPrice > 0) {
             existingProd.sellingPrice = Math.max(existingProd.sellingPrice, unitPrice);
           }
         } else {
-          productMap.set(prodKey, {
-            id: `prod-${prodKey.replace(/[^a-z0-9]/g, '-') || Date.now()}`,
-            name: productName,
+          productMap.set(slugKey, {
+            id: `prod-${slugKey}`,
+            name: cleanProdName,
             code: `PRD-${(productMap.size + 1).toString().padStart(3, '0')}`,
-            category: category,
+            category: category || 'फर्निचर व घरगुती वस्तू',
             quantity: quantity,
             unit: 'नग (Piece)',
             sellingPrice: unitPrice > 0 ? unitPrice : total,
@@ -338,7 +366,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       }
 
       // Update customer map for Khata
-      const custKey = cleanName.toLowerCase();
+      const custKey = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'cust';
       const existing = customerMap.get(custKey);
       if (existing) {
         existing.totalPurchases += total;
@@ -348,7 +376,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         if (!existing.address && village) existing.address = `${village}, Wardha`;
       } else {
         customerMap.set(custKey, {
-          id: `cust-${custKey.replace(/[^a-z0-9]/g, '-')}`,
+          id: `cust-${custKey}`,
           name: cleanName,
           phone: phone || '',
           address: village ? `${village}, Wardha` : 'Wardha',
@@ -422,7 +450,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
         const { schemeId } = getSchemeForCard(targetCardNo, remarks);
 
         cardTransactions.push({
-          id: `card-tx-${rcptNo.replace(/[^a-zA-Z0-9-]/g, '')}`,
+          id: `card-tx-${rcptNo ? rcptNo.replace(/[^a-zA-Z0-9-]/g, '') : 'rcpt'}-${r}`,
           cardId: `cm-${schemeId}-${targetCardNo}`,
           cardNumber: targetCardNo,
           schemeId,
@@ -439,7 +467,7 @@ export function processUniversalCsv(csvContent: string): UniversalImportResult {
       } else {
         // Customer credit recovery / Sales payment receipt (NOT a bill!)
         salesReceipts.push({
-          id: `rcpt-entry-${rcptNo.replace(/[^a-zA-Z0-9-]/g, '')}`,
+          id: `rcpt-entry-${rcptNo ? rcptNo.replace(/[^a-zA-Z0-9-]/g, '') : 'rcpt'}-${r}`,
           invoiceNo: rcptNo,
           date,
           customerName: cleanName,

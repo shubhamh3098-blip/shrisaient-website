@@ -6,6 +6,7 @@ import {
   deleteDoc,
   onSnapshot, 
   getDoc,
+  getDocs,
   collection,
   serverTimestamp, 
   setLogLevel,
@@ -101,6 +102,64 @@ export function clearQuotaExceededState(): void {
     localStorage.removeItem(QUOTA_STORAGE_KEY);
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Directly clears specific partitions in Cloud Firestore and overwrites metadata
+ * with totalItems: 0, chunkCount: 0 so no stale or orphaned chunks get loaded.
+ */
+export async function clearCloudSection(
+  section: 'all' | 'cards' | 'bills' | 'customers'
+): Promise<void> {
+  const sectionsCol = collection(firestore, 'stores', 'shri_sai_enterprise_main', 'sections');
+  const nowIso = new Date().toISOString();
+  const ops: Promise<any>[] = [];
+
+  if (section === 'all' || section === 'cards') {
+    ops.push(setDoc(doc(sectionsCol, 'cardMembers_meta'), { totalItems: 0, chunkCount: 0, updatedAt: nowIso }));
+    ops.push(setDoc(doc(sectionsCol, 'cardTransactions_meta'), { totalItems: 0, chunkCount: 0, updatedAt: nowIso }));
+    ops.push(setDoc(doc(sectionsCol, 'cardMembers_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso }));
+    ops.push(setDoc(doc(sectionsCol, 'cardTransactions_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso }));
+    for (let i = 1; i < 30; i++) {
+      ops.push(deleteDoc(doc(sectionsCol, `cardMembers_chunk_${i}`)).catch(() => {}));
+      ops.push(deleteDoc(doc(sectionsCol, `cardTransactions_chunk_${i}`)).catch(() => {}));
+    }
+  }
+
+  if (section === 'all' || section === 'bills') {
+    ops.push(setDoc(doc(sectionsCol, 'transactions_meta'), { totalItems: 0, chunkCount: 0, updatedAt: nowIso }));
+    ops.push(setDoc(doc(sectionsCol, 'customers'), { items: [], updatedAt: nowIso }));
+    ops.push(setDoc(doc(sectionsCol, 'transactions_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso }));
+    for (let i = 1; i < 30; i++) {
+      ops.push(deleteDoc(doc(sectionsCol, `transactions_chunk_${i}`)).catch(() => {}));
+    }
+  }
+
+  if (section === 'customers') {
+    ops.push(setDoc(doc(sectionsCol, 'customers'), { items: [], updatedAt: nowIso }));
+  }
+
+  const mainStoreRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
+  ops.push(
+    setDoc(
+      mainStoreRef,
+      {
+        updatedAt: nowIso,
+        clearedAt: nowIso,
+        clearedSection: section,
+      },
+      { merge: true }
+    )
+  );
+
+  lastSavedFingerprint = '';
+  lastSavedSectionFingerprints = {};
+
+  try {
+    await Promise.all(ops);
+  } catch (err) {
+    console.warn('clearCloudSection note:', err);
   }
 }
 
@@ -282,10 +341,15 @@ export async function syncDatabaseToCloud(
 
       // Chunked Transactions (Bills) - only if changed
       if (forceRetry || currTxFp !== prevFp.transactions) {
-        const txChunkCount = Math.max(1, Math.ceil(transactions.length / CHUNK_SIZE));
+        const txChunkCount = transactions.length === 0 ? 0 : Math.ceil(transactions.length / CHUNK_SIZE);
         activeSaves.push(
           setDoc(doc(sectionsCol, 'transactions_meta'), { totalItems: transactions.length, chunkCount: txChunkCount, updatedAt: nowIso })
         );
+        if (txChunkCount === 0) {
+          activeSaves.push(
+            setDoc(doc(sectionsCol, 'transactions_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso })
+          );
+        }
         for (let i = 0; i < txChunkCount; i++) {
           const chunk = transactions.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
           activeSaves.push(
@@ -296,18 +360,24 @@ export async function syncDatabaseToCloud(
             })
           );
         }
-        for (let i = txChunkCount; i < lastTransactionChunks; i++) {
-          activeSaves.push(deleteDoc(doc(sectionsCol, `transactions_chunk_${i}`)));
+        const cleanupUpto = Math.max(lastTransactionChunks, 30);
+        for (let i = Math.max(1, txChunkCount); i < cleanupUpto; i++) {
+          activeSaves.push(deleteDoc(doc(sectionsCol, `transactions_chunk_${i}`)).catch(() => {}));
         }
         lastTransactionChunks = txChunkCount;
       }
 
       // Chunked Card Members - only if changed
       if (forceRetry || currCardMemFp !== prevFp.cardMembers) {
-        const cmChunkCount = Math.max(1, Math.ceil(cardMembers.length / CHUNK_SIZE));
+        const cmChunkCount = cardMembers.length === 0 ? 0 : Math.ceil(cardMembers.length / CHUNK_SIZE);
         activeSaves.push(
           setDoc(doc(sectionsCol, 'cardMembers_meta'), { totalItems: cardMembers.length, chunkCount: cmChunkCount, updatedAt: nowIso })
         );
+        if (cmChunkCount === 0) {
+          activeSaves.push(
+            setDoc(doc(sectionsCol, 'cardMembers_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso })
+          );
+        }
         for (let i = 0; i < cmChunkCount; i++) {
           const chunk = cardMembers.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
           activeSaves.push(
@@ -318,18 +388,24 @@ export async function syncDatabaseToCloud(
             })
           );
         }
-        for (let i = cmChunkCount; i < lastCardMemberChunks; i++) {
-          activeSaves.push(deleteDoc(doc(sectionsCol, `cardMembers_chunk_${i}`)));
+        const cleanupUpto = Math.max(lastCardMemberChunks, 30);
+        for (let i = Math.max(1, cmChunkCount); i < cleanupUpto; i++) {
+          activeSaves.push(deleteDoc(doc(sectionsCol, `cardMembers_chunk_${i}`)).catch(() => {}));
         }
         lastCardMemberChunks = cmChunkCount;
       }
 
       // Chunked Card Transactions (Receipts) - only if changed
       if (forceRetry || currCardTxFp !== prevFp.cardTransactions) {
-        const ctxChunkCount = Math.max(1, Math.ceil(cardTransactions.length / CHUNK_SIZE));
+        const ctxChunkCount = cardTransactions.length === 0 ? 0 : Math.ceil(cardTransactions.length / CHUNK_SIZE);
         activeSaves.push(
           setDoc(doc(sectionsCol, 'cardTransactions_meta'), { totalItems: cardTransactions.length, chunkCount: ctxChunkCount, updatedAt: nowIso })
         );
+        if (ctxChunkCount === 0) {
+          activeSaves.push(
+            setDoc(doc(sectionsCol, 'cardTransactions_chunk_0'), { items: [], chunkIndex: 0, updatedAt: nowIso })
+          );
+        }
         for (let i = 0; i < ctxChunkCount; i++) {
           const chunk = cardTransactions.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
           activeSaves.push(
@@ -340,8 +416,9 @@ export async function syncDatabaseToCloud(
             })
           );
         }
-        for (let i = ctxChunkCount; i < lastCardTransactionChunks; i++) {
-          activeSaves.push(deleteDoc(doc(sectionsCol, `cardTransactions_chunk_${i}`)));
+        const cleanupUpto = Math.max(lastCardTransactionChunks, 30);
+        for (let i = Math.max(1, ctxChunkCount); i < cleanupUpto; i++) {
+          activeSaves.push(deleteDoc(doc(sectionsCol, `cardTransactions_chunk_${i}`)).catch(() => {}));
         }
         lastCardTransactionChunks = ctxChunkCount;
       }
@@ -471,13 +548,22 @@ export function subscribeToCloudDatabase(
         const txChunks: Record<number, any[]> = {};
         const cmChunks: Record<number, any[]> = {};
         const ctxChunks: Record<number, any[]> = {};
+        let txMeta: { totalItems?: number; chunkCount?: number } | null = null;
+        let cmMeta: { totalItems?: number; chunkCount?: number } | null = null;
+        let ctxMeta: { totalItems?: number; chunkCount?: number } | null = null;
 
         snapshot.forEach((docSnap) => {
           const id = docSnap.id;
           const docData = docSnap.data();
           if (!docData) return;
 
-          if (id === 'settings' && docData.data) {
+          if (id === 'transactions_meta') {
+            txMeta = docData as any;
+          } else if (id === 'cardMembers_meta') {
+            cmMeta = docData as any;
+          } else if (id === 'cardTransactions_meta') {
+            ctxMeta = docData as any;
+          } else if (id === 'settings' && docData.data) {
             settings = docData.data;
           } else if (id === 'stock' && Array.isArray(docData.items)) {
             stock = docData.items;
@@ -511,23 +597,44 @@ export function subscribeToCloudDatabase(
           }
         });
 
-        // Assemble transactions in index order
+        // Assemble transactions in index order, respecting meta chunkCount
         const transactions: any[] = [];
-        Object.keys(txChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          transactions.push(...txChunks[k]);
-        });
+        if (txMeta && (txMeta.chunkCount === 0 || txMeta.totalItems === 0)) {
+          // Explicitly cleared or empty
+        } else {
+          const maxTxChunks = txMeta && typeof txMeta.chunkCount === 'number' ? txMeta.chunkCount : 9999;
+          Object.keys(txChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
+            if (k < maxTxChunks && Array.isArray(txChunks[k])) {
+              transactions.push(...txChunks[k]);
+            }
+          });
+        }
 
-        // Assemble card members in index order
+        // Assemble card members in index order, respecting meta chunkCount
         const cardMembers: any[] = [];
-        Object.keys(cmChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          cardMembers.push(...cmChunks[k]);
-        });
+        if (cmMeta && (cmMeta.chunkCount === 0 || cmMeta.totalItems === 0)) {
+          // Explicitly cleared or empty
+        } else {
+          const maxCmChunks = cmMeta && typeof cmMeta.chunkCount === 'number' ? cmMeta.chunkCount : 9999;
+          Object.keys(cmChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
+            if (k < maxCmChunks && Array.isArray(cmChunks[k])) {
+              cardMembers.push(...cmChunks[k]);
+            }
+          });
+        }
 
-        // Assemble card transactions in index order
+        // Assemble card transactions in index order, respecting meta chunkCount
         const cardTransactions: any[] = [];
-        Object.keys(ctxChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
-          cardTransactions.push(...ctxChunks[k]);
-        });
+        if (ctxMeta && (ctxMeta.chunkCount === 0 || ctxMeta.totalItems === 0)) {
+          // Explicitly cleared or empty
+        } else {
+          const maxCtxChunks = ctxMeta && typeof ctxMeta.chunkCount === 'number' ? ctxMeta.chunkCount : 9999;
+          Object.keys(ctxChunks).map(Number).sort((a, b) => a - b).forEach((k) => {
+            if (k < maxCtxChunks && Array.isArray(ctxChunks[k])) {
+              cardTransactions.push(...ctxChunks[k]);
+            }
+          });
+        }
 
         const parsedData: AppDatabase = {
           settings: settings || initialFallback?.settings || {

@@ -20,6 +20,7 @@ import {
   Lock
 } from 'lucide-react';
 import { BusinessSettings, DeliveryRatesConfig } from '../types';
+import { CloudSyncStatus } from '../lib/firebase';
 
 interface SettingsViewProps {
   settings: BusinessSettings;
@@ -28,7 +29,9 @@ interface SettingsViewProps {
   onImportData: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetData: () => void;
   onClearAllDemoData?: () => void;
-  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
+  onClearCardsData?: () => void;
+  onClearBillsData?: () => void;
+  cloudStatus?: CloudSyncStatus;
   lastSyncedTime?: string;
   onManualCloudSync?: () => void;
   userRole?: 'admin' | 'staff';
@@ -41,6 +44,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onImportData,
   onResetData,
   onClearAllDemoData,
+  onClearCardsData,
+  onClearBillsData,
   cloudStatus = 'connected',
   lastSyncedTime,
   onManualCloudSync,
@@ -489,12 +494,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
               </label>
 
+              {onClearCardsData && (
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'सावधान: क्या आप सभी कार्ड्स और योजना हप्ते (Card Scheme Data) 100% साफ़ करना चाहते हैं?'
+                      )
+                    ) {
+                      onClearCardsData();
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  कार्ड डेटा साफ़ करें (Clear Cards)
+                </button>
+              )}
+
+              {onClearBillsData && (
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'सावधान: क्या आप सभी बिक्री बिल और ग्राहक खाते (Sales Bills Data) 100% साफ़ करना चाहते हैं?'
+                      )
+                    ) {
+                      onClearBillsData();
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  बिक्री बिल साफ़ करें (Clear Bills)
+                </button>
+              )}
+
               {onClearAllDemoData && (
                 <button
                   onClick={() => {
                     if (
                       window.confirm(
-                        'चेतावनी: क्या आप पूरा डेमो/सैंपल डेटा (सभी टेस्ट ग्राहक, डमी बिक्री और टेस्ट कार्ड मेंबर्स) हटाना चाहते हैं?\n\nयह आपका खाता ₹0 बैलेंस के साथ 100% साफ़ कर देगा ताकि आप असली बिजनेस एंट्री शुरू कर सकें।'
+                        'चेतावनी: क्या आप पूरा पुराना डेटा (सभी ग्राहक, बिक्री और कार्ड मेंबर्स) 100% हटाना चाहते हैं?\n\nयह आपका खाता ₹0 बैलेंस के साथ 100% साफ़ कर देगा।'
                       )
                     ) {
                       onClearAllDemoData();
@@ -503,7 +544,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
                 >
                   <Trash2 className="w-4 h-4" />
-                  पूरा डेमो डेटा साफ़ करें (Start Clean Slate)
+                  पूरा डेटा साफ़ करें (Clear All Data)
                 </button>
               )}
 

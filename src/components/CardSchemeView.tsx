@@ -23,7 +23,9 @@ import {
   ShieldCheck,
   RotateCcw,
   Check,
-  Tag
+  Tag,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import {
   CardMember,
@@ -45,6 +47,10 @@ interface CardSchemeViewProps {
   staff?: StaffMember[];
   onAddMember: (member: Omit<CardMember, 'id'>) => void;
   onRecordTransaction: (tx: Omit<CardTransaction, 'id' | 'createdAt'>) => void;
+  onUpdateMember?: (member: CardMember) => void;
+  onDeleteMember?: (memberId: string) => void;
+  onUpdateTransaction?: (tx: CardTransaction) => void;
+  onDeleteTransaction?: (txId: string) => void;
   onNavigateCsv?: () => void;
   salesBills?: any;
   initialAction?: 'payment' | 'add-card' | null;
@@ -60,6 +66,10 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   staff = [],
   onAddMember,
   onRecordTransaction,
+  onUpdateMember,
+  onDeleteMember,
+  onUpdateTransaction,
+  onDeleteTransaction,
   onNavigateCsv,
   salesBills = [],
   initialAction,
@@ -142,6 +152,31 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [refundMode, setRefundMode] = useState<'Cash' | 'Online'>('Cash');
   const [refundAgentName, setRefundAgentName] = useState(activeAgent);
   const [refundRemarks, setRefundRemarks] = useState('Partial refund / return to customer');
+
+  // Dedicated Member Edit Modal state
+  const [editingMember, setEditingMember] = useState<CardMember | null>(null);
+
+  // Weekly Collection Inline Member Edit state
+  const [paymentEditCustomerName, setPaymentEditCustomerName] = useState('');
+  const [paymentEditPhone, setPaymentEditPhone] = useState('');
+  const [paymentEditVillage, setPaymentEditVillage] = useState('');
+  const [paymentEditSheetNo, setPaymentEditSheetNo] = useState('');
+  const [showInlineMemberEdit, setShowInlineMemberEdit] = useState(false);
+
+  // Synchronize inline member fields whenever paymentSelectedCard changes
+  useEffect(() => {
+    if (paymentSelectedCard) {
+      setPaymentEditCustomerName(paymentSelectedCard.customerName || '');
+      setPaymentEditPhone(paymentSelectedCard.phone || '');
+      setPaymentEditVillage(paymentSelectedCard.village || '');
+      setPaymentEditSheetNo(paymentSelectedCard.sheetNo || '');
+      if (!paymentSelectedCard.phone || !paymentSelectedCard.village) {
+        setShowInlineMemberEdit(true);
+      } else {
+        setShowInlineMemberEdit(false);
+      }
+    }
+  }, [paymentSelectedCard]);
 
   // Keep newAgentName, paymentAgentName, refundAgentName in sync with activeAgent
   useEffect(() => {
@@ -318,17 +353,36 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     e.preventDefault();
     if (!paymentSelectedCard || paymentAmount <= 0) return;
 
-    const receiptNo = `REC-${paymentSelectedCard.cardNumber}-${Date.now().toString().slice(-4)}`;
-    const newBalance = (paymentSelectedCard.netBalance || 0) + paymentAmount;
+    // Check if customer details were updated in the inline editor
+    let activeCard = paymentSelectedCard;
+    const isInfoChanged =
+      (paymentEditCustomerName.trim() && paymentEditCustomerName.trim() !== (paymentSelectedCard.customerName || '').trim()) ||
+      paymentEditPhone.trim() !== (paymentSelectedCard.phone || '').trim() ||
+      paymentEditVillage.trim() !== (paymentSelectedCard.village || '').trim() ||
+      paymentEditSheetNo.trim() !== (paymentSelectedCard.sheetNo || '').trim();
+
+    if (onUpdateMember && isInfoChanged) {
+      activeCard = {
+        ...paymentSelectedCard,
+        customerName: paymentEditCustomerName.trim() || paymentSelectedCard.customerName,
+        phone: paymentEditPhone.trim(),
+        village: paymentEditVillage.trim(),
+        sheetNo: paymentEditSheetNo.trim(),
+      };
+      onUpdateMember(activeCard);
+    }
+
+    const receiptNo = `REC-${activeCard.cardNumber}-${Date.now().toString().slice(-4)}`;
+    const newBalance = (activeCard.netBalance || 0) + paymentAmount;
     const date = new Date().toISOString().split('T')[0];
     const finalAgent = paymentAgentName.trim() || activeAgent;
 
     onRecordTransaction({
-      cardId: paymentSelectedCard.id,
-      cardNumber: paymentSelectedCard.cardNumber,
-      schemeId: paymentSelectedCard.schemeId,
-      customerName: paymentSelectedCard.customerName,
-      customerPhone: paymentSelectedCard.phone,
+      cardId: activeCard.id,
+      cardNumber: activeCard.cardNumber,
+      schemeId: activeCard.schemeId,
+      customerName: activeCard.customerName,
+      customerPhone: activeCard.phone,
       receiptNo,
       date,
       type: 'WeeklyPayment',
@@ -341,16 +395,16 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     });
 
     // Auto-send WhatsApp receipt if customer has mobile number
-    if (sendWhatsAppOnPayment && paymentSelectedCard.phone && paymentSelectedCard.phone.trim().length >= 10) {
-      const cleanPhone = paymentSelectedCard.phone.replace(/[^0-9]/g, '');
+    if (sendWhatsAppOnPayment && activeCard.phone && activeCard.phone.trim().length >= 10) {
+      const cleanPhone = activeCard.phone.replace(/[^0-9]/g, '');
       const waMessage = encodeURIComponent(
         `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
         `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
         `--------------------------------\n` +
         `पावती क्र.: *${receiptNo}*\n` +
         `तारीख: ${date}\n` +
-        `कार्ड क्र.: *#${paymentSelectedCard.cardNumber}* (${paymentSelectedCard.schemeName})\n` +
-        `नाव: *${paymentSelectedCard.customerName}*\n` +
+        `कार्ड क्र.: *#${activeCard.cardNumber}* (${activeCard.schemeName})\n` +
+        `नाव: *${activeCard.customerName}*\n` +
         `जमा रक्कम: *₹${(Number(paymentAmount) || 0).toLocaleString()}* (Week ${paymentWeekNo})\n` +
         `पेमेंट मोड: ${paymentMode} | एजंट: ${finalAgent}\n` +
         `खात्यात एकूण शिल्लक जमा: *₹${(Number(newBalance) || 0).toLocaleString()}*\n` +
@@ -364,8 +418,8 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     // Success flash notification
     setLastActionMessage({
       title: `₹${(Number(paymentAmount) || 0).toLocaleString()} Weekly Payment Deposited!`,
-      text: `Card #${paymentSelectedCard.cardNumber} (${paymentSelectedCard.customerName}) | New Balance: ₹${(Number(newBalance) || 0).toLocaleString()} | Agent: ${finalAgent}`,
-      card: { ...paymentSelectedCard, netBalance: newBalance },
+      text: `Card #${activeCard.cardNumber} (${activeCard.customerName}) | New Balance: ₹${(Number(newBalance) || 0).toLocaleString()} | Agent: ${finalAgent}${isInfoChanged ? ' (माहिती अपडेट झाली)' : ''}`,
+      card: { ...activeCard, netBalance: newBalance },
     });
 
     // Reset Form, stay on this page
@@ -883,7 +937,14 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                         {member.phone}
                       </p>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500 text-xs sm:text-[10px]">No mobile</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingMember(member)}
+                        className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 border border-amber-200 dark:border-amber-800 rounded px-1.5 py-0.5 text-[10px] font-semibold cursor-pointer mt-0.5"
+                        title="मोबाईल नंबर जोडा"
+                      >
+                        + मोबाईल जोडा
+                      </button>
                     )}
                   </td>
 
@@ -895,7 +956,14 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           {member.village}
                         </span>
                       ) : (
-                        <span className="text-slate-400 dark:text-slate-500 text-xs sm:text-[11px]">-</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingMember(member)}
+                          className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 border border-amber-200 dark:border-amber-800 rounded px-1.5 py-0.5 text-[10px] font-semibold cursor-pointer w-fit"
+                          title="गाव / पत्ता जोडा"
+                        >
+                          + गाव जोडा
+                        </button>
                       )}
                       {member.sheetNo && (
                         <span className="text-xs sm:text-[10px] font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.2 rounded w-fit border border-blue-100 dark:border-blue-800">
@@ -976,6 +1044,15 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                         title="Refund / Return"
                       >
                         Refund
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingMember(member)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 font-bold text-xs transition cursor-pointer border border-amber-200 dark:border-amber-800"
+                        title="माहिती दुरुस्त करा (Edit Name, Phone, Village)"
+                      >
+                        ✏️ एडिट
                       </button>
 
                       <button
@@ -1323,6 +1400,111 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     </p>
                   </div>
 
+                  {/* Inline Member Missing Details Editor */}
+                  <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200">
+                        <Edit2 className="w-3.5 h-3.5 text-amber-600" />
+                        <span>ग्राहकाचा मोबाईल / गाव / नाव दुरुस्त करा</span>
+                        {(!paymentSelectedCard.phone || !paymentSelectedCard.village) && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-bold">माहिती अपूर्ण</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowInlineMemberEdit(!showInlineMemberEdit)}
+                        className="text-[11px] font-bold text-amber-700 dark:text-amber-300 underline cursor-pointer"
+                      >
+                        {showInlineMemberEdit ? 'संक्षिप्त करा ▲' : 'माहिती बदला ▼'}
+                      </button>
+                    </div>
+
+                    {showInlineMemberEdit && (
+                      <div className="space-y-2 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                              ग्राहकाचे नाव
+                            </label>
+                            <input
+                              type="text"
+                              value={paymentEditCustomerName}
+                              onChange={(e) => setPaymentEditCustomerName(e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-amber-300 dark:border-amber-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5 flex items-center justify-between">
+                              <span>मोबाईल नंबर</span>
+                              {!paymentEditPhone && <span className="text-[10px] text-rose-600 font-bold">आवश्यक</span>}
+                            </label>
+                            <input
+                              type="tel"
+                              value={paymentEditPhone}
+                              onChange={(e) => setPaymentEditPhone(e.target.value)}
+                              placeholder="उदा. 9822000000"
+                              className="w-full px-2.5 py-1.5 border border-amber-300 dark:border-amber-700 rounded-lg text-xs font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5 flex items-center justify-between">
+                              <span>गाव / पत्ता (Village)</span>
+                              {!paymentEditVillage && <span className="text-[10px] text-rose-600 font-bold">आवश्यक</span>}
+                            </label>
+                            <input
+                              type="text"
+                              value={paymentEditVillage}
+                              onChange={(e) => setPaymentEditVillage(e.target.value)}
+                              placeholder="उदा. KELZAR, WAIFAD, ARVI"
+                              className="w-full px-2.5 py-1.5 border border-amber-300 dark:border-amber-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">
+                              शीट क्रमांक (Sheet No)
+                            </label>
+                            <input
+                              type="text"
+                              value={paymentEditSheetNo}
+                              onChange={(e) => setPaymentEditSheetNo(e.target.value)}
+                              placeholder="उदा. 5104"
+                              className="w-full px-2.5 py-1.5 border border-amber-300 dark:border-amber-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {onUpdateMember && (
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated: CardMember = {
+                                  ...paymentSelectedCard,
+                                  customerName: paymentEditCustomerName.trim() || paymentSelectedCard.customerName,
+                                  phone: paymentEditPhone.trim(),
+                                  village: paymentEditVillage.trim(),
+                                  sheetNo: paymentEditSheetNo.trim(),
+                                };
+                                onUpdateMember(updated);
+                                setPaymentSelectedCard(updated);
+                                alert('सफलता: कार्ड मेंबर माहिती (नाव, फोन, गाव) त्वरित अपडेट करण्यात आली!');
+                              }}
+                              className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>केवळ माहिती त्वरित सेव्ह करा</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Payment Amount Fast Selector */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -1597,8 +1779,230 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
           member={selectedMemberForPassbook}
           transactions={transactions}
           settings={settings}
+          onUpdateMember={onUpdateMember}
           onClose={() => setSelectedMemberForPassbook(null)}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: DEDICATED EDIT CARD MEMBER DETAILS (नाव, फोन, गाव, शीट नं.) */}
+      {/* ========================================================================= */}
+      {editingMember && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 dark:bg-amber-950/60 rounded-xl text-amber-700 dark:text-amber-300">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    कार्ड माहिती दुरुस्त करा (Edit Card Member)
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    कार्ड क्र.: <strong className="text-blue-600 font-mono">#{editingMember.cardNumber}</strong> • योजना: {editingMember.schemeName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingMember(null)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold p-1 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (onUpdateMember) {
+                  onUpdateMember(editingMember);
+                }
+                setLastActionMessage({
+                  title: 'माहिती यशस्वीपणे अपडेट केली!',
+                  text: `कार्ड #${editingMember.cardNumber} (${editingMember.customerName}) ची माहिती सेव्ह झाली.`,
+                  card: editingMember,
+                });
+                setEditingMember(null);
+              }}
+              className="space-y-3.5"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    कार्ड क्रमांक (Card Number)
+                  </label>
+                  <input
+                    type="number"
+                    value={editingMember.cardNumber}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        cardNumber: parseInt(e.target.value) || editingMember.cardNumber,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    शीट क्रमांक (Sheet No)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMember.sheetNo || ''}
+                    placeholder="उदा. 5104"
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        sheetNo: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  ग्राहकाचे नाव (Customer Name) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingMember.customerName}
+                  onChange={(e) =>
+                    setEditingMember({
+                      ...editingMember,
+                      customerName: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    मोबाईल नंबर (Phone)
+                  </label>
+                  <input
+                    type="tel"
+                    value={editingMember.phone || ''}
+                    placeholder="१० अंकी नंबर"
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        phone: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    गाव / पत्ता (Village)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMember.village || ''}
+                    placeholder="उदा. Kelzar, Wardha"
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        village: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    कलेक्शन एजंट (Agent Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMember.agentName || ''}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        agentName: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    स्थिती (Status)
+                  </label>
+                  <select
+                    value={editingMember.status || 'Active'}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        status: e.target.value as any,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  >
+                    <option value="Active">सुरू (Active)</option>
+                    <option value="Completed">पूर्ण झाले (Completed)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs flex justify-between items-center">
+                <span className="text-slate-500 dark:text-slate-400">एकूण जमा शिल्लक:</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                  ₹{(editingMember.netBalance ?? 0).toLocaleString()}
+                </strong>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                {onDeleteMember ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`तुम्हाला नक्की कार्ड #${editingMember.cardNumber} (${editingMember.customerName}) हटवायचे आहे का?`)) {
+                        onDeleteMember(editingMember.id);
+                        setEditingMember(null);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-rose-200 dark:border-rose-800"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>मेंबर हटवा</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingMember(null)}
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    रद्द करा
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>माहिती सेव्ह करा</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

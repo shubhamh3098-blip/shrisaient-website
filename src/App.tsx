@@ -19,7 +19,10 @@ import {
 import {
   loadDatabase,
   saveDatabase,
+  deduplicateStock,
   clearAllDemoData,
+  clearCardsData,
+  clearBillsData,
   AppDatabase,
   DEFAULT_SETTINGS,
   INITIAL_STOCK,
@@ -36,6 +39,7 @@ import {
 import {
   subscribeToCloudDatabase,
   syncDatabaseToCloud,
+  clearCloudSection,
   logAuthEventToCloud,
   checkIsQuotaExceededToday,
   CloudSyncStatus
@@ -55,6 +59,7 @@ import { CardSchemeView } from './components/CardSchemeView';
 import { DealerLedgerView } from './components/DealerLedgerView';
 import { CsvImportView } from './components/CsvImportView';
 import { UploadedDataView } from './components/UploadedDataView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { CardPassbookModal } from './components/CardPassbookModal';
 import { LoginModal } from './components/LoginModal';
 import { ShopLandingView } from './components/ShopLandingView';
@@ -135,6 +140,11 @@ export default function App() {
   
   const isRemoteUpdateRef = useRef(false);
   const isFirstMountRef = useRef(true);
+  const userClearedSectionsRef = useRef<{
+    all?: number;
+    cards?: number;
+    bills?: number;
+  }>({});
 
   // Play audio chime when customer places an order
   const playOrderSound = () => {
@@ -204,13 +214,51 @@ export default function App() {
   }, []);
 
   // Clear demo data handler - resets customers, transactions, card members to a clean slate
-  const handleClearAllDemoData = () => {
+  const handleClearAllDemoData = async () => {
     const clean = clearAllDemoData(db);
+    userClearedSectionsRef.current.all = Date.now();
     setDb(clean);
-    syncDatabaseToCloud(clean, setCloudStatus, true);
+    saveDatabase(clean);
+    try {
+      await clearCloudSection('all');
+    } catch (e) {}
+    syncDatabaseToCloud(clean, setCloudStatus, true, true);
     alert(
-      'सफलता: सभी टेस्ट ग्राहक, बिक्री (Transactions) और डमी कार्ड मेंबर्स साफ़ कर दिए गए हैं!\n\nअब आपका खाता ₹0 बैलेंस के साथ वास्तविक बिजनेस एंट्री के लिए बिल्कुल तैयार है।'
+      '✓ सर्व जुना डेटा (बिले, कार्ड्स, ग्राहक व पावत्या) 100% पूर्णपणे क्लिअर झाला आहे!\n\nआता सिस्टीम पूर्ण स्वच्छ झाली आहे.'
     );
+  };
+
+  const handleClearCardsData = async () => {
+    const clean = clearCardsData(db);
+    userClearedSectionsRef.current.cards = Date.now();
+    setDb(clean);
+    saveDatabase(clean);
+    try {
+      await clearCloudSection('cards');
+    } catch (e) {}
+    syncDatabaseToCloud(clean, setCloudStatus, true, true);
+    alert('✓ सर्व कार्ड्स व योजना डेटा (Card Scheme Data) 100% पूर्णपणे क्लिअर झाला आहे!');
+  };
+
+  const handleClearBillsData = async () => {
+    const clean = clearBillsData(db);
+    userClearedSectionsRef.current.bills = Date.now();
+    setDb(clean);
+    saveDatabase(clean);
+    try {
+      await clearCloudSection('bills');
+    } catch (e) {}
+    syncDatabaseToCloud(clean, setCloudStatus, true, true);
+    alert('✓ सर्व सेल्स बिले व ग्राहक यादी (Sales Bills Data) 100% पूर्णपणे क्लिअर झाली आहेत!');
+  };
+
+  const handleClearZeroBills = () => {
+    const filteredTransactions = (db.transactions || []).filter((t) => (t.totalAmount || 0) > 0);
+    const updatedDb = { ...db, transactions: filteredTransactions };
+    setDb(updatedDb);
+    saveDatabase(updatedDb);
+    syncDatabaseToCloud(updatedDb, setCloudStatus, true, true);
+    alert('✓ सर्व ₹0 ची चुकीची बिले यशस्वीपणे काढून टाकली आहेत!');
   };
 
   // 1. Real-time Cloud Firestore Listener (Across All Devices & shrisaient.in)
@@ -220,32 +268,39 @@ export default function App() {
         if (remoteData) {
           isRemoteUpdateRef.current = true;
           setDb((prev) => {
-            // CRITICAL SAFETY CHECK:
-            // Never wipe out freshly imported local bills or cards if remote snapshot is empty or partial
-            const mergedTransactions =
-              remoteData.transactions && remoteData.transactions.length > 0
-                ? remoteData.transactions
-                : (prev.transactions && prev.transactions.length > 0 ? prev.transactions : []);
+            const now = Date.now();
+            const isAllRecentlyCleared = Boolean(
+              userClearedSectionsRef.current.all && now - userClearedSectionsRef.current.all < 30000
+            );
+            const isCardsRecentlyCleared =
+              isAllRecentlyCleared ||
+              Boolean(userClearedSectionsRef.current.cards && now - userClearedSectionsRef.current.cards < 30000);
+            const isBillsRecentlyCleared =
+              isAllRecentlyCleared ||
+              Boolean(userClearedSectionsRef.current.bills && now - userClearedSectionsRef.current.bills < 30000);
 
-            const mergedCardMembers =
-              remoteData.cardMembers && remoteData.cardMembers.length > 0
-                ? remoteData.cardMembers
-                : (prev.cardMembers && prev.cardMembers.length > 0 ? prev.cardMembers : []);
+            // Respect intentional clearing; otherwise use remoteData, or keep local if remote empty
+            const mergedTransactions = isBillsRecentlyCleared
+              ? []
+              : (remoteData.transactions !== undefined ? remoteData.transactions : prev.transactions || []);
 
-            const mergedCardTransactions =
-              remoteData.cardTransactions && remoteData.cardTransactions.length > 0
-                ? remoteData.cardTransactions
-                : (prev.cardTransactions && prev.cardTransactions.length > 0 ? prev.cardTransactions : []);
+            const mergedCardMembers = isCardsRecentlyCleared
+              ? []
+              : (remoteData.cardMembers !== undefined ? remoteData.cardMembers : prev.cardMembers || []);
 
-            const mergedCustomers =
-              remoteData.customers && remoteData.customers.length > 0
-                ? remoteData.customers
-                : (prev.customers && prev.customers.length > 0 ? prev.customers : []);
+            const mergedCardTransactions = isCardsRecentlyCleared
+              ? []
+              : (remoteData.cardTransactions !== undefined ? remoteData.cardTransactions : prev.cardTransactions || []);
 
-            const mergedStock =
+            const mergedCustomers = isBillsRecentlyCleared
+              ? []
+              : (remoteData.customers !== undefined ? remoteData.customers : prev.customers || []);
+
+            const rawStock =
               remoteData.stock && remoteData.stock.length > 0
                 ? remoteData.stock
                 : (prev.stock && prev.stock.length > 0 ? prev.stock : []);
+            const mergedStock = deduplicateStock(rawStock);
 
             return {
               settings: remoteData.settings ? { ...prev.settings, ...remoteData.settings } : prev.settings,
@@ -669,6 +724,7 @@ export default function App() {
             id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: b.customerName,
             phone: b.customerPhone || '',
+            totalPurchased: b.totalAmount,
             totalPurchases: b.totalAmount,
             totalPaid: b.payingNow,
             balanceDue: isReceipt ? 0 : b.dueAmount,
@@ -827,24 +883,28 @@ export default function App() {
     stockItems?: StockItem[];
   }) => {
     setDb((prev) => {
-      // 1. Merge customers for Khata Ledger
-      const currentCustomers = [...(prev.customers || [])];
-      data.customers.forEach((nc) => {
-        const idx = currentCustomers.findIndex((c) => c.name.toLowerCase() === nc.name.toLowerCase());
-        if (idx >= 0) {
-          currentCustomers[idx].totalPurchases += (nc.totalPurchases || 0);
-          currentCustomers[idx].totalPaid += (nc.totalPaid || 0);
-          currentCustomers[idx].balanceDue = Math.max(0, currentCustomers[idx].totalPurchases - currentCustomers[idx].totalPaid);
-          if (!currentCustomers[idx].phone && nc.phone) currentCustomers[idx].phone = nc.phone;
-          if (!currentCustomers[idx].address && nc.address) currentCustomers[idx].address = nc.address;
-        } else {
-          currentCustomers.push(nc);
-        }
+      // 1. Merge transactions & receipts with deduplication
+      const txMap = new Map<string, TransactionEntry>();
+      // Existing transactions
+      (prev.transactions || []).forEach((t) => {
+        const key = t.invoiceNo ? `inv-${t.invoiceNo.trim().toUpperCase()}` : t.id;
+        txMap.set(key, t);
       });
+      // Incoming bills override or add
+      (data.bills || []).forEach((b) => {
+        const key = b.invoiceNo ? `inv-${b.invoiceNo.trim().toUpperCase()}` : b.id;
+        txMap.set(key, b);
+      });
+      // Incoming sales receipts
+      (data.salesReceipts || []).forEach((r) => {
+        const key = r.invoiceNo ? `inv-${r.invoiceNo.trim().toUpperCase()}` : r.id;
+        txMap.set(key, r);
+      });
+      const currentBills = Array.from(txMap.values());
 
       // 2. Merge card members
       const currentMembers = [...(prev.cardMembers || [])];
-      data.cardMembers.forEach((nm) => {
+      (data.cardMembers || []).forEach((nm) => {
         const idx = currentMembers.findIndex((m) => m.cardNumber === nm.cardNumber && m.schemeId === nm.schemeId);
         if (idx >= 0) {
           currentMembers[idx] = {
@@ -858,12 +918,13 @@ export default function App() {
         }
       });
 
-      // 3. Merge transactions & receipts
-      const currentCardTx = [...data.cardTransactions, ...(prev.cardTransactions || [])];
-      const incomingReceipts = data.salesReceipts || [];
-      const currentBills = [...data.bills, ...incomingReceipts, ...(prev.transactions || [])];
+      // 3. Deduplicate and merge card transactions
+      const cardTxMap = new Map<string, CardTransaction>();
+      (prev.cardTransactions || []).forEach((ct) => cardTxMap.set(ct.id, ct));
+      (data.cardTransactions || []).forEach((ct) => cardTxMap.set(ct.id, ct));
+      const currentCardTx = Array.from(cardTxMap.values());
 
-      // Re-calculate card member balances
+      // Re-calculate card member balances from card transactions
       currentMembers.forEach((m) => {
         const txs = currentCardTx.filter((t) => t.cardNumber === m.cardNumber && t.schemeId === m.schemeId);
         let dep = m.openingAmt || 0;
@@ -876,6 +937,62 @@ export default function App() {
         m.totalRefunded = ref;
         m.netBalance = Math.max(0, dep - ref);
       });
+
+      // 4. Merge customers and recompute balance cleanly from currentBills to avoid doubling on re-import
+      const custMap = new Map<string, Customer>();
+      (prev.customers || []).forEach((c) => {
+        custMap.set(c.name.trim().toLowerCase(), {
+          ...c,
+          totalPurchases: 0,
+          totalPurchased: 0,
+          totalPaid: 0,
+          balanceDue: 0,
+        });
+      });
+      (data.customers || []).forEach((nc) => {
+        const key = nc.name.trim().toLowerCase();
+        const existing = custMap.get(key);
+        if (existing) {
+          if (!existing.phone && nc.phone) existing.phone = nc.phone;
+          if (!existing.address && nc.address) existing.address = nc.address;
+        } else {
+          custMap.set(key, {
+            ...nc,
+            totalPurchases: 0,
+            totalPurchased: 0,
+            totalPaid: 0,
+            balanceDue: 0,
+          });
+        }
+      });
+      // Accurately calculate customer ledger totals from all bills
+      currentBills.forEach((b) => {
+        if (!b.customerName) return;
+        const key = b.customerName.trim().toLowerCase();
+        let cust = custMap.get(key);
+        if (!cust) {
+          cust = {
+            id: `cust-${key.replace(/[^a-z0-9]/g, '-')}`,
+            name: b.customerName.trim(),
+            phone: b.customerPhone || '',
+            address: b.village ? `${b.village}, Wardha` : 'Wardha',
+            totalPurchases: 0,
+            totalPurchased: 0,
+            totalPaid: 0,
+            balanceDue: 0,
+            lastVisit: b.date,
+          };
+          custMap.set(key, cust);
+        }
+        cust.totalPurchases += (b.totalAmount || 0);
+        cust.totalPurchased = cust.totalPurchases;
+        cust.totalPaid += (b.payingNow || 0);
+        cust.balanceDue = Math.max(0, cust.totalPurchases - cust.totalPaid);
+        if (!cust.phone && b.customerPhone) cust.phone = b.customerPhone;
+        if (!cust.address && b.village) cust.address = `${b.village}, Wardha`;
+        if (b.date) cust.lastVisit = b.date;
+      });
+      const currentCustomers = Array.from(custMap.values());
 
       // 4. Merge Stock / Inventory Items extracted from Bills
       const currentStock = [...(prev.stock || [])];
@@ -924,7 +1041,7 @@ export default function App() {
         customers: currentCustomers,
         cardMembers: currentMembers,
         cardTransactions: currentCardTx,
-        stock: currentStock,
+        stock: deduplicateStock(currentStock),
       };
     });
   };
@@ -1046,6 +1163,76 @@ export default function App() {
     setDb(freshDb);
   };
 
+  const handleUpdateRecord = (category: string, id: string, updatedData: any) => {
+    setDb((prev) => {
+      let nextDb = { ...prev };
+      if (category === 'bill') {
+        nextDb.transactions = (prev.transactions || []).map((t) => (t.id === id ? { ...t, ...updatedData } : t));
+      } else if (category === 'receipt') {
+        nextDb.cardTransactions = (prev.cardTransactions || []).map((ct) => (ct.id === id ? { ...ct, ...updatedData } : ct));
+      } else if (category === 'card') {
+        nextDb.cardMembers = (prev.cardMembers || []).map((m) => (m.id === id ? { ...m, ...updatedData } : m));
+      } else if (category === 'customer') {
+        nextDb.customers = (prev.customers || []).map((c) => (c.id === id ? { ...c, ...updatedData } : c));
+      } else if (category === 'purchase') {
+        nextDb.purchases = (prev.purchases || []).map((p) => (p.id === id ? { ...p, ...updatedData } : p));
+      } else if (category === 'dealer') {
+        nextDb.dealers = (prev.dealers || []).map((d) => (d.id === id ? { ...d, ...updatedData } : d));
+      }
+      saveDatabase(nextDb);
+      syncDatabaseToCloud(nextDb, setCloudStatus, false);
+      return nextDb;
+    });
+  };
+
+  const handleDeleteRecord = (category: string, id: string) => {
+    setDb((prev) => {
+      let nextDb = { ...prev };
+      if (category === 'bill') {
+        nextDb.transactions = (prev.transactions || []).filter((t) => t.id !== id);
+      } else if (category === 'receipt') {
+        nextDb.cardTransactions = (prev.cardTransactions || []).filter((ct) => ct.id !== id);
+      } else if (category === 'card') {
+        nextDb.cardMembers = (prev.cardMembers || []).filter((m) => m.id !== id);
+        nextDb.cardTransactions = (prev.cardTransactions || []).filter((ct) => ct.cardId !== id);
+      } else if (category === 'customer') {
+        nextDb.customers = (prev.customers || []).filter((c) => c.id !== id);
+      } else if (category === 'purchase') {
+        nextDb.purchases = (prev.purchases || []).filter((p) => p.id !== id);
+      } else if (category === 'dealer') {
+        nextDb.dealers = (prev.dealers || []).filter((d) => d.id !== id);
+      }
+      saveDatabase(nextDb);
+      syncDatabaseToCloud(nextDb, setCloudStatus, false);
+      return nextDb;
+    });
+  };
+
+  const handleUpdateMember = (updatedMember: any) => {
+    setDb((prev) => {
+      const nextDb = {
+        ...prev,
+        cardMembers: (prev.cardMembers || []).map((m) => (m.id === updatedMember.id ? updatedMember : m)),
+      };
+      saveDatabase(nextDb);
+      syncDatabaseToCloud(nextDb, setCloudStatus, false);
+      return nextDb;
+    });
+  };
+
+  const handleDeleteMember = (memberId: string) => {
+    setDb((prev) => {
+      const nextDb = {
+        ...prev,
+        cardMembers: (prev.cardMembers || []).filter((m) => m.id !== memberId),
+        cardTransactions: (prev.cardTransactions || []).filter((ct) => ct.cardId !== memberId),
+      };
+      saveDatabase(nextDb);
+      syncDatabaseToCloud(nextDb, setCloudStatus, false);
+      return nextDb;
+    });
+  };
+
   if (appMode === 'shop') {
     return (
       <>
@@ -1089,7 +1276,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setAppMode('erp');
-                      setActiveTab('entries');
+                      setActiveTab('all-entries');
                       setNewOrderAlert(null);
                     }}
                     className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
@@ -1223,7 +1410,7 @@ export default function App() {
               )}
               <button
                 onClick={() => {
-                  setActiveTab('entries');
+                  setActiveTab('all-entries');
                   setNewOrderAlert(null);
                 }}
                 className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-white rounded-lg font-bold transition shadow-xs"
@@ -1501,6 +1688,8 @@ export default function App() {
               salesBills={db.transactions}
               initialAction={cardSchemeInitialAction}
               onClearInitialAction={() => setCardSchemeInitialAction(null)}
+              onUpdateMember={handleUpdateMember}
+              onDeleteMember={handleDeleteMember}
             />
           )}
 
@@ -1537,29 +1726,36 @@ export default function App() {
               existingPurchases={db.purchases || []}
               existingStock={db.stock || []}
               onSwitchTab={setActiveTab}
-              onFullResetData={handleResetData}
+              onFullResetData={handleClearAllDemoData}
+              onClearCardsData={handleClearCardsData}
+              onClearBillsData={handleClearBillsData}
+              onClearZeroBills={handleClearZeroBills}
             />
           )}
 
           {activeTab === 'uploaded-data' && (
-            <UploadedDataView
-              transactions={db.transactions || []}
-              cardMembers={db.cardMembers || []}
-              cardTransactions={db.cardTransactions || []}
-              customers={db.customers || []}
-              purchases={db.purchases || []}
-              dealers={db.dealers || []}
-              stock={db.stock || []}
-              settings={db.settings}
-              onOpenInvoiceModal={setSelectedInvoice}
-              onOpenPassbookModal={setSelectedPassbookMember}
-              onNavigateTab={(tab, filterParam) => {
-                if (tab === 'dealer-ledger' && filterParam) {
-                  setSelectedDealerForLedger(filterParam);
-                }
-                setActiveTab(tab);
-              }}
-            />
+            <ErrorBoundary fallbackTitle="मास्टर शोध (Master Search) लोड करताना त्रुटी आली">
+              <UploadedDataView
+                transactions={db.transactions || []}
+                cardMembers={db.cardMembers || []}
+                cardTransactions={db.cardTransactions || []}
+                customers={db.customers || []}
+                purchases={db.purchases || []}
+                dealers={db.dealers || []}
+                stock={db.stock || []}
+                settings={db.settings}
+                onOpenInvoiceModal={setSelectedInvoice}
+                onOpenPassbookModal={setSelectedPassbookMember}
+                onNavigateTab={(tab, filterParam) => {
+                  if (tab === 'dealer-ledger' && filterParam) {
+                    setSelectedDealerForLedger(filterParam);
+                  }
+                  setActiveTab(tab);
+                }}
+                onUpdateRecord={handleUpdateRecord}
+                onDeleteRecord={handleDeleteRecord}
+              />
+            </ErrorBoundary>
           )}
 
           {activeTab === 'all-entries' && (
@@ -1650,6 +1846,8 @@ export default function App() {
                 onImportData={handleImportData}
                 onResetData={handleResetData}
                 onClearAllDemoData={handleClearAllDemoData}
+                onClearCardsData={handleClearCardsData}
+                onClearBillsData={handleClearBillsData}
                 cloudStatus={cloudStatus}
                 lastSyncedTime={lastSyncedTime}
                 onManualCloudSync={handleManualCloudSync}
@@ -1675,6 +1873,10 @@ export default function App() {
           settings={db.settings}
           salesBills={db.transactions || []}
           onClose={() => setSelectedPassbookMember(null)}
+          onUpdateMember={(updatedMember) => {
+            handleUpdateMember(updatedMember);
+            setSelectedPassbookMember(updatedMember);
+          }}
         />
       )}
 

@@ -118,6 +118,7 @@ export interface Customer {
   linkedCardNumber?: number;
   linkedSchemeId?: CardSchemeId;
   lastVisit?: string;
+  lastTransactionDate?: string;
 }
 
 export interface StockItem {

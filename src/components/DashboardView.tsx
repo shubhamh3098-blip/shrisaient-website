@@ -300,9 +300,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {lowStockItems.length > 0 ? (
               <div className="space-y-2.5">
-                {lowStockItems.map((item) => (
+                {lowStockItems.map((item, idx) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${idx}`}
                     className="p-2.5 rounded-xl tactile-inset border border-amber-500/30 flex items-center justify-between text-xs"
                   >
                     <div>

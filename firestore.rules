@@ -3,12 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Only allow operations on designated store paths
     match /stores/{storeId} {
-      allow read: if true;
-      allow write: if request.resource.data != null;
+      allow read, write: if true;
 
       match /sections/{sectionId} {
-        allow read: if true;
-        allow write: if request.resource.data != null;
+        allow read, write: if true;
       }
     }
 

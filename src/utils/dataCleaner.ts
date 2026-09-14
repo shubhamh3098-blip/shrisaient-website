@@ -166,18 +166,30 @@ export function cleanPhone(rawPhone?: any): string {
 // Normalize Date
 export function cleanDate(rawDate?: string): string {
   if (!rawDate) return new Date().toISOString().split('T')[0];
-  let s = rawDate.trim().replace(/\//g, '-');
+  let s = rawDate.trim().replace(/\//g, '-').replace(/\.$/, '');
 
   // Fix typo 2003 -> 2023 for Shri Sai records
   if (s.includes('2003')) {
     s = s.replace('2003', '2023');
   }
+  if (s.includes('0226')) {
+    s = s.replace('0226', '2026');
+  }
 
-  const parts = s.split('-');
+  const monthNames: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+  };
+
+  const parts = s.split('-').filter(Boolean);
   if (parts.length === 3) {
     const p1 = parts[0].trim();
-    const p2 = parts[1].trim();
+    let p2 = parts[1].trim().toLowerCase();
     const p3 = parts[2].trim();
+
+    if (monthNames[p2.slice(0, 3)]) {
+      p2 = monthNames[p2.slice(0, 3)];
+    }
 
     // DD-MM-YYYY
     if (p1.length <= 2 && p3.length === 4) {
@@ -193,7 +205,17 @@ export function cleanDate(rawDate?: string): string {
     if (p1.length === 4) {
       return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
     }
+  } else if (parts.length === 2) {
+    // e.g. "13-Mar", "01-Jun", "24-Nov" -> defaults to appropriate year 2025/2026
+    const p1 = parts[0].trim();
+    const mStr = parts[1].trim().toLowerCase().slice(0, 3);
+    const mNum = monthNames[mStr];
+    if (mNum) {
+      const defaultYear = parseInt(mNum, 10) >= 6 ? '2025' : '2026';
+      return `${defaultYear}-${mNum}-${p1.padStart(2, '0')}`;
+    }
   }
+
   return s || new Date().toISOString().split('T')[0];
 }
 

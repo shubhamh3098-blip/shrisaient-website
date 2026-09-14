@@ -53,6 +53,8 @@ interface CsvImportViewProps {
   }) => void;
   onClearZeroBills?: () => void;
   onFullResetData?: () => void;
+  onClearCardsData?: () => void;
+  onClearBillsData?: () => void;
   existingCardMembers?: CardMember[];
   existingDealers?: Dealer[];
   existingBills?: TransactionEntry[];
@@ -123,6 +125,8 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
   onUniversalImport,
   onClearZeroBills,
   onFullResetData,
+  onClearCardsData,
+  onClearBillsData,
   existingCardMembers = [],
   existingDealers = [],
   existingBills = [],
@@ -398,7 +402,7 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
             totalAmount,
             payingNow,
             dueAmount: dueAmount > 0 ? dueAmount : Math.max(0, totalAmount - payingNow),
-            paymentMode: getField(r, ['Payment Mode', 'PaymentMode', 'Mode'], 'Cash'),
+            paymentMode: (getField(r, ['Payment Mode', 'PaymentMode', 'Mode'], 'Cash').toLowerCase().includes('online') ? 'Online' : 'Cash') as 'Cash' | 'Online',
             notes: remarks ? `Remarks: ${remarks}` : `Bill: Total ₹${totalAmount}, Paid ₹${payingNow}, Due ₹${dueAmount}${rawProduct ? ` | वस्तू: ${rawProduct}` : ''}`,
             createdAt: new Date().toISOString(),
           };
@@ -502,6 +506,40 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
 
         {/* Emergency Cleanup & Reset Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {onClearCardsData && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('तुम्हाला सर्व कार्ड्स व योजना हप्ते (Card Scheme Data) 100% पूर्णपणे क्लिअर करायचे आहेत का?')) {
+                  onClearCardsData();
+                  setSuccessMessage('सर्व कार्ड्स व साप्ताहिक हप्ते यशस्वीपणे क्लिअर झाले आहेत!');
+                  setLastImportedSummary(null);
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-purple-600" />
+              <span>कार्ड डेटा क्लिअर करा</span>
+            </button>
+          )}
+
+          {onClearBillsData && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('तुम्हाला सर्व जुनी विक्री बिले व ग्राहक यादी (Sales Bills Data) 100% पूर्णपणे क्लिअर करायची आहे का?')) {
+                  onClearBillsData();
+                  setSuccessMessage('सर्व विक्री बिले व ग्राहक यादी यशस्वीपणे क्लिअर झाली आहे!');
+                  setLastImportedSummary(null);
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>सेल्स बिले क्लिअर करा</span>
+            </button>
+          )}
+
           {onClearZeroBills && (
             <button
               type="button"
@@ -522,16 +560,16 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('सावधान: तुम्हाला सर्व डेटा (बिल, कार्ड्स, ग्राहक) रीसेट करून सुरुवातीपासून नवीन डेटा अपलोड करायचा आहे का?')) {
+                if (window.confirm('सावधान: तुम्हाला सर्व जुना डेटा (बिले, कार्ड्स, ग्राहक) 100% पूर्णपणे क्लिअर करून स्वच्छ करायचा आहे का?')) {
                   onFullResetData();
-                  setSuccessMessage('सर्व डेटा रीसेट झाला आहे! आता तुम्ही ताज्या फायली नव्याने अपलोड करू शकता.');
+                  setSuccessMessage('सर्व जुना डेटा यशस्वीपणे पूर्ण क्लिअर झाला आहे!');
                   setLastImportedSummary(null);
                 }
               }}
               className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>डेटा रीसेट (Start Clean)</span>
+              <span>सर्व जुना डेटा 100% क्लिअर करा</span>
             </button>
           )}
         </div>
@@ -1091,6 +1129,78 @@ export const CsvImportView: React.FC<CsvImportViewProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Bills Preview Table showing Product, Total, Advance, and Balance */}
+              {universalResult.bills && universalResult.bills.length > 0 && (
+                <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span>विक्री बिले तपशील (Product, Total, Advance & Balance Preview)</span>
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        फाईलमधून शोधण्यात आलेली बिले, वस्तू (Product), एकूण रक्कम (Total), अॅडव्हान्स (Advance) आणि बाकी (Balance)
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 self-start sm:self-auto">
+                      एकूण {universalResult.bills.length} बिले
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-72 overflow-y-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
+                        <tr>
+                          <th className="p-2.5">बिल # / तारीख</th>
+                          <th className="p-2.5">ग्राहक</th>
+                          <th className="p-2.5">प्रॉडक्ट / साहित्य (Product)</th>
+                          <th className="p-2.5 text-right">एकूण (Total)</th>
+                          <th className="p-2.5 text-right text-emerald-700">अॅडव्हान्स (Advance/Paid)</th>
+                          <th className="p-2.5 text-right text-amber-700">बाकी (Balance)</th>
+                          <th className="p-2.5 text-center">मोड</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {universalResult.bills.slice(0, 50).map((bill, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/80">
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="font-mono font-bold text-slate-800">#{bill.invoiceNo}</span>
+                              <div className="text-[11px] text-slate-400">{bill.date}</div>
+                            </td>
+                            <td className="p-2.5">
+                              <div className="font-semibold text-slate-900">{bill.customerName}</div>
+                              {bill.village && <div className="text-[11px] text-slate-500">{bill.village}</div>}
+                            </td>
+                            <td className="p-2.5 max-w-xs">
+                              <div className="font-bold text-indigo-950 truncate">
+                                {bill.stockItemName || bill.itemDetails || '-'}
+                              </div>
+                              {bill.quantity && bill.quantity > 1 && (
+                                <div className="text-[10px] text-slate-400">नग: {bill.quantity}</div>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              ₹{bill.totalAmount.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              ₹{bill.payingNow.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
+                              ₹{bill.dueAmount.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                {bill.paymentMode || 'Cash'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -10,13 +10,14 @@ import {
   CloudOff
 } from 'lucide-react';
 import { ActiveTab } from '../types';
+import { CloudSyncStatus } from '../lib/firebase';
 
 interface MobileBottomNavProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   onOpenShopView: () => void;
   onOpenInstallModal?: () => void;
-  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
+  cloudStatus?: CloudSyncStatus;
   isInstallable?: boolean;
 }
 
