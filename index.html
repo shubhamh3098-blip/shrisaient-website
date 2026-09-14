@@ -8,10 +8,14 @@
     <meta name="keywords" content="Shri Sai Enterprises Wardha, electronics furniture showroom Wardha, sofa shop Wardha, double bed mattress Wardha, smart TV Wardha, refrigerator cooler Arvi road Wardha, 30 month savings scheme, shrisaient.in" />
     <link rel="canonical" href="https://shrisaient.in/" />
 
-    <!-- Google Fonts: Plus Jakarta Sans, Playfair Display & Cinzel -->
+    <!-- Google Fonts Fast Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+    </noscript>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -26,7 +30,7 @@
     <meta name="twitter:title" content="Shri Sai Enterprises - Wardha Electronics & Furniture" />
     <meta name="twitter:description" content="Wardha's top store for Electronics, Furniture, Coolers, Smart TVs, Sofas, Beds & 30-Month Savings Scheme. Phone: 8766486915." />
 
-    <!-- Structured Data / JSON-LD for Google Local SEO & Google Business Profile -->
+    <!-- Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -55,13 +59,7 @@
         {
           "@type": "OpeningHoursSpecification",
           "dayOfWeek": [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday"
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
           ],
           "opens": "09:00",
           "closes": "21:00"
@@ -76,6 +74,7 @@
     </script>
     
     <!-- PWA & Mobile Web App Capabilities -->
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0B1528" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -90,4 +89,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
