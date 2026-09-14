@@ -1,6 +1,6 @@
-@import "tailwindcss";
-
-@custom-variant dark (&:where(.dark, .dark *));
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   /* Day Mode (Crisp High-Precision Professional Slate & Deep Emerald ERP Theme) */
@@ -221,4 +221,3 @@ input, select, textarea {
     width: 100% !important;
   }
 }
-
