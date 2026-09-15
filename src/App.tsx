@@ -964,10 +964,13 @@ export default function App() {
     setDb((prev) => {
       // 1. Credit receipts against matching bills (reduce dueAmount, increase payingNow)
       const updatedTransactions = [...(prev.transactions || [])];
-      // 2. Also prepare payment entries for bills if needed and credit customer balanceDue
+      // 2. Also prepare customer accounts so they show in Customer Khata
       const updatedCustomers = [...(prev.customers || [])];
+      const existingBillReceipts = [...(prev.billReceipts || [])];
+      const newBillReceipts: BillReceiptEntry[] = [];
+      const newLedgerTransactions: TransactionEntry[] = [];
 
-      newReceipts.forEach((rcpt) => {
+      newReceipts.forEach((rcpt, idx) => {
         const rcptNameNorm = (rcpt.customerName || '').trim().toLowerCase();
         const rawDigits = (rcpt.customerPhone || '').replace(/\D/g, '');
         const isPhoneValid = rawDigits.length >= 10 && !/^(\d)\1{9,}$/.test(rawDigits);
@@ -975,10 +978,13 @@ export default function App() {
         const isGenericName = !rcptNameNorm || rcptNameNorm.startsWith('ग्राहक #') || rcptNameNorm.startsWith('customer #');
         const rcptCard = rcpt.cardNumber;
         const rcptAmount = Number(rcpt.amount || 0);
+        const receiptCode = String(rcpt.receiptNo || '').trim();
+        const cleanReceiptNumStr = receiptCode.replace(/\D/g, '') || String(1000 + idx);
 
-        // Find matching customer
+        // Find or create matching customer
+        let matchedCustId = (rcpt as any).customerId;
         const custIdx = updatedCustomers.findIndex((c) => {
-          if (c.id && (rcpt as any).customerId && c.id === (rcpt as any).customerId) return true;
+          if (c.id && matchedCustId && c.id === matchedCustId) return true;
           if (rcptPhone && c.phone) {
             const cDigits = c.phone.replace(/\D/g, '');
             if (cDigits.length >= 10 && cDigits === rcptPhone) return true;
@@ -989,6 +995,7 @@ export default function App() {
 
         if (custIdx >= 0) {
           const cust = updatedCustomers[custIdx];
+          matchedCustId = cust.id;
           const newPaid = (cust.totalPaid || 0) + rcptAmount;
           const effectivePurchased = Math.max(cust.totalPurchased || 0, newPaid);
           const newDue = Math.max(0, (cust.balanceDue || 0) - rcptAmount);
@@ -997,7 +1004,22 @@ export default function App() {
             totalPurchased: effectivePurchased,
             totalPaid: newPaid,
             balanceDue: newDue,
+            village: (rcpt as any).village || (rcpt as any).customerVillage || cust.village || '',
+            phone: cust.phone || rcptPhone,
           };
+        } else if (rcpt.customerName) {
+          matchedCustId = `cust-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`;
+          updatedCustomers.push({
+            id: matchedCustId,
+            name: rcpt.customerName,
+            phone: rcptPhone,
+            village: (rcpt as any).village || (rcpt as any).customerVillage || '',
+            address: '',
+            totalPurchased: rcptAmount,
+            totalPaid: rcptAmount,
+            balanceDue: 0,
+            createdAt: rcpt.date || new Date().toISOString(),
+          });
         }
 
         // Credit against customer's existing unpaid bills (by invoiceNo if specified, or by customer name / card)
@@ -1023,18 +1045,57 @@ export default function App() {
               payingNow: bill.payingNow + creditToApply,
               dueAmount: Math.max(0, bill.dueAmount - creditToApply),
               notes: bill.notes
-                ? `${bill.notes} • Credited ₹${creditToApply} via Receipt #${rcpt.receiptNo}`
-                : `Credited ₹${creditToApply} via Receipt #${rcpt.receiptNo}`,
+                ? `${bill.notes} • Credited ₹${creditToApply} via Receipt #${receiptCode}`
+                : `Credited ₹${creditToApply} via Receipt #${receiptCode}`,
             };
             remainingCredit -= creditToApply;
           }
         }
+
+        // Add to BillReceipts list (Against Bill Receipts)
+        newBillReceipts.push({
+          id: `br-imp-${Date.now()}-${idx}`,
+          receiptNo: cleanReceiptNumStr,
+          date: rcpt.date || new Date().toISOString().split('T')[0],
+          customerId: matchedCustId || `cust-unknown-${idx}`,
+          customerName: rcpt.customerName,
+          customerPhone: rcptPhone,
+          customerVillage: (rcpt as any).village || (rcpt as any).customerVillage || '',
+          againstInvoiceNo: targetInvoice || '',
+          billTotal: rcptAmount,
+          previousBalance: rcptAmount,
+          amountPaid: rcptAmount,
+          remainingBalance: 0,
+          paymentMode: (rcpt.paymentMode === 'Online' ? 'Online' : 'Cash'),
+          agentName: (rcpt as any).collectedBy || (rcpt as any).agentName || 'Counter',
+          notes: rcpt.remarks || `पावती #${receiptCode}`,
+          createdAt: rcpt.createdAt || new Date().toISOString(),
+        });
+
+        // Add ledger record so it appears in All Transactions / All Entries
+        newLedgerTransactions.push({
+          id: `tx-imp-rcpt-${Date.now()}-${idx}`,
+          invoiceNo: receiptCode.startsWith('REC-') ? receiptCode : `REC-${receiptCode}`,
+          date: rcpt.date || new Date().toISOString().split('T')[0],
+          customerId: matchedCustId,
+          customerName: rcpt.customerName,
+          customerPhone: rcptPhone,
+          village: (rcpt as any).village || (rcpt as any).customerVillage || '',
+          totalAmount: rcptAmount,
+          payingNow: rcptAmount,
+          dueAmount: 0,
+          itemDetails: rcpt.remarks || `जमा पावती #${receiptCode}`,
+          paymentMode: rcpt.paymentMode || 'Cash',
+          notes: `जमा पावती #${receiptCode}`,
+          createdAt: rcpt.createdAt || new Date().toISOString(),
+        });
       });
 
       return {
         ...prev,
-        transactions: updatedTransactions,
+        transactions: [...newLedgerTransactions, ...updatedTransactions],
         cardTransactions: [...newReceipts, ...(prev.cardTransactions || [])],
+        billReceipts: [...newBillReceipts, ...existingBillReceipts],
         customers: updatedCustomers,
       };
     });
