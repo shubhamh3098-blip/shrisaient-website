@@ -75,7 +75,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           {onNavigateDealerLedger && (
             <button
               onClick={() => onNavigateDealerLedger()}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700"
             >
               <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               Open Dealer Khata (डीलर लेजर)
@@ -83,7 +83,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
           )}
           <button
             onClick={() => setShowModal(true)}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto active:scale-95"
           >
             <Plus className="w-4 h-4" />
             + Add Purchase Bill
@@ -92,12 +92,12 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       </div>
 
       {/* Auto-Sync Notice Banner */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-indigo-950/40 border border-blue-200/80 dark:border-indigo-900/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors">
         <div className="flex items-center gap-2.5 text-blue-900 dark:text-blue-200">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse shrink-0"></span>
           <p>
-            <strong className="font-semibold text-blue-950 dark:text-white">Auto-Synced Dealer Ledgers:</strong> Any purchase entered here (e.g.{' '}
-            <span className="font-mono font-semibold bg-white/80 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-slate-700">
+            <strong className="font-semibold text-blue-950 dark:text-blue-100">Auto-Synced Dealer Ledgers:</strong> Any purchase entered here (e.g.{' '}
+            <span className="font-mono font-semibold bg-white/80 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-200">
               Manisha Enterprises
             </span>
             ) automatically updates that supplier’s personal ledger and calculates pending balance.
@@ -106,7 +106,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
         {onNavigateDealerLedger && (
           <button
             onClick={() => onNavigateDealerLedger('Manisha Enterprises')}
-            className="shrink-0 font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 flex items-center gap-1 cursor-pointer bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-slate-700 shadow-xs"
+            className="shrink-0 font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-white flex items-center gap-1 cursor-pointer bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 shadow-xs"
           >
             View Manisha Enterprises Khata
             <ExternalLink className="w-3.5 h-3.5" />
@@ -116,25 +116,25 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+        <div className="bg-white dark:bg-[#0F172A] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs transition-colors">
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Procured Goods</p>
-          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1 font-mono-num">₹{totalPurchases.toLocaleString()}</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">₹{totalPurchases.toLocaleString()}</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+        <div className="bg-white dark:bg-[#0F172A] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs transition-colors">
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Paid to Suppliers</p>
-          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono-num">₹{totalPaid.toLocaleString()}</p>
+          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalPaid.toLocaleString()}</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+        <div className="bg-white dark:bg-[#0F172A] rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs transition-colors">
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Pending to Suppliers</p>
-          <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1 font-mono-num">₹{totalDueToSuppliers.toLocaleString()}</p>
+          <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">₹{totalDueToSuppliers.toLocaleString()}</p>
         </div>
       </div>
 
       {/* Purchases Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Bill No / Date</th>
                 <th className="py-3 px-4">Supplier / Vendor</th>
@@ -148,7 +148,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {purchases.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
                   <td className="py-3.5 px-4">
                     <p className="font-semibold text-slate-900 dark:text-white font-mono">{p.billNo}</p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">{p.date}</p>
@@ -156,26 +156,26 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-slate-900 dark:text-white block">{p.supplierName}</span>
                     {p.supplierName.toLowerCase().includes('manisha') && (
-                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-bold border border-amber-300 dark:border-amber-700">
+                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-bold border border-amber-200 dark:border-amber-800">
                         Key Supplier
                       </span>
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 max-w-xs truncate">{p.items}</td>
-                  <td className="py-3.5 px-4 text-right font-bold text-slate-900 dark:text-white font-mono-num">
+                  <td className="py-3.5 px-4 text-right font-bold text-slate-900 dark:text-white">
                     ₹{p.totalAmount.toLocaleString()}
                   </td>
-                  <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400 font-mono-num">
+                  <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                     ₹{p.paidAmount.toLocaleString()}
                   </td>
                   <td className="py-3.5 px-4 text-center">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         p.status === 'Paid'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                           : p.status === 'Partial'
-                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                          : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                          : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
                       }`}
                     >
                       {p.status}
@@ -188,14 +188,14 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     {onNavigateDealerLedger ? (
                       <button
                         onClick={() => onNavigateDealerLedger(p.supplierName)}
-                        className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold text-[11px] transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold text-[11px] transition flex items-center justify-center gap-1 mx-auto cursor-pointer border border-blue-200 dark:border-blue-800"
                         title={`View ${p.supplierName} ledger`}
                       >
                         <Building2 className="w-3 h-3" />
                         Ledger
                       </button>
                     ) : (
-                      <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px]">Active</span>
+                      <span className="text-slate-400 font-mono text-[11px]">Active</span>
                     )}
                   </td>
                 </tr>
@@ -208,7 +208,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl border border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="font-bold text-slate-900 dark:text-white text-base">Record Purchase Bill (खरीद बिल)</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer">
@@ -228,7 +228,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
                     placeholder="e.g. Manisha Enterprises"
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-900 dark:text-white"
                   />
                   <datalist id="dealers-list">
                     {dealers.map((d) => (
@@ -251,7 +251,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     value={billNo}
                     onChange={(e) => setBillNo(e.target.value)}
                     placeholder="e.g. PUR-8823"
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -263,7 +263,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   value={items}
                   onChange={(e) => setItems(e.target.value)}
                   placeholder="e.g. 50 bundles copper wire, 20 starter kits"
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm resize-none text-slate-900 dark:text-white"
                 />
               </div>
 
@@ -275,7 +275,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     required
                     value={totalAmount || ''}
                     onChange={(e) => setTotalAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm font-semibold font-mono-num focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -284,7 +284,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     type="number"
                     value={paidAmount || ''}
                     onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm font-mono-num focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -295,7 +295,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                   <select
                     value={paymentMode}
                     onChange={(e) => setPaymentMode(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   >
                     <option value="Online">Online / UPI / NEFT</option>
                     <option value="Cash">Cash</option>
@@ -308,7 +308,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white"
                   />
                 </div>
               </div>

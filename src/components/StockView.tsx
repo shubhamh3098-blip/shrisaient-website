@@ -163,10 +163,10 @@ export const StockView: React.FC<StockViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((item, idx) => {
+              {filtered.map((item) => {
                 const isLow = item.quantity <= item.minStockLevel;
                 return (
-                  <tr key={`${item.id}-${idx}`} className="hover:bg-slate-50/80 transition">
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3.5 px-4">
                       <p className="font-semibold text-slate-900">{item.name}</p>
                       <span className="text-[11px] font-mono text-slate-400">

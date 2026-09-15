@@ -28,16 +28,16 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   addressHindi: 'मातोश्री सभागृह समोर आर्वी रोड पंजाब कॉलनी वर्धा ,442001',
   invoicePrefix: 'INV-2026-',
   currency: '₹',
-  tagline: 'Electronics, Home Appliances, Wires & Hardware Trading',
+  tagline: 'Electronics, Home Appliances & Contemporary Furniture Showroom',
   deliveryRates: {
     freeDeliveryMinAmount: 3000,
     localDeliveryFee: 100,
     outerDeliveryFee: 250,
     estimatedDeliveryTime: 'Same Day / 24 Hours',
     deliveryAreas: 'Wardha City, Arvi, and All Surrounding Villages (50 km)',
-    deliveryNote: 'Free home delivery on orders above ₹3,000 and all Card Scheme major appliances (TV, Refrigerator, Cooler, Washing Machine).',
+    deliveryNote: 'Free home delivery on orders above ₹3,000 and all Card Scheme major appliances & furniture.',
   },
-  shopNotice: 'श्री साई इंटरप्राइजेस: ३०-महिने साप्ताहिक बचत कार्ड योजना बुकिंग चालू आहे • सर्व मोठ्या वस्तूंवर फ्री होम डिलिव्हरी!',
+  shopNotice: 'Shri Sai Electronics & Furniture: 30-Month Weekly Savings Scheme enrollment open • Free delivery across Wardha district!',
   whatsappOrderNumber: '8766486915',
   whatsappSecondaryNumber: '8600122798',
   bankDetails: {
@@ -57,22 +57,22 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     name: 'Scheme 1 (योजना 1)',
     code: 'SCH-1',
     startCardNo: 1001,
-    endCardNo: 2999,
+    endCardNo: 3000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 1 • कार्ड नं 1001 ते 2999 • सर्व मोठ्या होम अप्लायंसेजवर लागू',
+    description: '३०-महिने साप्ताहिक बचत योजना 1 • कार्ड नं 1001 ते 3000 • होम अप्लायंसेज',
     color: 'from-blue-600 to-blue-800',
   },
   {
     id: 'scheme2',
     name: 'Scheme 2 (योजना 2)',
     code: 'SCH-2',
-    startCardNo: 3001,
-    endCardNo: 3999,
+    startCardNo: 1001,
+    endCardNo: 3000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 3001 ते 3999 • कुलर, फ्रिज, वॉशिंग मशीन',
+    description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 1001 ते 3000 • कुलर, फ्रिज, वॉशिंग मशीन',
     color: 'from-emerald-600 to-teal-800',
   },
-{
+  {
     id: 'scheme3',
     name: 'Scheme 3 (योजना 3)',
     code: 'SCH-3',
@@ -86,31 +86,21 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     id: 'scheme4',
     name: 'Scheme 4 (योजना 4)',
     code: 'SCH-4',
-    startCardNo: 6001,
-    endCardNo: 7999,
+    startCardNo: 1001,
+    endCardNo: 6000,
     registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 4 • कार्ड नं 6001 ते 7999 • प्रीमियम इलेक्ट्रॉनिक्स व फर्निचर',
+    description: '३०-महिने साप्ताहिक बचत योजना 4 • कार्ड नं 1001 ते 6000',
     color: 'from-amber-600 to-orange-800',
   },
   {
     id: 'scheme5',
     name: 'Scheme 5 (योजना 5)',
     code: 'SCH-5',
-    startCardNo: 8001,
-    endCardNo: 9999,
+    startCardNo: 1001,
+    endCardNo: 6000,
     registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 5 • कार्ड नं 8001 ते 9999 • नवीन ऑफर्स व फेस्टिव्हल स्कीम',
-    color: 'from-pink-600 to-rose-800',
-  },
-  {
-    id: 'scheme6',
-    name: 'Scheme 6 (योजना 6)',
-    code: 'SCH-6',
-    startCardNo: 10001,
-    endCardNo: 12000,
-    registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 6 • कार्ड नं 10001 ते 12000 • सुपर सेव्हर वीकली स्कीम',
-    color: 'from-cyan-600 to-blue-900',
+    description: '३०-महिने साप्ताहिक बचत योजना 5 (भविष्य योजना) • कार्ड नं 1001 ते 6000',
+    color: 'from-rose-600 to-pink-800',
   },
 ];
 
@@ -234,69 +224,69 @@ export const INITIAL_STOCK: StockItem[] = [
     description: 'Heavy Duty Contactor, Overload Thermal Relay, Voltmeter & Ammeter Dual Gauges',
   },
   {
-    id: 'stk-sofa',
-    name: 'Royal Teak Finish 3+1+1 High-Density Sofa Set',
-    code: 'FRN-SOFA-311',
+    id: 'stk-sofa1',
+    name: 'Luxury 5-Seater Teak Wood Sofa Set with Velvet Upholstery',
+    code: 'FURN-SOFA-01',
     category: 'Furniture',
     quantity: 4,
     unit: 'Set',
-    sellingPrice: 38500,
-    purchasePrice: 29500,
+    sellingPrice: 36500,
+    purchasePrice: 28000,
     minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80',
-    description: 'Premium Solid Teakwood Frame, High-Resilience 40-Density Foam, Stain-Resistant Fabric & 5-Year Warranty',
+    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80',
+    description: 'Solid seasoned Teak wood frame, 40-density high resilient foam, stain-resistant velvet fabric, 5 years warranty.',
   },
   {
-    id: 'stk-bed',
+    id: 'stk-bed1',
     name: 'King Size Teak Finish Bed with Hydraulic Storage',
-    code: 'FRN-BED-KING',
+    code: 'FURN-BED-01',
     category: 'Furniture',
     quantity: 5,
     unit: 'Unit',
     sellingPrice: 28900,
-    purchasePrice: 22000,
+    purchasePrice: 22500,
     minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=600&q=80',
-    description: 'Sturdy Engineered Wood & Teak Finish, Smooth Hydraulic Gas-Lift Box Storage & Cushioned Headboard',
+    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=80',
+    description: 'Effortless hydraulic lift mechanism, spacious under-bed storage, cushioned headboard, termite-resistant treated wood.',
   },
   {
-    id: 'stk-wardrobe',
-    name: '4-Door Solid Wood Almirah & Wardrobe with Mirror',
-    code: 'FRN-WRD-4D',
-    category: 'Furniture',
-    quantity: 6,
-    unit: 'Unit',
-    sellingPrice: 24500,
-    purchasePrice: 18500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=600&q=80',
-    description: 'Spacious 4-Door Wardrobe with Full Length Dressing Mirror, Locker Drawer, Coat Hanging Rail & Safety Locks',
-  },
-  {
-    id: 'stk-dining',
+    id: 'stk-dining1',
     name: '6-Seater Solid Sheesham Wood Dining Table Set',
-    code: 'FRN-DNG-6S',
+    code: 'FURN-DINE-01',
     category: 'Furniture',
     quantity: 3,
     unit: 'Set',
-    sellingPrice: 32000,
-    purchasePrice: 25000,
+    sellingPrice: 24500,
+    purchasePrice: 19000,
     minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=600&q=80',
-    description: 'Pure Sheesham Wood Craftsmanship, 6 Ergonomically Curved Dining Chairs with Premium Cushion Seating',
+    imageUrl: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=800&q=80',
+    description: 'Premium natural wood finish, 12mm bevelled toughened glass top, 6 ergonomic cushioned chairs.',
   },
   {
-    id: 'stk-dressing',
-    name: 'Luxury Dressing Table with LED Mirror & Drawers',
-    code: 'FRN-DRS-LED',
+    id: 'stk-wardrobe1',
+    name: '4-Door Teak Veneer Wardrobe with Full Dressing Mirror',
+    code: 'FURN-WARD-01',
     category: 'Furniture',
-    quantity: 7,
+    quantity: 6,
     unit: 'Unit',
-    sellingPrice: 13500,
-    purchasePrice: 9800,
+    sellingPrice: 21900,
+    purchasePrice: 17200,
     minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1534349762230-e0cadf78f5da?auto=format&fit=crop&w=600&q=80',
-    description: 'Contemporary Dressing Vanity with Touch LED Lighted Mirror, Multiple Storage Drawers & Cosmetics Shelves',
+    imageUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=800&q=80',
+    description: 'Multi-compartment storage, lockable internal drawers, hanger rod, high-grade European hinges and safety locks.',
+  },
+  {
+    id: 'stk-recliner1',
+    name: 'Single Seater Ergonomic Motorized / Manual Recliner',
+    code: 'FURN-RECL-01',
+    category: 'Furniture',
+    quantity: 5,
+    unit: 'Unit',
+    sellingPrice: 16800,
+    purchasePrice: 13000,
+    minStockLevel: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
+    description: 'Zero-gravity multi-angle reclining, lumbar support, breathable leatherette upholstery, cup holders.',
   },
 ];
 
@@ -568,7 +558,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SANGITA UTTAM PATIL',
-    phone: '9822001030',
+    phone: '7972811639',
     village: 'HINGNI',
     address: 'HINGNI, Wardha',
     joiningDate: '2025-06-01',
@@ -586,7 +576,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'YAMUNA PRABHAKAR KAIKADI',
-    phone: '9822001029',
+    phone: '8698041323',
     village: 'HINGNI',
     address: 'HINGNI, Wardha',
     joiningDate: '2025-06-01',
@@ -604,7 +594,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SURAJ GAUTAM MOON',
-    phone: '9822001021',
+    phone: '9175534365',
     village: 'SINDHI MEGHE',
     address: 'SINDHI MEGHE, Wardha',
     joiningDate: '2025-06-01',
@@ -640,7 +630,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme1',
     schemeName: 'Scheme 1 (योजना 1)',
     customerName: 'SAVITA VASANT RAUT',
-    phone: '9822001242',
+    phone: '8888296288',
     village: 'WAIFAD',
     address: 'WAIFAD, Wardha',
     joiningDate: '2025-06-01',
@@ -660,7 +650,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SUNIL DANDAGE',
-    phone: '9822003191',
+    phone: '8855881081',
     village: 'PIPRI',
     address: 'PIPRI, Wardha',
     sheetNo: '',
@@ -720,7 +710,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'PRATIBHA MAROTI KHOLAME',
-    phone: '9822003123',
+    phone: '8551060253',
     village: 'PARSODI',
     address: 'PARSODI, Wardha',
     sheetNo: '',
@@ -740,7 +730,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'BALAJI SHAMRAO DANDGE',
-    phone: '9822003014',
+    phone: '9021496579',
     village: 'SHIVNAGAR',
     address: 'SHIVNAGAR, Wardha',
     sheetNo: '',
@@ -760,7 +750,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SARIKA SANDIP BHANDEKAR',
-    phone: '9822003234',
+    phone: '9096037244',
     village: 'KANHOLI BARA',
     address: 'KANHOLI BARA, Wardha',
     sheetNo: '',
@@ -780,7 +770,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme2',
     schemeName: 'Scheme 2 (योजना 2)',
     customerName: 'SUNIL GHONGADE',
-    phone: '9822003027',
+    phone: '9673448626',
     village: 'SATODA',
     address: 'SATODA, Wardha',
     sheetNo: '',
@@ -922,7 +912,7 @@ export const INITIAL_CARD_MEMBERS: CardMember[] = [
     schemeId: 'scheme3',
     schemeName: 'Scheme 3 (योजना 3)',
     customerName: 'GANESH TELRANDE',
-    phone: '9822004398',
+    phone: '9689033168',
     village: 'KELHZAR',
     address: 'KELHZAR, Wardha',
     sheetNo: '5166',
@@ -1064,7 +1054,10 @@ export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [
   },
 ];
 
+import { saveDatabaseToIndexedDB } from './indexedDb';
+
 const STORAGE_KEY = 'shri_sai_ent_db_v2';
+const STORAGE_SUMMARY_KEY = 'shri_sai_ent_summary_v2';
 
 export interface AppDatabase {
   settings: BusinessSettings;
@@ -1078,64 +1071,6 @@ export interface AppDatabase {
   cardTransactions: CardTransaction[];
   staff: StaffMember[];
   expenses: ExpenseEntry[];
-}
-
-export function deduplicateStock(items: StockItem[]): StockItem[] {
-  if (!Array.isArray(items)) return [];
-  const mergedMap = new Map<string, StockItem>();
-
-  items.forEach((item, index) => {
-    if (!item) return;
-    const name = (item.name || '').trim();
-    // Normalize name to alphanumeric slug to catch variations like "DIWAN 4*6" vs "DIWAN 4/6"
-    const nameSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const idSlug = (item.id || '').trim();
-
-    // Grouping key: if id exists and starts with prod-, use idSlug; otherwise use nameSlug or fallback
-    const groupKey = (idSlug && idSlug.startsWith('prod-'))
-      ? idSlug
-      : (nameSlug || idSlug || `item-${index}`);
-
-    if (mergedMap.has(groupKey)) {
-      const existing = mergedMap.get(groupKey)!;
-      existing.quantity = (Number(existing.quantity) || 0) + (Number(item.quantity) || 0);
-      if ((!existing.sellingPrice || existing.sellingPrice === 0) && item.sellingPrice) {
-        existing.sellingPrice = item.sellingPrice;
-      }
-      if ((!existing.purchasePrice || existing.purchasePrice === 0) && item.purchasePrice) {
-        existing.purchasePrice = item.purchasePrice;
-      }
-      if (!existing.imageUrl && item.imageUrl) {
-        existing.imageUrl = item.imageUrl;
-      }
-      if (!existing.category && item.category) {
-        existing.category = item.category;
-      }
-      if ((!existing.description || existing.description.length < (item.description || '').length) && item.description) {
-        existing.description = item.description;
-      }
-    } else {
-      mergedMap.set(groupKey, { ...item });
-    }
-  });
-
-  // Guarantee that every single item in the returned array has a strictly unique ID
-  const result: StockItem[] = [];
-  const seenIds = new Set<string>();
-
-  mergedMap.forEach((item, groupKey) => {
-    let finalId = item.id ? item.id.trim() : `prod-${groupKey}`;
-    if (!finalId || seenIds.has(finalId)) {
-      finalId = `${finalId || 'prod'}-${result.length + 1}`;
-    }
-    seenIds.add(finalId);
-    result.push({
-      ...item,
-      id: finalId,
-    });
-  });
-
-  return result;
 }
 
 export function loadDatabase(): AppDatabase {
@@ -1159,7 +1094,7 @@ export function loadDatabase(): AppDatabase {
         mergedSettings.additionalPhones = ['8600122798', '9175534365', '7822859073'];
       }
 
-      const rawStockList: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
+      const loadedStock: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
         ? parsed.stock.map((item: StockItem) => {
             if (!item.imageUrl) {
               const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
@@ -1171,12 +1106,25 @@ export function loadDatabase(): AppDatabase {
           })
         : INITIAL_STOCK;
 
-      const loadedStock = deduplicateStock(rawStockList);
+      const loadedCustomers: Customer[] = Array.isArray(parsed.customers)
+        ? parsed.customers.map((c: Customer) => {
+            const purchased = Number(c.totalPurchased || 0);
+            const paid = Number(c.totalPaid || 0);
+            const due = Number(c.balanceDue || 0);
+            if (purchased === 0 && (paid > 0 || due > 0)) {
+              return {
+                ...c,
+                totalPurchased: paid + due,
+              };
+            }
+            return c;
+          })
+        : [];
 
       return {
         settings: mergedSettings,
         stock: loadedStock,
-        customers: Array.isArray(parsed.customers) ? parsed.customers : [],
+        customers: loadedCustomers,
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
         purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
         dealers: Array.isArray(parsed.dealers) ? parsed.dealers : [],
@@ -1208,7 +1156,7 @@ export function loadDatabase(): AppDatabase {
 export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
   const clean: AppDatabase = {
     settings: currentDb.settings || DEFAULT_SETTINGS,
-    stock: currentDb.stock && currentDb.stock.length > 0 ? currentDb.stock : INITIAL_STOCK,
+    stock: [],
     customers: [],
     transactions: [],
     purchases: [],
@@ -1223,35 +1171,49 @@ export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
   return clean;
 }
 
-export function clearCardsData(currentDb: AppDatabase): AppDatabase {
-  const clean: AppDatabase = {
-    ...currentDb,
-    cardMembers: [],
-    cardTransactions: [],
-  };
-  saveDatabase(clean);
-  return clean;
-}
-
-export function clearBillsData(currentDb: AppDatabase): AppDatabase {
-  const clean: AppDatabase = {
-    ...currentDb,
-    transactions: [],
-    customers: [],
-  };
-  saveDatabase(clean);
-  return clean;
-}
-
 export function saveDatabase(db: AppDatabase): void {
+  // 1. Always save the complete database to IndexedDB (unlimited storage)
+  saveDatabaseToIndexedDB(db).catch((err) => {
+    console.warn('IndexedDB save notice:', err);
+  });
+
+  // 2. Try saving to localStorage. If quota is exceeded, gracefully fall back to saving
+  // critical core configuration and summary so app never crashes or errors out.
   try {
-    const cleanDb = {
-      ...db,
-      stock: deduplicateStock(db.stock || []),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanDb));
-  } catch (e) {
-    console.error('Failed to save database to localStorage', e);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  } catch (e: any) {
+    const isQuota =
+      e?.name === 'QuotaExceededError' ||
+      e?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      e?.message?.includes('quota') ||
+      e?.message?.includes('Quota') ||
+      e?.code === 22 ||
+      e?.code === 1014;
+
+    if (isQuota) {
+      console.warn('localStorage quota exceeded. Large dataset is safely stored in IndexedDB and Cloud Firestore.');
+      try {
+        // Save an essential compact version to localStorage so synchronous boots still have settings & stock
+        const compactDb: Partial<AppDatabase> = {
+          settings: db.settings,
+          stock: db.stock,
+          staff: db.staff,
+          // Limit heavy arrays in localStorage to prevent quota errors
+          customers: (db.customers || []).slice(0, 100),
+          transactions: (db.transactions || []).slice(0, 50),
+          cardMembers: (db.cardMembers || []).slice(0, 50),
+          cardTransactions: (db.cardTransactions || []).slice(0, 50),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(compactDb));
+      } catch (innerErr) {
+        // If even compact doesn't fit, just save minimal settings
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: db.settings, staff: db.staff }));
+        } catch (_) {}
+      }
+    } else {
+      console.error('Failed to save database to localStorage', e);
+    }
   }
 }
 

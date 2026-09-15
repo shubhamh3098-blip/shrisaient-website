@@ -29,9 +29,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       `Customer: ${entry.customerName}\n` +
       `Items: ${entry.itemDetails}\n` +
       `--------------------------------\n` +
-      `Total Amount: ₹${(Number(entry.totalAmount) || 0).toLocaleString()}\n` +
-      `Amount Paid: ₹${(Number(entry.payingNow) || 0).toLocaleString()} (${entry.paymentMode})\n` +
-      ((Number(entry.dueAmount) || 0) > 0 ? `Remaining Due / Udhar: ₹${(Number(entry.dueAmount) || 0).toLocaleString()}\n` : `Status: FULLY PAID\n`) +
+      `Total Amount: ₹${entry.totalAmount.toLocaleString()}\n` +
+      `Amount Paid: ₹${entry.payingNow.toLocaleString()} (${entry.paymentMode})\n` +
+      (entry.dueAmount > 0 ? `Remaining Due / Udhar: ₹${entry.dueAmount.toLocaleString()}\n` : `Status: FULLY PAID\n`) +
       `--------------------------------\n` +
       `🔗 Digital Bill Slip: ${invoiceUrl}\n` +
       `GSTIN: ${settings.gstin}\n` +
@@ -43,33 +43,33 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:static print:bg-white">
+      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 animate-fade-in my-auto print:my-0 print:border-none print:shadow-none print:rounded-none print:max-w-none">
         {/* Top action header (hidden in print) */}
-        <div className="no-print bg-slate-900 dark:bg-slate-950 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800">
+        <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold text-emerald-400">Invoice Ready</span>
-            <span className="text-slate-400">•</span>
-            <span className="font-mono text-slate-300">{entry.invoiceNo}</span>
+            <span className="font-bold text-emerald-400">पावती तयार आहे (Invoice Ready)</span>
+            <span className="text-slate-500">•</span>
+            <span className="font-mono text-slate-300 font-bold">{entry.invoiceNo}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-full bg-[#00523f] hover:bg-[#004232] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-[0_4px_14px_rgba(0,82,63,0.3)] active:scale-95 transition-all"
             >
               <Printer className="w-3.5 h-3.5" />
-              Print
+              प्रिंट (Print)
             </button>
             <button
               onClick={handleShareWhatsApp}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
             >
               <Share2 className="w-3.5 h-3.5" />
-              WhatsApp
+              व्हॉट्सॲप (Share)
             </button>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -77,61 +77,66 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         </div>
 
         {/* Printable Invoice Sheet matching authentic bill book BILL BOOK.p.png */}
-        <div id="printable-invoice" className="p-0 text-slate-800 bg-white">
+        <div id="printable-invoice" className="p-0 text-slate-800 bg-white print:w-full print:m-0">
           {/* Authentic Deep Navy Banner */}
-          <div className="bg-[#0B1528] text-white px-6 py-5 text-center border-b-2 border-amber-500">
-            <div className="flex justify-center mb-2">
+          <div className="bg-[#0B1528] text-white px-5 py-4 sm:px-6 sm:py-5 print:px-4 print:py-3 text-center border-b-2 border-amber-500">
+            <div className="flex justify-center mb-1.5 print:mb-1">
               <AppLogo size="sm" variant="iconOnly" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-wide font-serif">
+            <h2 className="text-2xl sm:text-3xl print:text-xl font-extrabold tracking-wide font-serif">
               श्री साई इंटरप्राइजेस
             </h2>
-            <p className="text-xs sm:text-sm font-medium text-slate-200 mt-1">
+            <p className="text-xs sm:text-sm print:text-[11px] font-medium text-slate-200 mt-0.5">
               Shri Sai Enterprises • Electronics & Home Appliances
             </p>
-            <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
+            <p className="text-[11px] sm:text-xs print:text-[10px] text-slate-300 mt-0.5">
               पत्ता : मातोश्री सभागृह समोर आर्वी रोड पंजाब कॉलनी वर्धा ,442001
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-amber-300 mt-1.5 font-bold">
-              <span>📞 8766486915</span>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] print:text-[10px] font-mono text-amber-300 mt-1 font-bold">
+              <span>GSTIN: 27AABCS1429B1Z8</span>
               <span>•</span>
-              <span>8600122798</span>
-              <span>•</span>
-              <span>9175534365</span>
-              <span>•</span>
-              <span>7822859073</span>
+              <span>मो: 8766486915 / 8600122798</span>
             </div>
           </div>
 
-          <div className="p-6 sm:p-8 space-y-5">
+          <div className="p-5 sm:p-6 print:p-4 space-y-4 print:space-y-2.5">
             {/* GST and Invoice Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5 print:pb-1.5 text-xs">
               <div>
-                <span className="font-bold text-slate-900 font-mono text-sm">
-                  GST IN 27ALOPL0030G2ZC
+                <span className="font-bold text-slate-900 font-mono text-xs">
+                  GST IN 27AABCS1429B1Z8
                 </span>
                 <p className="text-[11px] text-slate-500 mt-0.5">Tax Invoice / बिल क्र: <span className="font-bold font-mono text-slate-900">{entry.invoiceNo}</span></p>
               </div>
               <div className="text-left sm:text-right">
                 <p className="text-xs text-slate-700">दिनांक / Date: <span className="font-bold font-mono text-slate-900">{entry.date}</span></p>
-                <span className="inline-block px-2 py-0.5 mt-1 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
-                  {entry.paymentMode}
+                <span className="inline-block px-2 py-0.5 mt-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">
+                  {entry.paymentMode || 'Cash'}
                 </span>
               </div>
             </div>
 
             {/* Customer info */}
-            <div className="bg-slate-50 rounded-xl p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-200">
+            <div className="bg-slate-50 print:bg-slate-50/50 rounded-xl p-3 print:p-2 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-200">
               <div>
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">नाव / Billed To:</span>
                 <p className="font-bold text-slate-900 text-sm">{entry.customerName}</p>
-                {entry.customerPhone && (
-                  <p className="text-slate-600 font-mono mt-0.5">मोबाइल क्र : {entry.customerPhone}</p>
-                )}
+                <div className="flex items-center gap-2 mt-0.5 font-mono text-slate-600 text-[11px]">
+                  {entry.customerPhone && (
+                    <span>मो: {entry.customerPhone}</span>
+                  )}
+                  {entry.cardNumber && (
+                    <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                      कार्ड #{entry.cardNumber}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="text-left sm:text-right text-[11px]">
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">गाव / Location:</span>
-                <span className="font-semibold text-slate-800">वर्धा व परिसर / Wardha</span>
+                <span className="font-semibold text-slate-800">
+                  {entry.village ? `${entry.village}, वर्धा` : 'वर्धा व परिसर / Wardha'}
+                </span>
               </div>
             </div>
 
@@ -158,10 +163,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-700">
-                      ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
+                      ₹{entry.totalAmount.toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right font-bold font-mono text-slate-900">
-                      ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
+                      ₹{entry.totalAmount.toLocaleString()}
                     </td>
                   </tr>
                 </tbody>
@@ -173,22 +178,22 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <div className="flex justify-between text-slate-700 font-medium">
                 <span>एकूण / Total Amount:</span>
                 <span className="font-bold text-slate-900 text-sm font-mono">
-                  ₹{(Number(entry.totalAmount) || 0).toLocaleString()}
+                  ₹{entry.totalAmount.toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between text-slate-700 font-medium">
                 <span>अ‍ॅडव्हान्स / Paid Now:</span>
                 <span className="font-bold text-emerald-600 text-sm font-mono">
-                  ₹{(Number(entry.payingNow) || 0).toLocaleString()}
+                  ₹{entry.payingNow.toLocaleString()}
                 </span>
               </div>
-              {(Number(entry.dueAmount) || 0) > 0 ? (
-                <div className="flex justify-between text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg font-bold">
-                  <span>बाकी / Balance Due:</span>
-                  <span className="font-mono">₹{(Number(entry.dueAmount) || 0).toLocaleString()}</span>
+              {entry.dueAmount > 0 ? (
+                <div className="flex justify-between text-amber-900 bg-amber-50 px-3 py-1.5 rounded-lg font-bold">
+                  <span>बाकी / Balance Due (उधारी):</span>
+                  <span className="font-mono">₹{entry.dueAmount.toLocaleString()}</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold pt-1">
+                <div className="flex items-center gap-1.5 text-emerald-700 text-[11px] font-semibold pt-0.5">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>Full payment received with thanks (पूर्ण भरणा प्राप्त झाला).</span>
                 </div>
@@ -196,18 +201,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
 
             {/* Warranty & Bank Details matching Bill Book */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-slate-200 text-[10px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2.5 border-t border-slate-200 text-[10px] print:grid-cols-2">
               {/* Warranty note */}
-              <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-2.5 text-amber-900">
-                <p className="font-bold mb-1">वॉरंटी सूचना (Warranty Note):</p>
-                <p className="leading-relaxed text-[9.5px]">
-                  दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस कंपनीच्या सर्व्हिस सेण्टरचा मोबाईल नंबर घ्यावा.
+              <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-2 text-amber-900">
+                <p className="font-bold mb-0.5">वॉरंटी सूचना (Warranty Note):</p>
+                <p className="leading-relaxed text-[9px]">
+                  दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस सर्व्हिस सेण्टरचा नंबर घ्यावा.
                 </p>
               </div>
 
               {/* Bank Details */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-700 space-y-0.5">
-                <p className="font-bold text-slate-900 mb-1">Bank Details (बँक तपशील):</p>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700 space-y-0.5">
+                <p className="font-bold text-slate-900 mb-0.5">Bank Details (बँक तपशील):</p>
                 <p>Bank: <span className="font-semibold text-slate-900">HDFC Bank</span></p>
                 <p>A/C No: <span className="font-bold font-mono text-slate-900">50200083215914</span></p>
                 <p>IFSC: <span className="font-bold font-mono text-slate-900">HDFC0000965</span></p>
@@ -216,7 +221,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
 
             {/* Signatory footer */}
-            <div className="pt-4 flex items-end justify-between text-xs text-slate-500 border-t border-slate-100">
+            <div className="pt-3 print:pt-2 flex items-end justify-between text-xs text-slate-500 border-t border-slate-100">
               <div>
                 <p className="text-[11px] font-medium text-slate-700">Thank you for your business!</p>
                 <p className="text-[9px] text-slate-400 font-mono mt-0.5">
@@ -224,8 +229,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </p>
               </div>
               <div className="text-center">
-                <div className="h-8 w-28 border-b border-dashed border-slate-400 mx-auto"></div>
-                <p className="text-[10px] font-bold text-slate-800 mt-1">
+                <div className="h-6 w-28 border-b border-dashed border-slate-400 mx-auto"></div>
+                <p className="text-[10px] font-bold text-slate-800 mt-0.5">
                   Authorized Sign
                 </p>
                 <p className="text-[9px] text-slate-500">श्री साई इंटरप्राइजेस</p>
