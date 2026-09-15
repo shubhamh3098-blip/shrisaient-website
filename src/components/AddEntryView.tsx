@@ -12,10 +12,15 @@ import {
   Share2,
   RotateCcw,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Barcode,
+  FileSpreadsheet,
+  FileText,
+  Users
 } from 'lucide-react';
 import { Customer, StockItem, TransactionEntry, BusinessSettings, CardSchemeId } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
+import { getNextBillNumber } from '../utils/numbering';
 import { CreditCard } from 'lucide-react';
 
 interface AddEntryViewProps {
@@ -25,6 +30,7 @@ interface AddEntryViewProps {
   customersList: Customer[];
   settings: BusinessSettings;
   todaysTransactions: TransactionEntry[];
+  allTransactions?: TransactionEntry[];
   onOpenInvoiceModal: (entry: TransactionEntry) => void;
 }
 
@@ -35,6 +41,7 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
   customersList,
   settings,
   todaysTransactions,
+  allTransactions = [],
   onOpenInvoiceModal,
 }) => {
   // Form States
@@ -47,26 +54,38 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
 
+  const [docType, setDocType] = useState<'invoice' | 'quotation'>('invoice');
+  const [serialNumber, setSerialNumber] = useState<string>('');
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [payingNow, setPayingNow] = useState<string>('');
   const [itemDetails, setItemDetails] = useState<string>('');
+  const [billSeries, setBillSeries] = useState<'regular' | 'bajaj'>('regular');
   const [invoiceNo, setInvoiceNo] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [selectedSchemeId, setSelectedSchemeId] = useState<CardSchemeId | ''>('');
   const [selectedCardNumber, setSelectedCardNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [selectedAgent, setSelectedAgent] = useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [savedEntry, setSavedEntry] = useState<TransactionEntry | null>(null);
 
-  // Auto-generate invoice number
+  const txPool = allTransactions && allTransactions.length > 0 ? allTransactions : todaysTransactions;
+
+  // Auto-generate invoice number based on series and docType:
+  // Regular bill: 3848 -> 3849...
+  // Bajaj Finserv bill: B-200 -> B-201...
+  // Quotation: Q-3849...
   useEffect(() => {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const generated = `${settings.invoicePrefix || 'INV-2026-'}${todaysTransactions.length + 1}-${randomSuffix}`;
-    setInvoiceNo(generated);
-  }, [settings.invoicePrefix, todaysTransactions.length]);
+    const nextBill = getNextBillNumber(txPool, billSeries);
+    if (docType === 'quotation') {
+      setInvoiceNo(`Q-${nextBill}`);
+    } else {
+      setInvoiceNo(nextBill);
+    }
+  }, [billSeries, txPool.length, docType]);
 
   // Filter stock with memoization & 15 items cap
   const filteredStock = useMemo(() => {
@@ -135,6 +154,8 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
     setStockQty(1);
     setCustomerName('');
     setCustomerPhone('');
+    setDocType('invoice');
+    setSerialNumber('');
     setTotalAmount('');
     setPayingNow('');
     setItemDetails('');
@@ -144,8 +165,8 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
     setNotes('');
     setErrorMsg('');
     setSavedEntry(null);
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    setInvoiceNo(`${settings.invoicePrefix || 'INV-2026-'}${todaysTransactions.length + 1}-${randomSuffix}`);
+    const nextBill = getNextBillNumber(txPool, billSeries);
+    setInvoiceNo(nextBill);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -197,6 +218,9 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
         dueAmount,
         paymentMode,
         notes: notes.trim(),
+        docType,
+        serialNumber: serialNumber.trim() || undefined,
+        agentName: selectedAgent.trim() || undefined,
       };
 
       onSaveEntry(newEntry);
@@ -255,46 +279,68 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
         </button>
       </div>
 
-      {/* Success banner after saving */}
+      {/* Success banner after saving with crystal-clear Bill / Quotation Print actions */}
       {savedEntry && (
-        <div className="bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+        <div className="bg-emerald-50/95 dark:bg-emerald-950/50 border-2 border-emerald-500/80 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-emerald-900/10 animate-fade-in">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-[#00523f] dark:text-emerald-400 shrink-0">
-              <CheckCircle2 className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-md">
+              <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
             </div>
             <div>
-              <p className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
-                पावती यशस्वीपणे जतन झाली! / Entry recorded successfully! (#{savedEntry.invoiceNo})
-              </p>
-              <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-0.5">
-                एकूण: ₹{savedEntry.totalAmount.toLocaleString()} • जमा: ₹{savedEntry.payingNow.toLocaleString()} ({savedEntry.paymentMode})
-                {savedEntry.dueAmount > 0 && ` • उर्वरित उधारी: ₹${savedEntry.dueAmount.toLocaleString()}`}
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-700 text-white font-black text-xs uppercase">
+                  {savedEntry.docType === 'quotation' ? 'दरपत्रक / कोटेशन जतन' : 'विक्री बिल जतन'}
+                </span>
+                <span className="font-mono font-black text-emerald-900 dark:text-emerald-100 text-sm">
+                  #{savedEntry.invoiceNo}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200 mt-1">
+                {savedEntry.customerName} • एकूण रक्कम: ₹{savedEntry.totalAmount.toLocaleString()}
+                {savedEntry.docType !== 'quotation' && (
+                  <>
+                    {' '}• जमा: ₹{savedEntry.payingNow.toLocaleString()} ({savedEntry.paymentMode})
+                    {savedEntry.dueAmount > 0 && (
+                      <span className="text-amber-800 dark:text-amber-300 font-extrabold ml-1">
+                        • उधारी बाकी: ₹{savedEntry.dueAmount.toLocaleString()}
+                      </span>
+                    )}
+                  </>
+                )}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             <button
               id="btn-print-saved-bill"
+              type="button"
               onClick={() => onOpenInvoiceModal(savedEntry)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-[#00523f] dark:text-emerald-300 text-xs font-bold hover:bg-emerald-50 transition cursor-pointer shadow-2xs active:scale-95"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#00523f] hover:bg-[#004232] text-white text-xs font-black shadow-md shadow-[#00523f]/25 transition cursor-pointer active:scale-95"
             >
-              <Printer className="w-3.5 h-3.5" />
-              पावती प्रिंट (Print)
+              <Printer className="w-4 h-4" />
+              <span>
+                {savedEntry.docType === 'quotation' ? 'कोटेशन प्रिंट करा (Print Quotation)' : 'बिल प्रिंट करा (Print Tax Invoice)'}
+              </span>
             </button>
+
             <button
               id="btn-whatsapp-saved-bill"
+              type="button"
               onClick={() => handleShareWhatsApp(savedEntry)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#00523f] hover:bg-[#004232] text-white text-xs font-bold transition shadow-[0_4px_14px_rgba(0,82,63,0.25)] cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              व्हॉट्सॲप बिल (WhatsApp)
+              <Share2 className="w-4 h-4" />
+              <span>WhatsApp पाठवा</span>
             </button>
+
             <button
               id="btn-new-entry-another"
+              type="button"
               onClick={resetForm}
-              className="px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 transition cursor-pointer active:scale-95"
+              className="px-3.5 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold transition cursor-pointer active:scale-95"
             >
-              + पुढील नोंद (Next)
+              + पुढील नोंद
             </button>
           </div>
         </div>
@@ -309,6 +355,57 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
               <span>{errorMsg}</span>
             </div>
           )}
+
+          {/* Document Type Selector: विक्री बिल (Tax Invoice) vs कोटेशन (Quotation / Estimate) */}
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/90 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <span>दस्तऐवज प्रकार (Document Type):</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  docType === 'invoice' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+                }`}>
+                  {docType === 'invoice' ? 'पक्के विक्री बिल (TAX INVOICE)' : 'दरपत्रक / अंदाजपत्रक (QUOTATION)'}
+                </span>
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {docType === 'invoice'
+                  ? 'ग्राहकाला दिलेले पक्के विक्री बिल — अंतिम हिशोब व उधारी खात्यात जमा होते.'
+                  : 'ग्राहकाला दिलेले दरपत्रक / अंदाजपत्रक — केवळ माहितीसाठी, उधारी खात्यावर परिणाम होत नाही.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setDocType('invoice');
+                  setInvoiceNo((prev) => prev.replace(/^Q-/, ''));
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  docType === 'invoice'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>विक्री बिल (Sale Invoice)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDocType('quotation');
+                  setInvoiceNo((prev) => (prev.startsWith('Q-') ? prev : `Q-${prev}`));
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  docType === 'quotation'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>कोटेशन (Quotation)</span>
+              </button>
+            </div>
+          </div>
 
           {/* Product / Item linking to stock */}
           <div className="bg-[#F8F9FA] dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-4 space-y-2 relative">
@@ -597,18 +694,65 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
               />
             </div>
 
+            {/* Serial Number / IMEI / Machine No (User Request: SALE MHNJE BILL MADE SERIAL NUMBER VALA SECTION PAHIJE) */}
+            <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Barcode className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>वस्तूचा सिरीयल नंबर / IMEI (Serial No / IMEI / Model No)</span>
+                </label>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  (वॉरंटी व खात्रीसाठी बिलावर दिसेल)
+                </span>
+              </div>
+              <input
+                id="input-serial-number"
+                type="text"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                placeholder="उदा. IMEI: 869012059312345 / Sr No: WM-2026-LG-8899"
+                className="w-full px-3.5 py-2 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900 dark:text-white font-mono placeholder-slate-400 transition"
+              />
+            </div>
+
             {/* Bill / Invoice No. and Date */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                  Bill / Invoice No.
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    बिल नंबर (Bill / Invoice No.)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setBillSeries('regular')}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                        billSeries === 'regular'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      नियमित (3849+)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillSeries('bajaj')}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                        billSeries === 'bajaj'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      बजाज (B-201+)
+                    </button>
+                  </div>
+                </div>
                 <input
                   id="input-invoice-no"
                   type="text"
                   value={invoiceNo}
                   onChange={(e) => setInvoiceNo(e.target.value)}
-                  placeholder="INV-2026-1-7120"
+                  placeholder={billSeries === 'bajaj' ? 'B-201' : '3849'}
                   className="w-full px-4 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00523f]/20 focus:border-[#00523f] text-slate-900 dark:text-white placeholder-slate-400 transition font-mono font-bold"
                 />
               </div>
@@ -726,6 +870,41 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
                 />
                 <span>Online (GPay/UPI)</span>
               </button>
+            </div>
+          </div>
+
+          {/* Sales / Collection Agent Selection */}
+          <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-[#00523f] dark:text-emerald-400" />
+                <span>विक्री / वसुली प्रतिनिधी (Agent / Staff)</span>
+              </label>
+              <span className="text-[10px] text-slate-400">
+                (डॅशबोर्डवर एजंट वसुली हिशोबासाठी)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { name: '', label: 'दुकान काउंटर' },
+                { name: 'Shubham Shende', label: 'शुभम शेंडे' },
+                { name: 'Bhushan Lidbe', label: 'भूषण लिडबे' },
+                { name: 'Suraj Pendam', label: 'सुरज पेंदाम' },
+                { name: 'Ninad Hole', label: 'निनाद होले' },
+              ].map((ag) => (
+                <button
+                  key={ag.name}
+                  type="button"
+                  onClick={() => setSelectedAgent(ag.name)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    selectedAgent === ag.name
+                      ? 'bg-[#00523f] text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {ag.label}
+                </button>
+              ))}
             </div>
           </div>
 

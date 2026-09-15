@@ -6,7 +6,9 @@ import {
   FileText,
   IndianRupee,
   Search,
-  Zap
+  Zap,
+  Award,
+  Receipt
 } from 'lucide-react';
 
 interface QuickActionsBarProps {
@@ -14,8 +16,10 @@ interface QuickActionsBarProps {
   onOpenNewCard: () => void;
   onOpenCustomerKhata: () => void;
   onOpenSalesBill: () => void;
+  onOpenBillReceipts?: () => void;
   onOpenReceivePayment: () => void;
   onOpenMasterSearch: () => void;
+  onOpenAgentCommission?: () => void;
 }
 
 export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
@@ -23,8 +27,10 @@ export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
   onOpenNewCard,
   onOpenCustomerKhata,
   onOpenSalesBill,
+  onOpenBillReceipts,
   onOpenReceivePayment,
   onOpenMasterSearch,
+  onOpenAgentCommission,
 }) => {
   return (
     <section
@@ -128,6 +134,29 @@ export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
           </div>
         </button>
 
+        {/* 4.5 Bill Receipts (Emerald / Green) */}
+        {onOpenBillReceipts && (
+          <button
+            type="button"
+            onClick={onOpenBillReceipts}
+            title="बिलाच्या विरोधात जमा पावत्या (Receipts Against Bill - #1079...)"
+            className="group flex items-center gap-2 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-100/80 hover:bg-emerald-200/80 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/70 text-emerald-950 dark:text-emerald-100 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+          >
+            <div className="w-6 h-6 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <Receipt className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left leading-tight">
+              <span className="text-xs font-black block tracking-tight whitespace-nowrap flex items-center gap-1">
+                <span>Bill Receipts</span>
+                <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-600 text-white font-mono">#1079</span>
+              </span>
+              <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium block whitespace-nowrap">
+                बिलाविरोधात जमा पावती
+              </span>
+            </div>
+          </button>
+        )}
+
         {/* 5. Receive Payment (Rose / Pink) */}
         <button
           type="button"
@@ -167,6 +196,28 @@ export const QuickActionsBar: React.FC<QuickActionsBarProps> = ({
             </span>
           </div>
         </button>
+
+        {/* 7. Agent Commission & Day-wise Monitor (Teal / Emerald) */}
+        {onOpenAgentCommission && (
+          <button
+            type="button"
+            onClick={onOpenAgentCommission}
+            title="एजंट कमिशन व डॅशबोर्ड (4% Commission + ₹50 New Card + Advances)"
+            className="group flex items-center gap-2 px-3 py-1.5 rounded-xl border border-teal-200 dark:border-teal-800/80 bg-teal-50/90 hover:bg-teal-100/90 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-950 dark:text-teal-100 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+          >
+            <div className="w-6 h-6 rounded-lg bg-[#00523f] text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <Award className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left leading-tight">
+              <span className="text-xs font-black block tracking-tight whitespace-nowrap">
+                Agent 4% & पगार
+              </span>
+              <span className="text-[10px] text-teal-700 dark:text-teal-300 font-medium block whitespace-nowrap">
+                कमिशन डॅशबोर्ड
+              </span>
+            </div>
+          </button>
+        )}
       </div>
     </section>
   );

@@ -16,39 +16,42 @@ export const CollectionSlipModal: React.FC<CollectionSlipModalProps> = ({
   settings,
   onClose,
 }) => {
+  const [recipientPhone, setRecipientPhone] = React.useState<string>(() => {
+    return (transaction.customerPhone || member?.phone || '').replace(/[^0-9]/g, '');
+  });
+
   const handlePrint = () => {
     window.print();
   };
 
-  const phone = (transaction.customerPhone || member?.phone || '').replace(/[^0-9]/g, '');
+  const previousBalance = Math.max(0, (transaction.balanceAfter || 0) - (transaction.amount || 0));
 
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `*${settings.businessName}*\n` +
-      `*श्री साई इंटरप्राइजेस, वर्धा*\n` +
-      `*साप्ताहिक बचत योजना पावती / Weekly Collection Slip*\n` +
-      `------------------------------------------\n` +
-      `🧾 *पावती नं (Receipt No):* ${transaction.receiptNo}\n` +
+      `*${settings.businessName || 'श्री साई इंटरप्राइजेस, वर्धा'}*\n` +
+      `*साप्ताहिक बचत हप्ता पावती / Weekly Collection Slip*\n` +
+      `====================================\n` +
+      `👤 *ग्राहक / सभासद:* ${transaction.customerName}\n` +
+      `💳 *कार्ड नंबर:* #${transaction.cardNumber}\n` +
+      `🧾 *पावती क्र. (Receipt No):* ${transaction.receiptNo}\n` +
       `📅 *दिनांक (Date):* ${transaction.date}\n` +
-      `💳 *कार्ड नं (Card No):* #${transaction.cardNumber}\n` +
-      `👤 *सभासद (Member):* ${transaction.customerName}\n` +
-      (member?.village ? `📍 *गाव (Village):* ${member.village}\n` : '') +
-      (member?.sheetNo ? `📄 *शीट नं (Sheet No):* ${member.sheetNo}\n` : '') +
-      (transaction.weekNumber ? `🗓️ *हप्ता क्र. (Week No):* ${transaction.weekNumber}\n` : '') +
-      `------------------------------------------\n` +
-      `💰 *जमा रक्कम (Collected Amount): ₹${transaction.amount.toLocaleString()}*\n` +
-      `💵 *पेमेंट मोड (Payment Mode):* ${transaction.paymentMode}\n` +
+      (transaction.weekNumber ? `🗓️ *हप्ता क्र. (Week No):* हप्ता ${transaction.weekNumber}\n` : '') +
+      `------------------------------------\n` +
+      `💵 *आज जमा रक्कम (Today Paid):* ₹${transaction.amount.toLocaleString('en-IN')}/-\n` +
+      `⏳ *मागील शिल्लक जमा (जुने जमा):* ₹${previousBalance.toLocaleString('en-IN')}/-\n` +
+      `💰 *आतापर्यंत एकूण जमा (Total Savings):* ₹${(transaction.balanceAfter || 0).toLocaleString('en-IN')}/-\n` +
+      `------------------------------------\n` +
+      `💳 *पेमेंट मोड:* ${transaction.paymentMode || 'Cash'}\n` +
       (transaction.agentName ? `👨‍💼 *प्रतिनिधी (Agent):* ${transaction.agentName}\n` : '') +
-      `------------------------------------------\n` +
-      `🏦 *एकूण शिल्लक बचत (Net Saving Balance): ₹${transaction.balanceAfter.toLocaleString()}*\n` +
-      `------------------------------------------\n` +
-      `✅ आपली साप्ताहिक रक्कम सुरक्षितपणे जमा झाली आहे.\n` +
-      `🌐 वेबसाईट: ${settings.domainName}\n` +
-      `📞 संपर्क: ${settings.phone} / 8600122798\n` +
-      `पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा`
+      `====================================\n` +
+      `✅ आपली आजची हप्ता रक्कम सुरक्षितपणे जमा झाली आहे.\n` +
+      `🙏 श्री साई इंटरप्राइजेसवर विश्वास ठेवल्याबद्दल मनःपूर्वक धन्यवाद!\n` +
+      `📞 संपर्क: ${settings.phone || '8766486915'} / 8600122798\n` +
+      `📍 पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा`
     );
 
-    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
   };
 
@@ -77,7 +80,7 @@ export const CollectionSlipModal: React.FC<CollectionSlipModalProps> = ({
               <span>Print</span>
             </button>
 
-            {phone ? (
+            {recipientPhone ? (
               <button
                 type="button"
                 onClick={handleShareWhatsApp}
@@ -90,7 +93,7 @@ export const CollectionSlipModal: React.FC<CollectionSlipModalProps> = ({
               <button
                 type="button"
                 onClick={handleShareWhatsApp}
-                title="Customer phone not registered, click to choose contact"
+                title="Click to share receipt on WhatsApp"
                 className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Share2 className="w-3.5 h-3.5" />
@@ -106,6 +109,30 @@ export const CollectionSlipModal: React.FC<CollectionSlipModalProps> = ({
               <X className="w-4 h-4" />
             </button>
           </div>
+        </div>
+
+        {/* WhatsApp Fast-Sender Bar (no-print) */}
+        <div className="no-print bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-200 whitespace-nowrap">
+              📱 WhatsApp No:
+            </span>
+            <input
+              type="tel"
+              value={recipientPhone}
+              onChange={(e) => setRecipientPhone(e.target.value)}
+              placeholder="10 digit mobile..."
+              className="px-2.5 py-1 text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono w-32 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleShareWhatsApp}
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>ग्राहकाला व्हॉट्सॲप पाठवा (Send Slip)</span>
+          </button>
         </div>
 
         {/* Printable Slip Sheet */}
@@ -179,26 +206,54 @@ export const CollectionSlipModal: React.FC<CollectionSlipModalProps> = ({
             )}
           </div>
 
-          {/* Amount Paid Box */}
-          <div className="bg-emerald-50 border-2 border-emerald-400 p-3.5 rounded-xl text-center space-y-1">
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
-              {transaction.type === 'Refund' ? 'परतावा दिलेली रक्कम (Refund Amount)' : 'जमा केलेली रक्कम (Amount Received)'}
-            </span>
-            <div className="text-2xl font-black text-emerald-700 font-mono">
-              ₹{transaction.amount.toLocaleString()}
+          {/* 3-Box Clear Balance Breakdown: जुने जमा + आज जमा = एकूण जमा */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {/* Box 1: जुने जमा */}
+            <div className="bg-amber-50/80 border border-amber-300 rounded-xl p-2 text-amber-950">
+              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-tight block">
+                मागील जमा (जुने)
+              </span>
+              <div className="text-sm sm:text-base font-black font-mono text-amber-900 mt-0.5">
+                ₹{previousBalance.toLocaleString('en-IN')}
+              </div>
+              <span className="text-[9px] text-amber-700 font-medium block">
+                Prev Balance
+              </span>
             </div>
-            <div className="text-[11px] text-emerald-800 font-medium">
-              मोड: <strong>{transaction.paymentMode}</strong>
-              {transaction.agentName && ` • प्रतिनिधी: ${transaction.agentName}`}
+
+            {/* Box 2: आज जमा रक्कम */}
+            <div className="bg-emerald-50 border-2 border-emerald-500 rounded-xl p-2 text-emerald-950 shadow-xs">
+              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-tight block">
+                आज जमा रक्कम
+              </span>
+              <div className="text-base sm:text-lg font-black font-mono text-emerald-700 mt-0.5">
+                ₹{transaction.amount.toLocaleString('en-IN')}
+              </div>
+              <span className="text-[9px] text-emerald-700 font-bold block">
+                Today Received
+              </span>
+            </div>
+
+            {/* Box 3: एकूण जमा */}
+            <div className="bg-blue-50/80 border border-blue-300 rounded-xl p-2 text-blue-950">
+              <span className="text-[10px] font-bold text-blue-800 uppercase tracking-tight block">
+                एकूण जमा बचत
+              </span>
+              <div className="text-sm sm:text-base font-black font-mono text-blue-900 mt-0.5">
+                ₹{(transaction.balanceAfter || 0).toLocaleString('en-IN')}
+              </div>
+              <span className="text-[9px] text-blue-700 font-medium block">
+                Total Savings
+              </span>
             </div>
           </div>
 
-          {/* Balance After */}
-          <div className="flex items-center justify-between px-3 py-2 bg-slate-100 rounded-lg text-xs font-semibold text-slate-800">
-            <span>एकूण शिल्लक जमा बचत (Total Savings Balance):</span>
-            <span className="font-mono font-bold text-sm text-blue-700">
-              ₹{transaction.balanceAfter.toLocaleString()}
-            </span>
+          {/* Payment Mode & Agent Info */}
+          <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100 rounded-lg text-[11px] font-medium text-slate-700">
+            <span>पेमेंट पद्धत: <strong className="text-slate-900">{transaction.paymentMode || 'Cash'}</strong></span>
+            {transaction.agentName && (
+              <span>प्रतिनिधी: <strong className="text-slate-900">{transaction.agentName}</strong></span>
+            )}
           </div>
 
           {/* Footer Note and Sign */}

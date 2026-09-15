@@ -11,8 +11,13 @@ import {
   PurchaseEntry,
   StaffMember,
   StockItem,
-  TransactionEntry
+  TransactionEntry,
+  AgentAdvance,
+  BillReceiptEntry
 } from '../types';
+import { saveDatabaseToIndexedDB } from './indexedDb';
+
+export const STORAGE_KEY = 'shri_sai_enterprise_db';
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
   businessName: 'Shri Sai Enterprises',
@@ -105,959 +110,126 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
 ];
 
 
-export const INITIAL_STOCK: StockItem[] = [
-  {
-    id: 'stk-tv32',
-    name: 'Smart LED TV 32" HD Ready (Frameless)',
-    code: 'TV-32-SMART',
-    category: 'Home Appliances',
-    quantity: 14,
-    unit: 'Unit',
-    sellingPrice: 12500,
-    purchasePrice: 9800,
-    minStockLevel: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=600&q=80',
-    description: '32-inch Frameless Smart LED TV with YouTube, Netflix, Wi-Fi & 1 Year Warranty',
-  },
-  {
-    id: 'stk-tv43',
-    name: 'Smart LED TV 43" 4K Ultra HD Display',
-    code: 'TV-43-4K',
-    category: 'Home Appliances',
-    quantity: 8,
-    unit: 'Unit',
-    sellingPrice: 23900,
-    purchasePrice: 19500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1461151304267-38535e780c79?auto=format&fit=crop&w=600&q=80',
-    description: '43-inch 4K HDR Ultra Clear Display, Dolby Audio, Bluetooth & Screen Mirroring',
-  },
-  {
-    id: 'stk-fridge',
-    name: 'Double Door Refrigerator 240L (5-Star Inverter)',
-    code: 'FRIDGE-240L',
-    category: 'Home Appliances',
-    quantity: 6,
-    unit: 'Unit',
-    sellingPrice: 21500,
-    purchasePrice: 17800,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
-    description: 'Frost-Free Inverter Compressor, Toughened Glass Shelves, 10 Years Compressor Warranty',
-  },
-  {
-    id: 'stk-cooler',
-    name: 'Desert Air Cooler 70L Heavy Duty Honeycomb',
-    code: 'CLR-70L-HD',
-    category: 'Home Appliances',
-    quantity: 18,
-    unit: 'Unit',
-    sellingPrice: 7800,
-    purchasePrice: 5900,
-    minStockLevel: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=600&q=80',
-    description: '70 Litres Tank, High Air Delivery Fan, 3-Side Honeycomb Cooling Pads & Inverter Compatible',
-  },
-  {
-    id: 'stk-wm',
-    name: 'Semi-Automatic Washing Machine 7.5 Kg',
-    code: 'WM-75-SEMI',
-    category: 'Home Appliances',
-    quantity: 9,
-    unit: 'Unit',
-    sellingPrice: 11200,
-    purchasePrice: 8900,
-    minStockLevel: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
-    description: '7.5 Kg Capacity, Powerful Spin Dryer, Rust-Proof Polypropylene Body & 5 Years Motor Warranty',
-  },
-  {
-    id: 'stk-fan',
-    name: 'Ceiling Fan 1200mm High Speed Copper (Pack of 2)',
-    code: 'FAN-1200-HS',
-    category: 'Electricals',
-    quantity: 32,
-    unit: 'Pack',
-    sellingPrice: 3200,
-    purchasePrice: 2400,
-    minStockLevel: 8,
-    imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80',
-    description: '100% Pure Copper Winding, 400 RPM High Air Delivery, Double Ball Bearing',
-  },
-  {
-    id: 'stk-1',
-    name: 'Copper Electric Wire 1.5 sq mm (90m Roll)',
-    code: 'STK-CW15',
-    category: 'Electricals',
-    quantity: 48,
-    unit: 'Roll',
-    sellingPrice: 1850,
-    purchasePrice: 1450,
-    minStockLevel: 10,
-    imageUrl: 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=600&q=80',
-    description: 'Flame Retardant (FR) PVC Insulated Multi-strand Copper Industrial Cable (90 Meters)',
-  },
-  {
-    id: 'stk-2',
-    name: 'LED Tube Light 20W (Pack of 5)',
-    code: 'STK-LED20',
-    category: 'Electricals',
-    quantity: 65,
-    unit: 'Pack',
-    sellingPrice: 950,
-    purchasePrice: 680,
-    minStockLevel: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=600&q=80',
-    description: '20W Cool Day White Light, Surge Protection 4kV, Glare-Free Polycarbonate Batten',
-  },
-  {
-    id: 'stk-6',
-    name: 'Submersible Pump Starter Panel 1.5 HP',
-    code: 'STK-PNL15',
-    category: 'Industrial',
-    quantity: 5,
-    unit: 'Unit',
-    sellingPrice: 3400,
-    purchasePrice: 2750,
-    minStockLevel: 4,
-    imageUrl: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=600&q=80',
-    description: 'Heavy Duty Contactor, Overload Thermal Relay, Voltmeter & Ammeter Dual Gauges',
-  },
-  {
-    id: 'stk-sofa1',
-    name: 'Luxury 5-Seater Teak Wood Sofa Set with Velvet Upholstery',
-    code: 'FURN-SOFA-01',
-    category: 'Furniture',
-    quantity: 4,
-    unit: 'Set',
-    sellingPrice: 36500,
-    purchasePrice: 28000,
-    minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80',
-    description: 'Solid seasoned Teak wood frame, 40-density high resilient foam, stain-resistant velvet fabric, 5 years warranty.',
-  },
-  {
-    id: 'stk-bed1',
-    name: 'King Size Teak Finish Bed with Hydraulic Storage',
-    code: 'FURN-BED-01',
-    category: 'Furniture',
-    quantity: 5,
-    unit: 'Unit',
-    sellingPrice: 28900,
-    purchasePrice: 22500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=80',
-    description: 'Effortless hydraulic lift mechanism, spacious under-bed storage, cushioned headboard, termite-resistant treated wood.',
-  },
-  {
-    id: 'stk-dining1',
-    name: '6-Seater Solid Sheesham Wood Dining Table Set',
-    code: 'FURN-DINE-01',
-    category: 'Furniture',
-    quantity: 3,
-    unit: 'Set',
-    sellingPrice: 24500,
-    purchasePrice: 19000,
-    minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=800&q=80',
-    description: 'Premium natural wood finish, 12mm bevelled toughened glass top, 6 ergonomic cushioned chairs.',
-  },
-  {
-    id: 'stk-wardrobe1',
-    name: '4-Door Teak Veneer Wardrobe with Full Dressing Mirror',
-    code: 'FURN-WARD-01',
-    category: 'Furniture',
-    quantity: 6,
-    unit: 'Unit',
-    sellingPrice: 21900,
-    purchasePrice: 17200,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=800&q=80',
-    description: 'Multi-compartment storage, lockable internal drawers, hanger rod, high-grade European hinges and safety locks.',
-  },
-  {
-    id: 'stk-recliner1',
-    name: 'Single Seater Ergonomic Motorized / Manual Recliner',
-    code: 'FURN-RECL-01',
-    category: 'Furniture',
-    quantity: 5,
-    unit: 'Unit',
-    sellingPrice: 16800,
-    purchasePrice: 13000,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
-    description: 'Zero-gravity multi-angle reclining, lumbar support, breathable leatherette upholstery, cup holders.',
-  },
-];
+export const INITIAL_STOCK: StockItem[] = [];
 
-export const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: 'cust-1',
-    name: 'Rajesh Sharma Electricals',
-    phone: '9822012345',
-    address: 'Near Gandhi Chowk, Shop 12',
-    totalPurchased: 45200,
-    totalPaid: 41200,
-    balanceDue: 4000,
-    lastVisit: '2026-09-08',
-  },
-  {
-    id: 'cust-2',
-    name: 'Amit Patil (Contractor)',
-    phone: '9765412390',
-    address: 'Sai Nagar, Sector 4',
-    totalPurchased: 84000,
-    totalPaid: 76000,
-    balanceDue: 8000,
-    lastVisit: '2026-09-09',
-  },
-  {
-    id: 'cust-3',
-    name: 'Vijay Deshmukh',
-    phone: '9421098765',
-    address: 'Plot 15, MIDC Area',
-    totalPurchased: 15600,
-    totalPaid: 15600,
-    balanceDue: 0,
-    lastVisit: '2026-09-07',
-  },
-  {
-    id: 'cust-4',
-    name: 'Ganesh Hardware & Sanitary',
-    phone: '9890123456',
-    address: 'Bus Stand Road',
-    totalPurchased: 62000,
-    totalPaid: 50000,
-    balanceDue: 12000,
-    lastVisit: '2026-09-09',
-  },
-];
+export const INITIAL_CUSTOMERS: Customer[] = [];
 
-export const INITIAL_TRANSACTIONS: TransactionEntry[] = [
-  {
-    id: 'tx-1',
-    invoiceNo: 'INV-2026-001',
-    date: '2026-09-09',
-    customerName: 'Amit Patil (Contractor)',
-    customerPhone: '9765412390',
-    customerId: 'cust-2',
-    stockItemId: 'stk-1',
-    stockItemName: 'Copper Electric Wire 1.5 sq mm (90m)',
-    quantity: 4,
-    itemDetails: '4 rolls copper wire + 20 pcs modular switch',
-    totalAmount: 8160,
-    payingNow: 5000,
-    dueAmount: 3160,
-    paymentMode: 'Cash',
-    notes: 'Remaining 3160 will clear by Friday',
-    createdAt: '2026-09-09T10:15:00Z',
-  },
-  {
-    id: 'tx-2',
-    invoiceNo: 'INV-2026-002',
-    date: '2026-09-09',
-    customerName: 'Vijay Deshmukh',
-    customerPhone: '9421098765',
-    customerId: 'cust-3',
-    stockItemId: 'stk-2',
-    stockItemName: 'LED Tube Light 20W (Pack of 5)',
-    quantity: 2,
-    itemDetails: '2 packs LED Tube Light 20W for office fitting',
-    totalAmount: 1900,
-    payingNow: 1900,
-    dueAmount: 0,
-    paymentMode: 'Online',
-    notes: 'Paid via GPay UPI',
-    createdAt: '2026-09-09T11:45:00Z',
-  },
-  {
-    id: 'tx-3',
-    invoiceNo: 'INV-2026-003',
-    date: '2026-09-08',
-    customerName: 'Rajesh Sharma Electricals',
-    customerPhone: '9822012345',
-    customerId: 'cust-1',
-    stockItemId: 'stk-3',
-    stockItemName: 'PVC Conduit Pipe 25mm (3m)',
-    quantity: 20,
-    itemDetails: '20 pieces PVC pipes 25mm + fittings',
-    totalAmount: 2600,
-    payingNow: 2600,
-    dueAmount: 0,
-    paymentMode: 'Cash',
-    notes: 'Full payment received in cash',
-    createdAt: '2026-09-08T15:30:00Z',
-  },
-];
+export const INITIAL_TRANSACTIONS: TransactionEntry[] = [];
 
 export const INITIAL_PURCHASES: PurchaseEntry[] = [
   {
-    id: 'pur-manisha-1',
-    billNo: 'PUR-7701',
-    date: '2026-08-10',
-    supplierName: 'Manisha Enterprises',
-    items: 'Wires and modular accessories',
-    totalAmount: 95000,
-    paidAmount: 50000,
-    status: 'Partial',
+    id: 'pur-manisha-01604',
+    billNo: 'CS/2526/01604',
+    date: '2026-02-25',
+    supplierName: 'MANISHA ENTERPRISES',
+    supplierAddress: 'INGOLE CHOWK MAIN ROAD WARDHA 442001 MAHARASHTRA INDIA',
+    supplierPhone: '9766911693',
+    supplierGstin: '27ABDPB8956C1ZS',
+    supplierState: 'MAHARASHTRA',
+    buyerName: 'SHRI SAI ENTERPRISES-LG-WARDHA[NEW]',
+    buyerGstin: '27ALOPL0030G2ZC',
+    buyerAddress: 'WARD NO 1, NEAR DATEY SABHAGRUH, Arvi Road, WARDHA 442001 MAHARASHTRA',
+    poNo: 'CSSO2526-00579',
+    poDate: '23/02/2026',
+    location: 'LG DISTRIBUTION',
+    salesConsultant: 'DHIRAJ BHOWARE',
+    approvedBy: 'ARTI INGOLE',
+    transporter: 'GENERAL TRANSPORT',
+    items: 'LG GLT2216WYRI (2 Pcs)',
+    itemsDetail: [
+      {
+        id: 'pi-1',
+        description: 'LG GLT2216WYRI',
+        hsn: '84182100',
+        qty: 2,
+        rate: 21592,
+        discount: 0,
+        taxableAmount: 43183,
+        taxRate: 18,
+        cgstRate: 9,
+        cgstAmount: 3886.48,
+        sgstRate: 9,
+        sgstAmount: 3886.48,
+        taxAmount: 7772.95,
+        totalAmount: 50956,
+        serialNumbers: ['602NRZX294301', '602NRQV293652'],
+      },
+    ],
+    subtotal: 43183,
+    cgstAmount: 3886.48,
+    sgstAmount: 3886.48,
+    totalTax: 7772.95,
+    totalAmount: 50956,
+    paidAmount: 0,
+    status: 'Pending',
     paymentMode: 'Online',
-    notes: 'Primary wiring stock batch',
+    supplierBank: {
+      accountName: 'MANISHA ENTERPRISE',
+      accountNo: '108051000302',
+      ifscCode: 'ICIC0001080',
+      bankName: 'ICICI BANK',
+      branch: 'SHIVAJI CHOWK, ARVI ROAD, WARDHA',
+    },
+    notes: 'LG Refrigerator Procurement • Serial Nos: 602NRZX294301, 602NRQV293652',
+    autoUpdateStock: true,
   },
-  {
-    id: 'pur-manisha-2',
-    billNo: 'PUR-7702',
-    date: '2026-08-25',
-    supplierName: 'Manisha Enterprises',
-    items: 'PVC pipes & electrical conduits lot',
-    totalAmount: 50000,
-    paidAmount: 65000,
-    status: 'Paid',
-    paymentMode: 'Online',
-    notes: 'PVC stock batch',
-  },
-  {
-    id: 'pur-1',
-    billNo: 'PUR-8821',
-    date: '2026-09-06',
-    supplierName: 'Polycab Distributors Ltd.',
-    items: 'Copper Wires 1.5mm & 2.5mm (50 coils)',
-    totalAmount: 72500,
-    paidAmount: 72500,
-    status: 'Paid',
-    paymentMode: 'Online',
-  },
-  {
-    id: 'pur-2',
-    billNo: 'PUR-8822',
-    date: '2026-09-08',
-    supplierName: 'Anchor Switchgear Pvt Ltd',
-    items: 'Modular switches, plates, 32A MCBs',
-    totalAmount: 28400,
-    paidAmount: 20000,
-    status: 'Partial',
-    paymentMode: 'Online',
-  },
+];
+
+export const CORE_AGENTS = [
+  { name: 'Shubham Shende', marathiName: 'शुभम शेंडे', phone: '8766486915' },
+  { name: 'Bhushan Lidbe', marathiName: 'भूषण लिडबे', phone: '8600122798' },
+  { name: 'Suraj Pendam', marathiName: 'सुरज पेंदाम', phone: '9175534365' },
+  { name: 'Ninad Hole', marathiName: 'निनाद होले', phone: '7822859073' },
 ];
 
 export const INITIAL_STAFF: StaffMember[] = [
   {
-    id: 'stf-1',
-    name: 'Ramesh Kadam',
-    role: 'Store Manager & Billing',
-    phone: '9870011223',
-    salary: 18000,
-    advancePaid: 2000,
-    attendanceToday: 'Present',
-  },
-  {
-    id: 'stf-2',
-    name: 'Suresh More',
-    role: 'Warehouse & Delivery',
-    phone: '9870033445',
-    salary: 14000,
+    id: "stf-shubham",
+    name: "Shubham Shende",
+    role: "Field Collection Agent (शुभम शेंडे)",
+    phone: "8766486915",
+    salary: 15000,
     advancePaid: 0,
     attendanceToday: 'Present',
   },
+  {
+    id: "stf-bhushan",
+    name: "Bhushan Lidbe",
+    role: "Field Collection Agent (भूषण लिडबे)",
+    phone: "8600122798",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+  },
+  {
+    id: "stf-suraj",
+    name: "Suraj Pendam",
+    role: "Field Collection Agent (सुरज पेंदाम)",
+    phone: "9175534365",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+  },
+  {
+    id: "stf-ninad",
+    name: "Ninad Hole",
+    role: "Field Collection Agent (निनाद होले)",
+    phone: "7822859073",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+  }
 ];
 
-export const INITIAL_EXPENSES: ExpenseEntry[] = [
-  {
-    id: 'exp-1',
-    date: '2026-09-09',
-    category: 'Tea & Snacks',
-    description: 'Staff tea & morning snacks',
-    amount: 140,
-    paymentMode: 'Cash',
-  },
-  {
-    id: 'exp-2',
-    date: '2026-09-09',
-    category: 'Transport',
-    description: 'Tempo auto delivery freight to Site #3',
-    amount: 350,
-    paymentMode: 'Cash',
-  },
-  {
-    id: 'exp-3',
-    date: '2026-09-05',
-    category: 'Electricity',
-    description: 'MSEDCL Shop electricity bill',
-    amount: 2450,
-    paymentMode: 'Online',
-  },
-];
+export const INITIAL_EXPENSES: ExpenseEntry[] = [];
 
-export const INITIAL_DEALERS: Dealer[] = [
-  {
-    id: 'dlr-1',
-    name: 'Manisha Enterprises',
-    phone: '9823019876',
-    address: 'Shop 14, Wholesale Electrical Market, Pune',
-    gstin: '27AABCM7612E1Z4',
-    totalPurchases: 145000,
-    totalPaid: 115000,
-    balanceDue: 30000,
-    lastTransactionDate: '2026-09-08',
-  },
-  {
-    id: 'dlr-2',
-    name: 'Polycab Distributors Ltd.',
-    phone: '9822019900',
-    address: 'Plot 45, MIDC Industrial Area, Chakan',
-    gstin: '27AAACP4412F1Z9',
-    totalPurchases: 72500,
-    totalPaid: 72500,
-    balanceDue: 0,
-    lastTransactionDate: '2026-09-06',
-  },
-  {
-    id: 'dlr-3',
-    name: 'Anchor Switchgear Pvt Ltd',
-    phone: '9890045678',
-    address: 'Gala 8, Commercial Complex, Station Road',
-    gstin: '27AABCA3319K1ZR',
-    totalPurchases: 28400,
-    totalPaid: 20000,
-    balanceDue: 8400,
-    lastTransactionDate: '2026-09-08',
-  },
-];
+export const INITIAL_DEALERS: Dealer[] = [];
 
-export const INITIAL_DEALER_PAYMENTS: DealerPayment[] = [
-  {
-    id: 'dp-1',
-    dealerId: 'dlr-1',
-    dealerName: 'Manisha Enterprises',
-    voucherNo: 'VCH-1001',
-    date: '2026-09-05',
-    amount: 50000,
-    paymentMode: 'Online',
-    referenceNo: 'UPI-984712093',
-    notes: 'Part payment against August invoices',
-    createdAt: '2026-09-05T14:30:00Z',
-  },
-  {
-    id: 'dp-2',
-    dealerId: 'dlr-1',
-    dealerName: 'Manisha Enterprises',
-    voucherNo: 'VCH-1002',
-    date: '2026-09-08',
-    amount: 65000,
-    paymentMode: 'Online',
-    referenceNo: 'NEFT-88349120',
-    notes: 'Advance against wire and cable supply',
-    createdAt: '2026-09-08T16:45:00Z',
-  },
-];
+export const INITIAL_DEALER_PAYMENTS: DealerPayment[] = [];
 
-export const INITIAL_CARD_MEMBERS: CardMember[] = [
-  // Scheme 1 (Card Nos 1001-2999)
-  {
-    id: 'cm-1030',
-    cardNumber: 1030,
-    schemeId: 'scheme1',
-    schemeName: 'Scheme 1 (योजना 1)',
-    customerName: 'SANGITA UTTAM PATIL',
-    phone: '7972811639',
-    village: 'HINGNI',
-    address: 'HINGNI, Wardha',
-    joiningDate: '2025-06-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 450,
-    totalRefunded: 0,
-    netBalance: 450,
-    status: 'Active',
-    notes: 'Active Member (Scheme 1)',
-  },
-  {
-    id: 'cm-1029',
-    cardNumber: 1029,
-    schemeId: 'scheme1',
-    schemeName: 'Scheme 1 (योजना 1)',
-    customerName: 'YAMUNA PRABHAKAR KAIKADI',
-    phone: '8698041323',
-    village: 'HINGNI',
-    address: 'HINGNI, Wardha',
-    joiningDate: '2025-06-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 200,
-    totalRefunded: 0,
-    netBalance: 200,
-    status: 'Active',
-    notes: 'Active Member (Scheme 1)',
-  },
-  {
-    id: 'cm-1021',
-    cardNumber: 1021,
-    schemeId: 'scheme1',
-    schemeName: 'Scheme 1 (योजना 1)',
-    customerName: 'SURAJ GAUTAM MOON',
-    phone: '9175534365',
-    village: 'SINDHI MEGHE',
-    address: 'SINDHI MEGHE, Wardha',
-    joiningDate: '2025-06-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 300,
-    totalRefunded: 0,
-    netBalance: 300,
-    status: 'Active',
-    notes: 'Active Member (Scheme 1)',
-  },
-  {
-    id: 'cm-1081',
-    cardNumber: 1081,
-    schemeId: 'scheme1',
-    schemeName: 'Scheme 1 (योजना 1)',
-    customerName: 'SHALINI NARAYAN KUBHARE',
-    phone: '',
-    village: 'HINGNI',
-    address: 'HINGNI, Wardha',
-    joiningDate: '2025-06-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 500,
-    totalRefunded: 0,
-    netBalance: 500,
-    status: 'Active',
-    notes: 'Active Member (Scheme 1)',
-  },
-  {
-    id: 'cm-1242',
-    cardNumber: 1242,
-    schemeId: 'scheme1',
-    schemeName: 'Scheme 1 (योजना 1)',
-    customerName: 'SAVITA VASANT RAUT',
-    phone: '8888296288',
-    village: 'WAIFAD',
-    address: 'WAIFAD, Wardha',
-    joiningDate: '2025-06-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 5300,
-    totalRefunded: 0,
-    netBalance: 5300,
-    status: 'Active',
-    notes: 'Active Member (Scheme 1)',
-  },
+export const INITIAL_CARD_MEMBERS: CardMember[] = [];
 
-  // Scheme 2 (Card Nos 3001-3999)
-  {
-    id: 'cm-3191',
-    cardNumber: 3191,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'SUNIL DANDAGE',
-    phone: '8855881081',
-    village: 'PIPRI',
-    address: 'PIPRI, Wardha',
-    sheetNo: '',
-    openingAmt: 0,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 3000,
-    totalRefunded: 0,
-    netBalance: 3000,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3201',
-    cardNumber: 3201,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'PRASHANT BHALE',
-    phone: '',
-    village: 'SATODA',
-    address: 'SATODA, Wardha',
-    sheetNo: '',
-    openingAmt: 100,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 100,
-    totalRefunded: 0,
-    netBalance: 100,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3001',
-    cardNumber: 3001,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'SHIVANSHU NIDHEKAR',
-    phone: '',
-    village: 'JAMNI',
-    address: 'JAMNI, Wardha',
-    sheetNo: '',
-    openingAmt: 200,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 200,
-    totalRefunded: 0,
-    netBalance: 200,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3123',
-    cardNumber: 3123,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'PRATIBHA MAROTI KHOLAME',
-    phone: '8551060253',
-    village: 'PARSODI',
-    address: 'PARSODI, Wardha',
-    sheetNo: '',
-    openingAmt: 200,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 200,
-    totalRefunded: 0,
-    netBalance: 200,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3014',
-    cardNumber: 3014,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'BALAJI SHAMRAO DANDGE',
-    phone: '9021496579',
-    village: 'SHIVNAGAR',
-    address: 'SHIVNAGAR, Wardha',
-    sheetNo: '',
-    openingAmt: 1000,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 1000,
-    totalRefunded: 0,
-    netBalance: 1000,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3234',
-    cardNumber: 3234,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'SARIKA SANDIP BHANDEKAR',
-    phone: '9096037244',
-    village: 'KANHOLI BARA',
-    address: 'KANHOLI BARA, Wardha',
-    sheetNo: '',
-    openingAmt: 100,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 100,
-    totalRefunded: 0,
-    netBalance: 100,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-  {
-    id: 'cm-3027',
-    cardNumber: 3027,
-    schemeId: 'scheme2',
-    schemeName: 'Scheme 2 (योजना 2)',
-    customerName: 'SUNIL GHONGADE',
-    phone: '9673448626',
-    village: 'SATODA',
-    address: 'SATODA, Wardha',
-    sheetNo: '',
-    openingAmt: 500,
-    joiningDate: '2024-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 500,
-    totalRefunded: 0,
-    netBalance: 500,
-    status: 'Active',
-    notes: 'Active Member (Scheme 2)',
-  },
-
-  // Scheme 3 (Card Nos 4001-6000)
-  {
-    id: 'cm-4107',
-    cardNumber: 4107,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'RANJANA SHAMBHARKAR',
-    phone: '',
-    village: 'BORI',
-    address: 'BORI, Wardha',
-    sheetNo: '2793',
-    openingAmt: 600,
-    joiningDate: '2025-07-05',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 600,
-    totalRefunded: 0,
-    netBalance: 600,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #2793',
-  },
-  {
-    id: 'cm-4304',
-    cardNumber: 4304,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'VAISHALI BAVNE',
-    phone: '',
-    village: 'HINGNI',
-    address: 'HINGNI, Wardha',
-    sheetNo: '5104',
-    openingAmt: 100,
-    joiningDate: '2025-10-18',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 100,
-    totalRefunded: 0,
-    netBalance: 100,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5104',
-  },
-  {
-    id: 'cm-4181',
-    cardNumber: 4181,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'SANGITA',
-    phone: '',
-    village: 'DEVNAGAR',
-    address: 'DEVNAGAR, Wardha',
-    sheetNo: '5110',
-    openingAmt: 200,
-    joiningDate: '2025-10-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 200,
-    totalRefunded: 0,
-    netBalance: 200,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5110',
-  },
-  {
-    id: 'cm-4302',
-    cardNumber: 4302,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'SANJAY KUMBHARE',
-    phone: '',
-    village: 'KELHZAR',
-    address: 'KELHZAR, Wardha',
-    sheetNo: '5122',
-    openingAmt: 500,
-    joiningDate: '2025-10-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 500,
-    totalRefunded: 0,
-    netBalance: 500,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5122',
-  },
-  {
-    id: 'cm-4349',
-    cardNumber: 4349,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'RAHUL DUDHAKOHALHE',
-    phone: '',
-    village: 'VAYFAD',
-    address: 'VAYFAD, Wardha',
-    sheetNo: '5125',
-    openingAmt: 100,
-    joiningDate: '2025-10-29',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 100,
-    totalRefunded: 0,
-    netBalance: 100,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5125',
-  },
-  {
-    id: 'cm-4352',
-    cardNumber: 4352,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'KAUSHALYA CHAUDHARI',
-    phone: '',
-    village: 'KHADKI',
-    address: 'KHADKI, Wardha',
-    sheetNo: '5132',
-    openingAmt: 500,
-    joiningDate: '2025-11-02',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 500,
-    totalRefunded: 0,
-    netBalance: 500,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5132',
-  },
-  {
-    id: 'cm-4398',
-    cardNumber: 4398,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'GANESH TELRANDE',
-    phone: '9689033168',
-    village: 'KELHZAR',
-    address: 'KELHZAR, Wardha',
-    sheetNo: '5166',
-    openingAmt: 100,
-    joiningDate: '2025-11-01',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 100,
-    totalRefunded: 0,
-    netBalance: 100,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5166',
-  },
-  {
-    id: 'cm-4393',
-    cardNumber: 4393,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'RUPALI PULKARI',
-    phone: '',
-    village: 'VAYFAD',
-    address: 'VAYFAD, Wardha',
-    sheetNo: '5486',
-    openingAmt: 600,
-    joiningDate: '2025-11-26',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 600,
-    totalRefunded: 0,
-    netBalance: 600,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #5486',
-  },
-  {
-    id: 'cm-4049',
-    cardNumber: 4049,
-    schemeId: 'scheme3',
-    schemeName: 'Scheme 3 (योजना 3)',
-    customerName: 'AADESH DEHARE',
-    phone: '',
-    village: 'KHADKI',
-    address: 'KHADKI, Wardha',
-    sheetNo: '634',
-    openingAmt: 1000,
-    joiningDate: '2025-06-15',
-    registrationFee: 50,
-    registrationFeePaid: true,
-    totalDeposited: 1000,
-    totalRefunded: 0,
-    netBalance: 1000,
-    status: 'Active',
-    notes: 'Active Member (Scheme 3) • Sheet #634',
-  },
-];
-
-export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [
-  {
-    id: 'ctx-1',
-    cardId: 'cm-1',
-    cardNumber: 1001,
-    schemeId: 'scheme1',
-    customerName: 'Prakash Shinde',
-    customerPhone: '9822456781',
-    receiptNo: 'REC-SCH1-001',
-    date: '2026-07-01',
-    type: 'Fee',
-    amount: 50,
-    paymentMode: 'Cash',
-    remarks: 'Card Opening / Registration Fee',
-    balanceAfter: 0,
-    createdAt: '2026-07-01T10:00:00Z',
-  },
-  {
-    id: 'ctx-2',
-    cardId: 'cm-1',
-    cardNumber: 1001,
-    schemeId: 'scheme1',
-    customerName: 'Prakash Shinde',
-    customerPhone: '9822456781',
-    receiptNo: 'REC-SCH1-012',
-    date: '2026-07-08',
-    type: 'WeeklyPayment',
-    weekNumber: 1,
-    amount: 1000,
-    paymentMode: 'Cash',
-    remarks: 'Week 1 Installment',
-    balanceAfter: 1000,
-    createdAt: '2026-07-08T11:00:00Z',
-  },
-  {
-    id: 'ctx-3',
-    cardId: 'cm-1',
-    cardNumber: 1001,
-    schemeId: 'scheme1',
-    customerName: 'Prakash Shinde',
-    customerPhone: '9822456781',
-    receiptNo: 'REC-SCH1-045',
-    date: '2026-08-15',
-    type: 'WeeklyPayment',
-    weekNumber: 6,
-    amount: 4000,
-    paymentMode: 'Online',
-    remarks: 'Weeks 2 to 5 lump-sum deposit',
-    balanceAfter: 5000,
-    createdAt: '2026-08-15T15:30:00Z',
-  },
-  {
-    id: 'ctx-4',
-    cardId: 'cm-1',
-    cardNumber: 1001,
-    schemeId: 'scheme1',
-    customerName: 'Prakash Shinde',
-    customerPhone: '9822456781',
-    receiptNo: 'REC-SCH1-098',
-    date: '2026-08-28',
-    type: 'WeeklyPayment',
-    weekNumber: 8,
-    amount: 5000,
-    paymentMode: 'Cash',
-    remarks: 'Week 7 & 8 deposit',
-    balanceAfter: 10000,
-    createdAt: '2026-08-28T16:00:00Z',
-  },
-  {
-    id: 'ctx-5',
-    cardId: 'cm-1',
-    cardNumber: 1001,
-    schemeId: 'scheme1',
-    customerName: 'Prakash Shinde',
-    customerPhone: '9822456781',
-    receiptNo: 'REF-SCH1-003',
-    date: '2026-09-04',
-    type: 'Refund',
-    amount: 5000,
-    paymentMode: 'Cash',
-    remarks: 'Partial withdrawal/refund to customer (₹10000 se ₹5000 wapas)',
-    balanceAfter: 5000,
-    createdAt: '2026-09-04T12:00:00Z',
-  },
-];
-
-import { saveDatabaseToIndexedDB } from './indexedDb';
-
-const STORAGE_KEY = 'shri_sai_ent_db_v2';
-const STORAGE_SUMMARY_KEY = 'shri_sai_ent_summary_v2';
+export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [];
 
 export interface AppDatabase {
   settings: BusinessSettings;
@@ -1071,6 +243,8 @@ export interface AppDatabase {
   cardTransactions: CardTransaction[];
   staff: StaffMember[];
   expenses: ExpenseEntry[];
+  agentAdvances: AgentAdvance[];
+  billReceipts?: BillReceiptEntry[];
 }
 
 export function loadDatabase(): AppDatabase {
@@ -1094,45 +268,101 @@ export function loadDatabase(): AppDatabase {
         mergedSettings.additionalPhones = ['8600122798', '9175534365', '7822859073'];
       }
 
-      const loadedStock: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
-        ? parsed.stock.map((item: StockItem) => {
-            if (!item.imageUrl) {
-              const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
-              if (matched?.imageUrl) {
-                return { ...item, imageUrl: matched.imageUrl, description: item.description || matched.description };
-              }
-            }
-            return item;
-          })
-        : INITIAL_STOCK;
-
-      const loadedCustomers: Customer[] = Array.isArray(parsed.customers)
-        ? parsed.customers.map((c: Customer) => {
-            const purchased = Number(c.totalPurchased || 0);
-            const paid = Number(c.totalPaid || 0);
-            const due = Number(c.balanceDue || 0);
-            if (purchased === 0 && (paid > 0 || due > 0)) {
-              return {
-                ...c,
-                totalPurchased: paid + due,
-              };
-            }
-            return c;
-          })
+      const demoStockIds = new Set(['stk-tv32', 'stk-tv43', 'stk-fridge', 'stk-cooler', 'stk-wm', 'stk-fan', 'stk-1', 'stk-2', 'stk-6', 'stk-bed1', 'stk-dining1', 'stk-wardrobe1', 'stk-recliner1']);
+      const loadedStock: StockItem[] = Array.isArray(parsed.stock)
+        ? parsed.stock.filter((item: StockItem) => !demoStockIds.has(item.id))
         : [];
+
+      const demoCustIds = new Set(['cust-1', 'cust-2', 'cust-3', 'cust-4']);
+      const loadedCustomers: Customer[] = Array.isArray(parsed.customers)
+        ? parsed.customers
+            .filter((c: Customer) => !demoCustIds.has(c.id))
+            .map((c: Customer) => {
+              const purchased = Number(c.totalPurchased || 0);
+              const paid = Number(c.totalPaid || 0);
+              const due = Number(c.balanceDue || 0);
+              if (purchased === 0 && (paid > 0 || due > 0)) {
+                return {
+                  ...c,
+                  totalPurchased: paid + due,
+                };
+              }
+              return c;
+            })
+        : [];
+
+      const demoTxIds = new Set(['tx-1', 'tx-2', 'tx-3']);
+      const loadedTransactions: TransactionEntry[] = Array.isArray(parsed.transactions)
+        ? parsed.transactions.filter((t: TransactionEntry) => !demoTxIds.has(t.id))
+        : [];
+
+      const demoPurIds = new Set(['pur-manisha-1', 'pur-manisha-2', 'pur-1', 'pur-2']);
+      const loadedPurchases: PurchaseEntry[] = Array.isArray(parsed.purchases)
+        ? parsed.purchases.filter((p: PurchaseEntry) => !demoPurIds.has(p.id))
+        : [];
+
+      const demoDlrIds = new Set(['dlr-1', 'dlr-2', 'dlr-3']);
+      const loadedDealers: Dealer[] = Array.isArray(parsed.dealers)
+        ? parsed.dealers.filter((d: Dealer) => !demoDlrIds.has(d.id))
+        : [];
+
+      const demoDpIds = new Set(['dp-1', 'dp-2', 'dp-3', 'dp-4']);
+      const loadedDealerPayments: DealerPayment[] = Array.isArray(parsed.dealerPayments)
+        ? parsed.dealerPayments.filter((dp: DealerPayment) => !demoDpIds.has(dp.id))
+        : [];
+
+      const demoCardTxIds = new Set(['ctx-1', 'ctx-2', 'ctx-3', 'ctx-4', 'ctx-5']);
+      const loadedCardTransactions: CardTransaction[] = Array.isArray(parsed.cardTransactions)
+        ? parsed.cardTransactions.filter((ctx: CardTransaction) => !demoCardTxIds.has(ctx.id) && ctx.customerName !== 'Prakash Shinde')
+        : [];
+
+      const demoExpIds = new Set(['exp-1', 'exp-2', 'exp-3', 'exp-4', 'exp-5']);
+      const loadedExpenses: ExpenseEntry[] = Array.isArray(parsed.expenses)
+        ? parsed.expenses.filter((e: ExpenseEntry) => !demoExpIds.has(e.id))
+        : [];
+
+      // Ensure the 4 primary agents always exist in staff
+      const rawStaff: StaffMember[] = Array.isArray(parsed.staff) && parsed.staff.length > 0
+        ? parsed.staff.filter((s: StaffMember) => s.name !== 'Rahul Sharma')
+        : [];
+      INITIAL_STAFF.forEach((agent) => {
+        if (!rawStaff.some((s) => s.name.toLowerCase() === agent.name.toLowerCase())) {
+          rawStaff.push(agent);
+        }
+      });
+      const loadedStaff = rawStaff;
+
+      const finalPurchases = loadedPurchases.length > 0 ? loadedPurchases : INITIAL_PURCHASES;
+      const finalDealers = loadedDealers.length > 0
+        ? loadedDealers
+        : [
+            {
+              id: 'dlr-manisha-lg',
+              name: 'MANISHA ENTERPRISES',
+              phone: '9766911693',
+              totalPurchases: 50956,
+              totalPaid: 0,
+              balanceDue: 50956,
+              lastTransactionDate: '2026-02-25',
+            },
+          ];
 
       return {
         settings: mergedSettings,
         stock: loadedStock,
         customers: loadedCustomers,
-        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-        purchases: Array.isArray(parsed.purchases) ? parsed.purchases : [],
-        dealers: Array.isArray(parsed.dealers) ? parsed.dealers : [],
-        dealerPayments: Array.isArray(parsed.dealerPayments) ? parsed.dealerPayments : [],
-        cardMembers: Array.isArray(parsed.cardMembers) ? parsed.cardMembers : [],
-        cardTransactions: Array.isArray(parsed.cardTransactions) ? parsed.cardTransactions : [],
-        staff: Array.isArray(parsed.staff) ? parsed.staff : INITIAL_STAFF,
-        expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+        transactions: loadedTransactions,
+        purchases: finalPurchases,
+        dealers: finalDealers,
+        dealerPayments: loadedDealerPayments,
+        cardMembers: Array.isArray(parsed.cardMembers)
+        ? parsed.cardMembers.filter((cm: CardMember) => !["cm-1030", "cm-1029", "cm-1021", "cm-1081", "cm-4181", "cm-4302", "cm-4349", "cm-4352", "cm-4398", "cm-4393", "cm-4049"].includes(cm.id))
+        : [],
+        cardTransactions: loadedCardTransactions,
+        staff: loadedStaff,
+        expenses: loadedExpenses,
+        agentAdvances: Array.isArray(parsed.agentAdvances) ? parsed.agentAdvances : [],
+        billReceipts: Array.isArray(parsed.billReceipts) ? parsed.billReceipts : [],
       };
     }
   } catch (e) {
@@ -1150,6 +380,8 @@ export function loadDatabase(): AppDatabase {
     cardTransactions: [],
     staff: INITIAL_STAFF,
     expenses: [],
+    agentAdvances: [],
+    billReceipts: [],
   };
 }
 
@@ -1166,6 +398,7 @@ export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
     cardTransactions: [],
     staff: currentDb.staff && currentDb.staff.length > 0 ? currentDb.staff : INITIAL_STAFF,
     expenses: [],
+    agentAdvances: [],
   };
   saveDatabase(clean);
   return clean;

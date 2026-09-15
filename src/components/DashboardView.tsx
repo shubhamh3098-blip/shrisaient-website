@@ -13,7 +13,17 @@ import {
   ReceiptIndianRupee,
   ArrowUpRight
 } from 'lucide-react';
-import { BusinessSettings, Customer, StockItem, TransactionEntry } from '../types';
+import {
+  BusinessSettings,
+  Customer,
+  StockItem,
+  TransactionEntry,
+  CardTransaction,
+  CardMember,
+  StaffMember,
+  AgentAdvance
+} from '../types';
+import { AgentCollectionDashboardSection } from './AgentCollectionDashboardSection';
 
 interface DashboardViewProps {
   transactions: TransactionEntry[];
@@ -22,6 +32,11 @@ interface DashboardViewProps {
   settings: BusinessSettings;
   onNavigate: (tab: any) => void;
   onOpenInvoiceModal: (entry: TransactionEntry) => void;
+  cardTransactions?: CardTransaction[];
+  cardMembers?: CardMember[];
+  staff?: StaffMember[];
+  agentAdvances?: AgentAdvance[];
+  onOpenAgentCommission?: (agentName: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,6 +46,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   settings,
   onNavigate,
   onOpenInvoiceModal,
+  cardTransactions = [],
+  cardMembers = [],
+  staff = [],
+  agentAdvances = [],
+  onOpenAgentCommission,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -190,6 +210,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 4 Core Agents Daily Collection & Reconcile Hub */}
+      <AgentCollectionDashboardSection
+        cardTransactions={cardTransactions}
+        transactions={transactions}
+        cardMembers={cardMembers}
+        staff={staff}
+        agentAdvances={agentAdvances}
+        settings={settings}
+        onNavigate={onNavigate}
+        onOpenAgentCommission={onOpenAgentCommission}
+      />
 
       {/* Middle section: Recent Transactions & Low Stock Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

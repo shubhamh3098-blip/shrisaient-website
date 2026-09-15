@@ -25,7 +25,9 @@ import {
   Download,
   Database,
   Sun,
-  Moon
+  Moon,
+  Award,
+  Receipt
 } from 'lucide-react';
 import { ActiveTab, BusinessSettings, AuthUser } from '../types';
 import { AppLogo } from './AppLogo';
@@ -69,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard' as ActiveTab, title: 'Dashboard', marathi: 'डॅशबोर्ड', icon: LayoutDashboard },
     { id: 'add-entry' as ActiveTab, title: 'New Bill / Entry', marathi: 'नवीन बिल / पावती', icon: PlusCircle, hasDot: true },
     { id: 'all-entries' as ActiveTab, title: 'All Transactions', marathi: 'सर्व व्यवहार', icon: Clock },
+    { id: 'bill-receipts' as ActiveTab, title: 'Bill Receipts', marathi: 'बिलाच्या जमा पावत्या', icon: Receipt, badge: '#1079' },
     { id: 'card-scheme' as ActiveTab, title: '30-Month Scheme', marathi: 'साप्ताहिक बचत योजना', icon: CreditCard, badge: '30-Mo' },
     { id: 'customers' as ActiveTab, title: 'Customer Khata', marathi: 'ग्राहक खातेवही', icon: Users },
     { id: 'stock' as ActiveTab, title: 'Stock & Inventory', marathi: 'स्टॉक व साहित्य', icon: Package },
@@ -77,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'csv-import' as ActiveTab, title: 'Excel Import', marathi: 'डेटा आयात', icon: FileSpreadsheet },
     { id: 'uploaded-data' as ActiveTab, title: 'Master Search', marathi: 'सर्व डेटा शोध', icon: Database, badge: 'Search' },
     { id: 'staff' as ActiveTab, title: 'Staff & Agents', marathi: 'कर्मचारी व एजंट', icon: UserCheck },
+    { id: 'agent-commission' as ActiveTab, title: 'Agent Commission', marathi: 'एजंट कमिशन व डॅशबोर्ड', icon: Award, badge: '4%' },
     { id: 'expenses' as ActiveTab, title: 'Shop Expenses', marathi: 'दुकान खर्च', icon: ReceiptIndianRupee },
   ];
 

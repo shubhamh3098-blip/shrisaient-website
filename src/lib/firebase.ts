@@ -139,6 +139,8 @@ export async function syncDatabaseToCloud(
         cardTransactions: sanitizeForFirestore(data.cardTransactions),
         staff: sanitizeForFirestore(data.staff),
         expenses: sanitizeForFirestore(data.expenses),
+        agentAdvances: sanitizeForFirestore(data.agentAdvances || []),
+        billReceipts: sanitizeForFirestore(data.billReceipts || []),
       };
 
       await setDoc(storeRef, payload, { merge: true });
@@ -166,7 +168,7 @@ export async function syncDatabaseToCloud(
     await executeSave();
   } else {
     // 2500ms debounce to prevent excessive writes on every stroke
-    saveTimeout = setTimeout(executeSave, 2500);
+    saveTimeout = setTimeout(executeSave, 600);
   }
 }
 
@@ -241,6 +243,8 @@ export function subscribeToCloudDatabase(
               cardTransactions: docData.cardTransactions || [],
               staff: docData.staff || [],
               expenses: docData.expenses || [],
+              agentAdvances: docData.agentAdvances || [],
+              billReceipts: docData.billReceipts || [],
             };
             onDataReceived(parsedData);
             if (onStatusChange) onStatusChange('connected');

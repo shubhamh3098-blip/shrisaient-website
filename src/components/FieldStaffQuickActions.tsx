@@ -35,6 +35,7 @@ import {
   CardSchemeId
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
+import { getNextReceiptNumber } from '../utils/numbering';
 import { CollectionSlipModal } from './CollectionSlipModal';
 import { CardPassbookModal } from './CardPassbookModal';
 
@@ -96,9 +97,15 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   const [collectionWeekNo, setCollectionWeekNo] = useState<number>(1);
   const [collectionMode, setCollectionMode] = useState<'Cash' | 'Online'>('Cash');
   const [agentNameInput, setAgentNameInput] = useState<string>(() => {
-    return localStorage.getItem('active_card_agent') || currentAgentName || 'Staff Agent';
+    return localStorage.getItem('active_card_agent') || currentAgentName || 'Shubham Shende';
   });
+  const [collectionReceiptNo, setCollectionReceiptNo] = useState<string>('');
   const [collectionRemarks, setCollectionRemarks] = useState('');
+
+  // Auto-calculate next receipt number (baseline 1078 -> 1079...)
+  useEffect(() => {
+    setCollectionReceiptNo(getNextReceiptNumber(cardTransactions));
+  }, [cardTransactions, selectedMember]);
 
   // Inline edit state for card member in weekly payment flow
   const [editCustomerName, setEditCustomerName] = useState('');
@@ -414,7 +421,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
       });
     }
 
-    const receiptNo = `CS-${Date.now().toString().slice(-6)}`;
+    const receiptNo = collectionReceiptNo.trim() || getNextReceiptNumber(cardTransactions);
     const newBal = (selectedMember.netBalance || 0) + collectionAmount;
 
     const txPayload: Omit<CardTransaction, 'id' | 'createdAt'> = {
@@ -920,15 +927,33 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                   <CreditCard className="w-4 h-4 text-amber-700" />
                   साप्ताहिक कार्ड कलेक्शन (Week Payment Entry)
                 </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600">स्टाफ / एजंट:</span>
-                  <input
-                    type="text"
-                    value={agentNameInput}
-                    onChange={(e) => setAgentNameInput(e.target.value)}
-                    placeholder="Agent Name"
-                    className="px-2 py-1 bg-white border border-amber-300 rounded-lg font-bold text-slate-800 text-xs w-32 focus:outline-none"
-                  />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 w-full sm:w-auto">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-600">स्टाफ / एजंट:</span>
+                    <input
+                      type="text"
+                      value={agentNameInput}
+                      onChange={(e) => setAgentNameInput(e.target.value)}
+                      placeholder="Agent Name"
+                      className="px-2 py-1 bg-white border border-amber-300 rounded-lg font-bold text-slate-800 text-xs w-36 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 overflow-x-auto pt-1 sm:pt-0">
+                    {['Shubham Shende', 'Bhushan Lidbe', 'Suraj Pendam', 'Ninad Hole'].map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAgentNameInput(a)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition whitespace-nowrap cursor-pointer ${
+                          agentNameInput === a
+                            ? 'bg-amber-700 text-white shadow-2xs'
+                            : 'bg-white/80 hover:bg-white text-slate-700 border border-amber-200'
+                        }`}
+                      >
+                        {a.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1213,8 +1238,21 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                     />
                   </div>
 
-                  {/* Week & Mode */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Receipt No, Week & Mode */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        पावती क्र. (Receipt No) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={collectionReceiptNo}
+                        onChange={(e) => setCollectionReceiptNo(e.target.value)}
+                        placeholder="1079"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold font-mono text-emerald-700 bg-white"
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         आठवडा नं. (Week #)
@@ -1222,7 +1260,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                       <input
                         type="number"
                         min="1"
-                        max="52"
+                        max="130"
                         value={collectionWeekNo}
                         onChange={(e) => setCollectionWeekNo(parseInt(e.target.value) || 1)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"

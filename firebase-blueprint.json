@@ -16,6 +16,8 @@
         "cardTransactions": { "type": "array", "description": "Card deposits and refunds" },
         "staff": { "type": "array", "description": "Staff members" },
         "expenses": { "type": "array", "description": "Expenses" },
+        "agentAdvances": { "type": "array", "description": "Agent advance payments and salary deductions" },
+        "billReceipts": { "type": "array", "description": "Against-bill payment receipts numbered from 1079" },
         "authSessions": { "type": "array", "description": "Recent authenticated login records" },
         "adminUsers": { "type": "array", "description": "Authorized admin and staff credentials" }
       }

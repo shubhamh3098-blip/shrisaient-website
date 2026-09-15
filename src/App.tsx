@@ -15,8 +15,13 @@ import {
   StockItem,
   TransactionEntry,
   AuthUser,
-  UserRole
+  UserRole,
+  AgentAdvance,
+  BillReceiptEntry
 } from './types';
+import {
+  getNextAgainstBillReceiptNumber
+} from './utils/numbering';
 import {
   loadDatabase,
   saveDatabase,
@@ -47,11 +52,13 @@ import { AddEntryView } from './components/AddEntryView';
 import { DashboardView } from './components/DashboardView';
 import { AllEntriesView } from './components/AllEntriesView';
 import { CustomersView } from './components/CustomersView';
+import { BillReceiptsView } from './components/BillReceiptsView';
 import { StockView } from './components/StockView';
 import { PurchasesView } from './components/PurchasesView';
 import { StaffView } from './components/StaffView';
 import { ExpensesView } from './components/ExpensesView';
 import { SettingsView } from './components/SettingsView';
+import { AgentCommissionView } from './components/AgentCommissionView';
 import { InvoiceModal } from './components/InvoiceModal';
 import { CardSchemeView } from './components/CardSchemeView';
 import { DealerLedgerView } from './components/DealerLedgerView';
@@ -121,6 +128,7 @@ export default function App() {
   const [showInstallModal, setShowInstallModal] = useState<boolean>(false);
   const [showFieldQuickActions, setShowFieldQuickActions] = useState<boolean>(false);
   const [fieldQuickActionTab, setFieldQuickActionTab] = useState<FieldActionTab>('card-collection');
+  const [selectedAgentForCommission, setSelectedAgentForCommission] = useState<string>('Shubham Shende');
   const { isInstallable } = usePWAInstall();
   const { theme, toggleTheme } = useTheme();
   
@@ -148,6 +156,7 @@ export default function App() {
         tabParam === 'stock' ||
         tabParam === 'purchases' ||
         tabParam === 'staff' ||
+        tabParam === 'agent-commission' ||
         tabParam === 'expenses' ||
         tabParam === 'settings' ||
         tabParam === 'card-scheme' ||
@@ -244,6 +253,7 @@ export default function App() {
             cardTransactions: remoteData.cardTransactions !== undefined ? remoteData.cardTransactions : prev.cardTransactions,
             staff: remoteData.staff !== undefined ? remoteData.staff : prev.staff,
             expenses: remoteData.expenses !== undefined ? remoteData.expenses : prev.expenses,
+            agentAdvances: remoteData.agentAdvances !== undefined ? remoteData.agentAdvances : prev.agentAdvances,
           }));
           setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
@@ -378,7 +388,7 @@ export default function App() {
     }));
   };
 
-  // Handler: Settle payment from customer
+  // Handler: Settle payment from customer (generates an official Against Bill Receipt)
   const handleSettlePayment = (
     customerId: string,
     amount: number,
@@ -388,14 +398,18 @@ export default function App() {
     setDb((prev) => {
       let customerName = '';
       let customerPhone = '';
+      let prevDue = 0;
+      let newDue = 0;
+
       const updatedCustomers = prev.customers.map((c) => {
         if (c.id === customerId) {
           customerName = c.name;
           customerPhone = c.phone;
-          const newDue = Math.max(0, c.balanceDue - amount);
+          prevDue = c.balanceDue || 0;
+          newDue = Math.max(0, prevDue - amount);
           return {
             ...c,
-            totalPaid: c.totalPaid + amount,
+            totalPaid: (c.totalPaid || 0) + amount,
             balanceDue: newDue,
             lastVisit: new Date().toISOString().split('T')[0],
           };
@@ -403,15 +417,19 @@ export default function App() {
         return c;
       });
 
+      // Compute next sequential receipt number (baseline 1078, so starting from 1079+)
+      const receiptNo = getNextAgainstBillReceiptNumber(prev.billReceipts || [], prev.transactions || []);
+
       // Also record as a payment received entry in ledger
       const paymentReceipt: TransactionEntry = {
         id: `tx-settle-${Date.now()}`,
-        invoiceNo: `REC-${Date.now().toString().slice(-5)}`,
+        invoiceNo: `REC-${receiptNo}`,
         date: new Date().toISOString().split('T')[0],
         customerName,
         customerPhone,
         customerId,
-        itemDetails: `Khata Payment Settlement (${notes || 'Udhar Clearance'})`,
+        agentName: currentUser?.name || 'दुकान काउंटर',
+        itemDetails: `बिलाविरोधात जमा पावती #${receiptNo} (${notes || 'पार्ट पेमेंट / उधारी जमा'})`,
         totalAmount: amount,
         payingNow: amount,
         dueAmount: 0,
@@ -420,12 +438,80 @@ export default function App() {
         createdAt: new Date().toISOString(),
       };
 
+      const billReceiptEntry: BillReceiptEntry = {
+        id: `rcp-${Date.now()}`,
+        receiptNo,
+        date: new Date().toISOString().split('T')[0],
+        customerId,
+        customerName,
+        customerPhone,
+        previousBalance: prevDue,
+        amountPaid: amount,
+        remainingBalance: newDue,
+        paymentMode: mode,
+        agentName: currentUser?.name || 'दुकान काउंटर',
+        notes: notes || 'पार्ट पेमेंट / हप्ता जमा',
+        createdAt: new Date().toISOString(),
+      };
+
       return {
         ...prev,
         customers: updatedCustomers,
         transactions: [paymentReceipt, ...prev.transactions],
+        billReceipts: [billReceiptEntry, ...(prev.billReceipts || [])],
       };
     });
+  };
+
+  // Handler: Save against-bill receipt directly from BillReceiptsView
+  const handleSaveBillReceipt = (receipt: BillReceiptEntry) => {
+    setDb((prev) => {
+      // 1. Update customer's balance and total paid
+      const updatedCustomers = prev.customers.map((c) => {
+        if (c.id === receipt.customerId) {
+          return {
+            ...c,
+            totalPaid: (c.totalPaid || 0) + receipt.amountPaid,
+            balanceDue: Math.max(0, receipt.remainingBalance),
+            lastVisit: receipt.date,
+          };
+        }
+        return c;
+      });
+
+      // 2. Add as transaction for day-end cashbook reconciliation
+      const ledgerEntry: TransactionEntry = {
+        id: `tx-rcp-${Date.now()}`,
+        invoiceNo: `REC-${receipt.receiptNo}`,
+        date: receipt.date,
+        customerName: receipt.customerName,
+        customerPhone: receipt.customerPhone,
+        customerId: receipt.customerId,
+        agentName: receipt.agentName,
+        itemDetails: `बिलाविरोधात जमा पावती #${receipt.receiptNo} (${receipt.againstInvoiceNo ? `बिल क्र. ${receipt.againstInvoiceNo}` : 'पार्ट पेमेंट'})`,
+        totalAmount: receipt.amountPaid,
+        payingNow: receipt.amountPaid,
+        dueAmount: 0,
+        paymentMode: receipt.paymentMode,
+        notes: `बिलाविरोधात जमा: ${receipt.notes || 'भागशः भरणा'}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      return {
+        ...prev,
+        customers: updatedCustomers,
+        transactions: [ledgerEntry, ...prev.transactions],
+        billReceipts: [receipt, ...(prev.billReceipts || [])],
+      };
+    });
+  };
+
+  // Handler: Delete against-bill receipt
+  const handleDeleteBillReceipt = (receiptId: string) => {
+    setDb((prev) => ({
+      ...prev,
+      billReceipts: (prev.billReceipts || []).filter((r) => r.id !== receiptId),
+    }));
   };
 
   const handleRecheckLedgers = () => {
@@ -601,7 +687,7 @@ export default function App() {
     }));
   };
 
-  // Purchases Handlers (with automatic Dealer Ledger Synchronization)
+  // Purchases Handlers (with automatic Dealer Ledger & Stock Synchronization)
   const handleAddPurchase = (purchaseData: Omit<PurchaseEntry, 'id'>) => {
     const newPurchase: PurchaseEntry = {
       ...purchaseData,
@@ -609,7 +695,7 @@ export default function App() {
     };
 
     setDb((prev) => {
-      // Sync with dealer ledger
+      // 1. Sync with dealer ledger
       const supplier = purchaseData.supplierName.trim();
       let dealerExists = false;
       const updatedDealers = (prev.dealers || []).map((d) => {
@@ -632,7 +718,7 @@ export default function App() {
         updatedDealers.push({
           id: `dlr-${Date.now()}`,
           name: supplier,
-          phone: '',
+          phone: purchaseData.supplierPhone || '',
           totalPurchases: purchaseData.totalAmount,
           totalPaid: purchaseData.paidAmount,
           balanceDue: Math.max(0, purchaseData.totalAmount - purchaseData.paidAmount),
@@ -640,10 +726,46 @@ export default function App() {
         });
       }
 
+      // 2. Auto-sync with Inventory Stock if itemsDetail are provided
+      let updatedStock = [...prev.stock];
+      if (purchaseData.itemsDetail && purchaseData.itemsDetail.length > 0) {
+        purchaseData.itemsDetail.forEach((item) => {
+          const existingStockIdx = updatedStock.findIndex(
+            (s) => s.name.trim().toLowerCase() === item.description.trim().toLowerCase()
+          );
+
+          if (existingStockIdx >= 0) {
+            const currentItem = updatedStock[existingStockIdx];
+            updatedStock[existingStockIdx] = {
+              ...currentItem,
+              quantity: currentItem.quantity + item.qty,
+              purchasePrice: item.rate,
+              description: item.serialNumbers && item.serialNumbers.length > 0
+                ? `${currentItem.description || ''} | Batch: ${item.serialNumbers.join(', ')}`.trim()
+                : currentItem.description,
+            };
+          } else {
+            updatedStock.push({
+              id: `stock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              name: item.description,
+              code: item.hsn || `LG-${Date.now().toString().slice(-4)}`,
+              category: 'Home Appliances & Electronics',
+              quantity: item.qty,
+              unit: 'Pcs',
+              purchasePrice: item.rate,
+              sellingPrice: Math.round(item.rate * 1.15),
+              minStockLevel: 1,
+              description: `Procured from ${supplier} (Inv #${purchaseData.billNo}). Serials: ${(item.serialNumbers || []).join(', ')}`,
+            });
+          }
+        });
+      }
+
       return {
         ...prev,
         purchases: [newPurchase, ...prev.purchases],
         dealers: updatedDealers,
+        stock: updatedStock,
       };
     });
   };
@@ -1005,6 +1127,18 @@ export default function App() {
     }));
   };
 
+  const handleRecordAgentAdvance = (advanceData: Omit<AgentAdvance, 'id' | 'createdAt'>) => {
+    const newAdvance: AgentAdvance = {
+      ...advanceData,
+      id: `adv-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setDb((prev) => ({
+      ...prev,
+      agentAdvances: [newAdvance, ...(prev.agentAdvances || [])],
+    }));
+  };
+
   // Expenses Handlers
   const handleAddExpense = (expData: Omit<ExpenseEntry, 'id'>) => {
     const newExp: ExpenseEntry = {
@@ -1090,6 +1224,7 @@ export default function App() {
         dealerPayments: INITIAL_DEALER_PAYMENTS,
         cardMembers: INITIAL_CARD_MEMBERS,
         cardTransactions: INITIAL_CARD_TRANSACTIONS,
+        agentAdvances: [],
       };
       setDb(sampleDb);
       saveDatabase(sampleDb);
@@ -1113,6 +1248,7 @@ export default function App() {
       cardTransactions: [],
       staff: db.staff && db.staff.length > 0 ? db.staff : INITIAL_STAFF,
       expenses: [],
+      agentAdvances: [],
     };
 
     // 1. Immediately update React state to clear all views instantly
@@ -1447,11 +1583,13 @@ export default function App() {
           }}
           onOpenCustomerKhata={() => setActiveTab('customers')}
           onOpenSalesBill={() => setActiveTab('add-entry')}
+          onOpenBillReceipts={() => setActiveTab('bill-receipts')}
           onOpenReceivePayment={() => {
             setFieldQuickActionTab('settle-khata');
             setShowFieldQuickActions(true);
           }}
           onOpenMasterSearch={() => setActiveTab('uploaded-data')}
+          onOpenAgentCommission={() => setActiveTab('agent-commission')}
         />
 
         {/* View Switcher */}
@@ -1462,8 +1600,16 @@ export default function App() {
               customers={db.customers}
               stock={db.stock}
               settings={db.settings}
+              cardTransactions={db.cardTransactions || []}
+              cardMembers={db.cardMembers || []}
+              staff={db.staff || []}
+              agentAdvances={db.agentAdvances || []}
               onNavigate={setActiveTab}
               onOpenInvoiceModal={setSelectedInvoice}
+              onOpenAgentCommission={(agentName) => {
+                if (agentName) setSelectedAgentForCommission(agentName);
+                setActiveTab('agent-commission');
+              }}
             />
           )}
 
@@ -1477,6 +1623,7 @@ export default function App() {
               todaysTransactions={db.transactions.filter(
                 (t) => t.date === new Date().toISOString().split('T')[0]
               )}
+              allTransactions={db.transactions}
               onOpenInvoiceModal={setSelectedInvoice}
             />
           )}
@@ -1557,6 +1704,17 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'bill-receipts' && (
+            <BillReceiptsView
+              billReceipts={db.billReceipts || []}
+              customers={db.customers}
+              transactions={db.transactions}
+              settings={db.settings}
+              onSaveReceipt={handleSaveBillReceipt}
+              onDeleteReceipt={handleDeleteBillReceipt}
+            />
+          )}
+
           {activeTab === 'customers' && (
             <CustomersView
               customers={db.customers}
@@ -1582,6 +1740,7 @@ export default function App() {
             <PurchasesView
               purchases={db.purchases}
               dealers={db.dealers || []}
+              settings={db.settings}
               onAddPurchase={handleAddPurchase}
               onNavigateDealerLedger={(dealerName) => {
                 setSelectedDealerForLedger(dealerName);
@@ -1596,6 +1755,18 @@ export default function App() {
               onAddStaff={handleAddStaff}
               onUpdateAttendance={handleUpdateAttendance}
               onRecordAdvance={handleRecordAdvance}
+            />
+          )}
+
+          {activeTab === 'agent-commission' && (
+            <AgentCommissionView
+              cardTransactions={db.cardTransactions || []}
+              cardMembers={db.cardMembers || []}
+              agentAdvances={db.agentAdvances || []}
+              settings={db.settings}
+              onRecordAdvance={handleRecordAgentAdvance}
+              onRefreshSync={handleManualCloudSync}
+              currentAgentFilter={selectedAgentForCommission}
             />
           )}
 

@@ -91,11 +91,33 @@ export interface TransactionEntry {
   stockItemId?: string;
   stockItemName?: string;
   quantity?: number;
+  serialNumber?: string;
+  docType?: 'invoice' | 'quotation';
+  agentName?: string;
   itemDetails: string;
   totalAmount: number;
   payingNow: number;
   dueAmount: number; // totalAmount - payingNow
   paymentMode: 'Cash' | 'Online';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface BillReceiptEntry {
+  id: string;
+  receiptNo: string; // Sequence: 1078, 1079, 1080...
+  date: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerVillage?: string;
+  againstInvoiceNo?: string; // Reference bill number e.g. "3848", "B-201"
+  billTotal?: number;
+  previousBalance: number; // आधीची बाकी
+  amountPaid: number; // आज जमा केलेली रक्कम
+  remainingBalance: number; // शिल्लक बाकी
+  paymentMode: 'Cash' | 'Online';
+  agentName?: string; // Shubham Shende, Bhushan Lidbe, Suraj Pendam, Ninad Hole, Counter
   notes?: string;
   createdAt: string;
 }
@@ -129,17 +151,78 @@ export interface StockItem {
   description?: string;
 }
 
+export interface PurchaseItemDetail {
+  id: string;
+  description: string;
+  hsn: string;
+  qty: number;
+  rate: number;
+  discount: number;
+  taxableAmount: number;
+  taxRate: number;
+  cgstRate: number;
+  cgstAmount: number;
+  sgstRate: number;
+  sgstAmount: number;
+  igstRate?: number;
+  igstAmount?: number;
+  taxAmount: number;
+  totalAmount: number;
+  serialNumbers?: string[];
+}
+
 export interface PurchaseEntry {
   id: string;
   billNo: string;
   date: string;
   supplierName: string;
+  supplierAddress?: string;
+  supplierPhone?: string;
+  supplierGstin?: string;
+  supplierState?: string;
+  
+  // Buyer Details
+  buyerName?: string;
+  buyerGstin?: string;
+  buyerAddress?: string;
+  
+  // Order & Logistics
+  poNo?: string;
+  poDate?: string;
+  location?: string;
+  salesConsultant?: string;
+  approvedBy?: string;
+  transporter?: string;
+  vehicleNo?: string;
+  ewayBillNo?: string;
+  irn?: string;
+
+  // Items
   items: string;
+  itemsDetail?: PurchaseItemDetail[];
+
+  // Financials & Tax
+  subtotal?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTax?: number;
   totalAmount: number;
   paidAmount: number;
   status: 'Paid' | 'Partial' | 'Pending';
   paymentMode: 'Cash' | 'Online' | 'Cheque';
+  
+  // Supplier Bank Details
+  supplierBank?: {
+    accountName?: string;
+    accountNo?: string;
+    ifscCode?: string;
+    bankName?: string;
+    branch?: string;
+  };
+
   notes?: string;
+  autoUpdateStock?: boolean;
 }
 
 export interface StaffMember {
@@ -160,6 +243,16 @@ export interface ExpenseEntry {
   description: string;
   amount: number;
   paymentMode: 'Cash' | 'Online';
+}
+
+export interface AgentAdvance {
+  id: string;
+  agentName: string;
+  date: string;
+  amount: number;
+  paymentMode: 'Cash' | 'Online';
+  notes?: string;
+  createdAt: string;
 }
 
 export interface DeliveryRatesConfig {
@@ -220,6 +313,7 @@ export type ActiveTab =
   | 'dashboard'
   | 'add-entry'
   | 'all-entries'
+  | 'bill-receipts'
   | 'card-scheme'
   | 'customers'
   | 'stock'
@@ -228,6 +322,7 @@ export type ActiveTab =
   | 'csv-import'
   | 'uploaded-data'
   | 'staff'
+  | 'agent-commission'
   | 'expenses'
   | 'settings';
 

@@ -39,6 +39,7 @@ import {
   StaffMember
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
+import { getNextReceiptNumber } from '../utils/numbering';
 import { CardPassbookModal } from './CardPassbookModal';
 import { CollectionSlipModal } from './CollectionSlipModal';
 
@@ -138,7 +139,13 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [paymentWeekNo, setPaymentWeekNo] = useState<number>(1);
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [paymentAgentName, setPaymentAgentName] = useState(activeAgent);
+  const [paymentReceiptNo, setPaymentReceiptNo] = useState<string>('');
   const [paymentRemarks, setPaymentRemarks] = useState('');
+
+  // Auto-calculate next receipt number (baseline 1078 -> 1079...)
+  useEffect(() => {
+    setPaymentReceiptNo(getNextReceiptNumber(transactions));
+  }, [transactions, showPaymentModal]);
 
   // Inline Member Edit State while collecting weekly payment (नाव, मोबाईल, गाव, शीट बदल)
   const [editCustomerName, setEditCustomerName] = useState('');
@@ -233,7 +240,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       .map((m) => m.agentName?.trim())
       .filter((a): a is string => Boolean(a && a.length > 0));
     const fromStaff = staff.map((s) => s.name.trim());
-    const defaults = ['Rahul Sharma', 'Sachin Deshmukh', 'Pooja Patil'];
+    const defaults = ['Shubham Shende', 'Bhushan Lidbe', 'Suraj Pendam', 'Ninad Hole'];
     return Array.from(new Set([...defaults, ...fromStaff, ...fromMembers])).sort();
   }, [members, staff]);
 
@@ -411,7 +418,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       sheetNo: finalSheetNo,
     };
 
-    const receiptNo = `REC-${paymentSelectedCard.cardNumber}-${Date.now().toString().slice(-4)}`;
+    const receiptNo = paymentReceiptNo.trim() || getNextReceiptNumber(transactions);
     const newBalance = (paymentSelectedCard.netBalance || 0) + paymentAmount;
     const date = new Date().toISOString().split('T')[0];
     const finalAgent = paymentAgentName.trim() || activeAgent;
@@ -1756,8 +1763,21 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     />
                   </div>
 
-                  {/* Week Number & Mode */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Receipt No, Week Number & Mode */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        पावती नं (Receipt No) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={paymentReceiptNo}
+                        onChange={(e) => setPaymentReceiptNo(e.target.value)}
+                        placeholder="1079"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold text-emerald-700 bg-white"
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Week Number
@@ -1765,7 +1785,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       <input
                         type="number"
                         min="1"
-                        max="52"
+                        max="130"
                         value={paymentWeekNo}
                         onChange={(e) => setPaymentWeekNo(parseInt(e.target.value) || 1)}
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold"
