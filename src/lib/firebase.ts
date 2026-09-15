@@ -124,26 +124,93 @@ export async function syncDatabaseToCloud(
 
     try {
       const storeRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
-      const payload = {
+      const payload: Record<string, any> = {
         updatedAt: new Date().toISOString(),
         serverTime: serverTimestamp(),
         domain: 'shrisaient.in',
         settings: sanitizeForFirestore(data.settings),
         stock: sanitizeForFirestore(data.stock),
-        customers: sanitizeForFirestore(data.customers),
-        transactions: sanitizeForFirestore(data.transactions),
-        purchases: sanitizeForFirestore(data.purchases),
         dealers: sanitizeForFirestore(data.dealers),
         dealerPayments: sanitizeForFirestore(data.dealerPayments),
-        cardMembers: sanitizeForFirestore(data.cardMembers),
-        cardTransactions: sanitizeForFirestore(data.cardTransactions),
+        purchases: sanitizeForFirestore(data.purchases),
         staff: sanitizeForFirestore(data.staff),
         expenses: sanitizeForFirestore(data.expenses),
         agentAdvances: sanitizeForFirestore(data.agentAdvances || []),
-        billReceipts: sanitizeForFirestore(data.billReceipts || []),
       };
 
-      await setDoc(storeRef, payload, { merge: true });
+      // Also include in main doc if compact (< 150 items) for backward compatibility
+      if (data.customers && data.customers.length <= 150) {
+        payload.customers = sanitizeForFirestore(data.customers);
+      }
+      if (data.transactions && data.transactions.length <= 150) {
+        payload.transactions = sanitizeForFirestore(data.transactions);
+      }
+      if (data.cardMembers && data.cardMembers.length <= 150) {
+        payload.cardMembers = sanitizeForFirestore(data.cardMembers);
+      }
+      if (data.cardTransactions && data.cardTransactions.length <= 150) {
+        payload.cardTransactions = sanitizeForFirestore(data.cardTransactions);
+      }
+      if (data.billReceipts && data.billReceipts.length <= 150) {
+        payload.billReceipts = sanitizeForFirestore(data.billReceipts);
+      }
+
+      const savePromises: Promise<any>[] = [
+        setDoc(storeRef, payload, { merge: true }),
+      ];
+
+      // Partition large collections into dedicated documents to completely avoid 1MB limits
+      if (data.cardTransactions && data.cardTransactions.length > 0) {
+        savePromises.push(
+          setDoc(
+            doc(firestore, 'stores', 'data_card_transactions'),
+            { items: sanitizeForFirestore(data.cardTransactions), updatedAt: new Date().toISOString() },
+            { merge: true }
+          )
+        );
+      }
+
+      if (data.transactions && data.transactions.length > 0) {
+        savePromises.push(
+          setDoc(
+            doc(firestore, 'stores', 'data_transactions'),
+            { items: sanitizeForFirestore(data.transactions), updatedAt: new Date().toISOString() },
+            { merge: true }
+          )
+        );
+      }
+
+      if (data.cardMembers && data.cardMembers.length > 0) {
+        savePromises.push(
+          setDoc(
+            doc(firestore, 'stores', 'data_card_members'),
+            { items: sanitizeForFirestore(data.cardMembers), updatedAt: new Date().toISOString() },
+            { merge: true }
+          )
+        );
+      }
+
+      if (data.customers && data.customers.length > 0) {
+        savePromises.push(
+          setDoc(
+            doc(firestore, 'stores', 'data_customers'),
+            { items: sanitizeForFirestore(data.customers), updatedAt: new Date().toISOString() },
+            { merge: true }
+          )
+        );
+      }
+
+      if (data.billReceipts && data.billReceipts.length > 0) {
+        savePromises.push(
+          setDoc(
+            doc(firestore, 'stores', 'data_bill_receipts'),
+            { items: sanitizeForFirestore(data.billReceipts), updatedAt: new Date().toISOString() },
+            { merge: true }
+          )
+        );
+      }
+
+      await Promise.allSettled(savePromises);
       if (onStatusChange) onStatusChange('connected');
     } catch (err: any) {
       const isQuota = 
@@ -221,33 +288,67 @@ export function subscribeToCloudDatabase(
   if (onStatusChange) onStatusChange('syncing');
 
   const storeRef = doc(firestore, 'stores', 'shri_sai_enterprise_main');
+  const cardTxRef = doc(firestore, 'stores', 'data_card_transactions');
+  const txRef = doc(firestore, 'stores', 'data_transactions');
+  const membersRef = doc(firestore, 'stores', 'data_card_members');
+  const custRef = doc(firestore, 'stores', 'data_customers');
+  const rcpRef = doc(firestore, 'stores', 'data_bill_receipts');
 
-  let unsubscribe = () => {};
+  const currentCloudData: AppDatabase = {
+    settings: undefined,
+    stock: [],
+    customers: [],
+    transactions: [],
+    purchases: [],
+    dealers: [],
+    dealerPayments: [],
+    cardMembers: [],
+    cardTransactions: [],
+    staff: [],
+    expenses: [],
+    agentAdvances: [],
+    billReceipts: [],
+  };
+
+  const unsubs: (() => void)[] = [];
+
+  const notify = () => {
+    onDataReceived({ ...currentCloudData });
+    if (onStatusChange) onStatusChange('connected');
+  };
 
   try {
-    unsubscribe = onSnapshot(
+    const u1 = onSnapshot(
       storeRef,
       (snapshot) => {
         if (snapshot.exists()) {
           const docData = snapshot.data();
           if (docData) {
-            const parsedData: AppDatabase = {
-              settings: docData.settings || undefined,
-              stock: docData.stock || [],
-              customers: docData.customers || [],
-              transactions: docData.transactions || [],
-              purchases: docData.purchases || [],
-              dealers: docData.dealers || [],
-              dealerPayments: docData.dealerPayments || [],
-              cardMembers: docData.cardMembers || [],
-              cardTransactions: docData.cardTransactions || [],
-              staff: docData.staff || [],
-              expenses: docData.expenses || [],
-              agentAdvances: docData.agentAdvances || [],
-              billReceipts: docData.billReceipts || [],
-            };
-            onDataReceived(parsedData);
-            if (onStatusChange) onStatusChange('connected');
+            currentCloudData.settings = docData.settings || currentCloudData.settings;
+            currentCloudData.stock = docData.stock || currentCloudData.stock;
+            currentCloudData.purchases = docData.purchases || currentCloudData.purchases;
+            currentCloudData.dealers = docData.dealers || currentCloudData.dealers;
+            currentCloudData.dealerPayments = docData.dealerPayments || currentCloudData.dealerPayments;
+            currentCloudData.staff = docData.staff || currentCloudData.staff;
+            currentCloudData.expenses = docData.expenses || currentCloudData.expenses;
+            currentCloudData.agentAdvances = docData.agentAdvances || currentCloudData.agentAdvances;
+
+            if ((!currentCloudData.cardTransactions || currentCloudData.cardTransactions.length === 0) && docData.cardTransactions) {
+              currentCloudData.cardTransactions = docData.cardTransactions;
+            }
+            if ((!currentCloudData.transactions || currentCloudData.transactions.length === 0) && docData.transactions) {
+              currentCloudData.transactions = docData.transactions;
+            }
+            if ((!currentCloudData.customers || currentCloudData.customers.length === 0) && docData.customers) {
+              currentCloudData.customers = docData.customers;
+            }
+            if ((!currentCloudData.cardMembers || currentCloudData.cardMembers.length === 0) && docData.cardMembers) {
+              currentCloudData.cardMembers = docData.cardMembers;
+            }
+            if ((!currentCloudData.billReceipts || currentCloudData.billReceipts.length === 0) && docData.billReceipts) {
+              currentCloudData.billReceipts = docData.billReceipts;
+            }
+            notify();
           }
         } else {
           if (onStatusChange) onStatusChange('connected');
@@ -263,11 +364,7 @@ export function subscribeToCloudDatabase(
           error?.message?.includes('resource-exhausted');
 
         if (isQuota) {
-          try {
-            unsubscribe();
-          } catch (e) {}
           markQuotaExhausted();
-          console.warn('Firestore: Daily write quota reached. Switched to safe Local Storage.');
           if (onStatusChange) onStatusChange('offline', 'Operating in safe Local Storage mode.');
         } else {
           console.warn('Firestore subscription notice:', error.message);
@@ -275,10 +372,73 @@ export function subscribeToCloudDatabase(
         }
       }
     );
+    unsubs.push(u1);
+
+    const u2 = onSnapshot(cardTxRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const d = snapshot.data();
+        if (d && Array.isArray(d.items)) {
+          currentCloudData.cardTransactions = d.items;
+          notify();
+        }
+      }
+    });
+    unsubs.push(u2);
+
+    const u3 = onSnapshot(txRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const d = snapshot.data();
+        if (d && Array.isArray(d.items)) {
+          currentCloudData.transactions = d.items;
+          notify();
+        }
+      }
+    });
+    unsubs.push(u3);
+
+    const u4 = onSnapshot(membersRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const d = snapshot.data();
+        if (d && Array.isArray(d.items)) {
+          currentCloudData.cardMembers = d.items;
+          notify();
+        }
+      }
+    });
+    unsubs.push(u4);
+
+    const u5 = onSnapshot(custRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const d = snapshot.data();
+        if (d && Array.isArray(d.items)) {
+          currentCloudData.customers = d.items;
+          notify();
+        }
+      }
+    });
+    unsubs.push(u5);
+
+    const u6 = onSnapshot(rcpRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const d = snapshot.data();
+        if (d && Array.isArray(d.items)) {
+          currentCloudData.billReceipts = d.items;
+          notify();
+        }
+      }
+    });
+    unsubs.push(u6);
+
   } catch (err: any) {
     console.warn('Firestore listener notice:', err);
     if (onStatusChange) onStatusChange('offline', err?.message || 'Offline mode');
   }
 
-  return unsubscribe;
+  return () => {
+    unsubs.forEach((u) => {
+      try {
+        u();
+      } catch (_) {}
+    });
+  };
 }

@@ -206,28 +206,69 @@ export default function App() {
     );
   };
 
+  const lastImportTimeRef = useRef<number>(0);
+  const isResettingRef = useRef<boolean>(false);
+
+  // Helper: safely merges remote/idb items into local state without ever wiping out existing local data
+  const safeMergeCollections = <T extends Record<string, any>>(
+    localList: T[] = [],
+    remoteList: T[] = [],
+    getKey: (item: T) => string
+  ): T[] => {
+    // If remote is empty, NEVER wipe out local list!
+    if (!remoteList || remoteList.length === 0) {
+      return localList || [];
+    }
+    // If local is empty, take remote
+    if (!localList || localList.length === 0) {
+      return remoteList;
+    }
+
+    const map = new Map<string, T>();
+    // 1. Put remote entries first
+    remoteList.forEach((item) => {
+      const key = getKey(item);
+      if (key) map.set(key, item);
+    });
+    // 2. Local entries take precedence (prevents stale remote/idb from downgrading freshly imported data)
+    localList.forEach((item) => {
+      const key = getKey(item);
+      if (key) {
+        const existing = map.get(key);
+        map.set(key, existing ? { ...existing, ...item } : item);
+      }
+    });
+
+    return Array.from(map.values());
+  };
+
   // 0. Load comprehensive state from IndexedDB on startup (bypasses localStorage 5MB quota)
   useEffect(() => {
     let isMounted = true;
     loadDatabaseFromIndexedDB().then((idbData) => {
-      if (!isMounted || !idbData) return;
+      if (!isMounted || !idbData || isResettingRef.current) return;
       setDb((prev) => {
-        // If IndexedDB has more complete datasets, merge them in
-        const idbCustCount = idbData.customers?.length || 0;
-        const prevCustCount = prev.customers?.length || 0;
-        const idbTxCount = idbData.transactions?.length || 0;
-        const prevTxCount = prev.transactions?.length || 0;
-        const idbCardTxCount = idbData.cardTransactions?.length || 0;
-        const prevCardTxCount = prev.cardTransactions?.length || 0;
-
-        if (idbCustCount >= prevCustCount || idbTxCount >= prevTxCount || idbCardTxCount >= prevCardTxCount) {
-          return {
-            ...prev,
-            ...idbData,
-            settings: { ...prev.settings, ...(idbData.settings || {}) },
-          };
+        // If a local import just happened in the last 60 seconds, do not let older IDB state overwrite it
+        const isRecent = (Date.now() - lastImportTimeRef.current) < 60000;
+        if (isRecent) {
+          return prev;
         }
-        return prev;
+
+        return {
+          ...prev,
+          settings: { ...prev.settings, ...(idbData.settings || {}) },
+          stock: safeMergeCollections(prev.stock || [], idbData.stock || [], (s) => s.id || s.name),
+          customers: safeMergeCollections(prev.customers || [], idbData.customers || [], (c) => c.id || c.phone || c.name),
+          transactions: safeMergeCollections(prev.transactions || [], idbData.transactions || [], (t) => t.invoiceNo || t.id),
+          cardTransactions: safeMergeCollections(prev.cardTransactions || [], idbData.cardTransactions || [], (ct) => ct.receiptNo || ct.id),
+          cardMembers: safeMergeCollections(prev.cardMembers || [], idbData.cardMembers || [], (cm) => `${cm.schemeId}_${cm.cardNumber}`),
+          billReceipts: safeMergeCollections(prev.billReceipts || [], idbData.billReceipts || [], (br) => br.receiptNo || br.id),
+          dealers: safeMergeCollections(prev.dealers || [], idbData.dealers || [], (d) => d.id || d.name),
+          purchases: safeMergeCollections(prev.purchases || [], idbData.purchases || [], (p) => p.billNo || p.id),
+          dealerPayments: safeMergeCollections(prev.dealerPayments || [], idbData.dealerPayments || [], (dp) => dp.id || ''),
+          expenses: safeMergeCollections(prev.expenses || [], idbData.expenses || [], (e) => e.id || ''),
+          agentAdvances: safeMergeCollections(prev.agentAdvances || [], idbData.agentAdvances || [], (a) => a.id || ''),
+        };
       });
     });
     return () => {
@@ -239,22 +280,106 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToCloudDatabase(
       (remoteData) => {
-        if (remoteData) {
+        if (remoteData && !isResettingRef.current) {
           isRemoteUpdateRef.current = true;
-          setDb((prev) => ({
-            settings: remoteData.settings ? { ...prev.settings, ...remoteData.settings } : prev.settings,
-            stock: remoteData.stock !== undefined ? remoteData.stock : prev.stock,
-            customers: remoteData.customers !== undefined ? remoteData.customers : prev.customers,
-            transactions: remoteData.transactions !== undefined ? remoteData.transactions : prev.transactions,
-            purchases: remoteData.purchases !== undefined ? remoteData.purchases : prev.purchases,
-            dealers: remoteData.dealers !== undefined ? remoteData.dealers : prev.dealers,
-            dealerPayments: remoteData.dealerPayments !== undefined ? remoteData.dealerPayments : prev.dealerPayments,
-            cardMembers: remoteData.cardMembers !== undefined ? remoteData.cardMembers : prev.cardMembers,
-            cardTransactions: remoteData.cardTransactions !== undefined ? remoteData.cardTransactions : prev.cardTransactions,
-            staff: remoteData.staff !== undefined ? remoteData.staff : prev.staff,
-            expenses: remoteData.expenses !== undefined ? remoteData.expenses : prev.expenses,
-            agentAdvances: remoteData.agentAdvances !== undefined ? remoteData.agentAdvances : prev.agentAdvances,
-          }));
+          setDb((prev) => {
+            const mergedTransactions = safeMergeCollections(
+              prev.transactions || [],
+              remoteData.transactions || [],
+              (t) => (t.invoiceNo ? `inv_${t.invoiceNo.toLowerCase().trim()}` : t.id || '')
+            );
+
+            const mergedCardTransactions = safeMergeCollections(
+              prev.cardTransactions || [],
+              remoteData.cardTransactions || [],
+              (ct) => (ct.receiptNo ? `rcpt_${ct.receiptNo}` : ct.id || '')
+            );
+
+            const mergedCardMembers = safeMergeCollections(
+              prev.cardMembers || [],
+              remoteData.cardMembers || [],
+              (cm) => (cm.schemeId && cm.cardNumber ? `${cm.schemeId}_${cm.cardNumber}` : cm.id || '')
+            );
+
+            const mergedCustomers = safeMergeCollections(
+              prev.customers || [],
+              remoteData.customers || [],
+              (c) => (c.phone && c.phone.length >= 10 ? `p_${c.phone}` : (c.id || c.name.toLowerCase().trim()))
+            );
+
+            const mergedBillReceipts = safeMergeCollections(
+              prev.billReceipts || [],
+              remoteData.billReceipts || [],
+              (br) => (br.receiptNo ? `br_${br.receiptNo}` : br.id || '')
+            );
+
+            const mergedStock = safeMergeCollections(
+              prev.stock || [],
+              remoteData.stock || [],
+              (s) => s.id || s.name.toLowerCase().trim()
+            );
+
+            const mergedPurchases = safeMergeCollections(
+              prev.purchases || [],
+              remoteData.purchases || [],
+              (p) => (p.billNo ? `p_${p.billNo.toLowerCase().trim()}` : p.id || '')
+            );
+
+            const mergedDealers = safeMergeCollections(
+              prev.dealers || [],
+              remoteData.dealers || [],
+              (d) => d.id || d.name.toLowerCase().trim()
+            );
+
+            const mergedDealerPayments = safeMergeCollections(
+              prev.dealerPayments || [],
+              remoteData.dealerPayments || [],
+              (dp) => dp.id || ''
+            );
+
+            const mergedExpenses = safeMergeCollections(
+              prev.expenses || [],
+              remoteData.expenses || [],
+              (e) => e.id || ''
+            );
+
+            const mergedAgentAdvances = safeMergeCollections(
+              prev.agentAdvances || [],
+              remoteData.agentAdvances || [],
+              (a) => a.id || ''
+            );
+
+            const updated: AppDatabase = {
+              ...prev,
+              settings: remoteData.settings ? { ...prev.settings, ...remoteData.settings } : prev.settings,
+              stock: mergedStock,
+              customers: mergedCustomers,
+              transactions: mergedTransactions,
+              purchases: mergedPurchases,
+              dealers: mergedDealers,
+              dealerPayments: mergedDealerPayments,
+              cardMembers: mergedCardMembers,
+              cardTransactions: mergedCardTransactions,
+              staff: remoteData.staff && remoteData.staff.length > 0 ? remoteData.staff : prev.staff,
+              expenses: mergedExpenses,
+              agentAdvances: mergedAgentAdvances,
+              billReceipts: mergedBillReceipts,
+            };
+
+            // If local data had more items than remote, bring Cloud up-to-date
+            const hadMoreLocal =
+              (prev.transactions?.length || 0) > (remoteData.transactions?.length || 0) ||
+              (prev.cardTransactions?.length || 0) > (remoteData.cardTransactions?.length || 0) ||
+              (prev.cardMembers?.length || 0) > (remoteData.cardMembers?.length || 0) ||
+              (prev.customers?.length || 0) > (remoteData.customers?.length || 0) ||
+              (prev.billReceipts?.length || 0) > (remoteData.billReceipts?.length || 0);
+
+            if (hadMoreLocal) {
+              syncDatabaseToCloud(updated, setCloudStatus, true);
+            }
+
+            return updated;
+          });
           setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
       },
@@ -952,11 +1077,16 @@ export default function App() {
         }
       });
 
-      return {
+      const updatedDb: AppDatabase = {
         ...prev,
         transactions: existingTransactions,
         customers: updatedCustomers,
       };
+      lastImportTimeRef.current = Date.now();
+      saveDatabase(updatedDb);
+      saveDatabaseToIndexedDB(updatedDb);
+      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
+      return updatedDb;
     });
   };
 
@@ -1091,13 +1221,18 @@ export default function App() {
         });
       });
 
-      return {
+      const updatedDb: AppDatabase = {
         ...prev,
         transactions: [...newLedgerTransactions, ...updatedTransactions],
         cardTransactions: [...newReceipts, ...(prev.cardTransactions || [])],
         billReceipts: [...newBillReceipts, ...existingBillReceipts],
         customers: updatedCustomers,
       };
+      lastImportTimeRef.current = Date.now();
+      saveDatabase(updatedDb);
+      saveDatabaseToIndexedDB(updatedDb);
+      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
+      return updatedDb;
     });
   };
 
@@ -1124,10 +1259,15 @@ export default function App() {
           existing.push(nc);
         }
       });
-      return {
+      const updatedDb: AppDatabase = {
         ...prev,
         cardMembers: existing,
       };
+      lastImportTimeRef.current = Date.now();
+      saveDatabase(updatedDb);
+      saveDatabaseToIndexedDB(updatedDb);
+      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
+      return updatedDb;
     });
   };
 
@@ -1146,11 +1286,16 @@ export default function App() {
         }
       });
 
-      return {
+      const updatedDb: AppDatabase = {
         ...prev,
         purchases: [...newPurchases, ...prev.purchases],
         dealers: currentDealers,
       };
+      lastImportTimeRef.current = Date.now();
+      saveDatabase(updatedDb);
+      saveDatabaseToIndexedDB(updatedDb);
+      syncDatabaseToCloud(updatedDb, setCloudStatus, true);
+      return updatedDb;
     });
   };
 
@@ -1297,6 +1442,7 @@ export default function App() {
 
     // FULL RESET (पूर्ण डेटा गायब / रिसेट):
     // सर्व ग्राहक, बिले, कार्ड्स, हप्ते, खरेदी, डीलर व खर्च पूर्णपणे रिकामे (0 records, ₹0 balance)
+    isResettingRef.current = true;
     const cleanDb: AppDatabase = {
       settings: db.settings || DEFAULT_SETTINGS,
       stock: [],
@@ -1334,6 +1480,9 @@ export default function App() {
     } catch (e) {
       console.warn('Cloud reset error:', e);
     }
+    setTimeout(() => {
+      isResettingRef.current = false;
+    }, 5000);
   };
 
   if (appMode === 'shop') {
