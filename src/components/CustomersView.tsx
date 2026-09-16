@@ -91,9 +91,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   const [selectedDuplicatePairId, setSelectedDuplicatePairId] = useState<string | undefined>(undefined);
   const [dismissedPairIds, setDismissedPairIds] = useState<Set<string>>(new Set());
 
-  const duplicatePairs = useMemo(() => {
-    return detectDuplicateCustomers(customers || [], dismissedPairIds);
-  }, [customers, dismissedPairIds]);
+const duplicatePairs = useMemo(() => {
+  return detectDuplicateCustomers(customers || [], dismissedPairIds);
+}, [customers, dismissedPairIds]);
 
   // Add customer form states
   const [newName, setNewName] = useState('');
