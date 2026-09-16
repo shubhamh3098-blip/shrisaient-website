@@ -1,5 +1,13 @@
 import { Customer } from '../types';
-import { DuplicatePair } from '../components/DuplicateCustomerMergeModal';
+
+// Standalone interface to prevent circular dependency
+export interface DuplicatePair {
+  id: string;
+  custA: Customer;
+  custB: Customer;
+  reason: string;
+  matchScore: number;
+}
 
 function normalizeText(text?: string): string {
   if (!text) return '';
@@ -17,7 +25,7 @@ function normalizePhone(phone?: string): string {
   return digits;
 }
 
-// Fast Levenshtein distance using 2 rows instead of full matrix
+// Fast Levenshtein distance
 function fastLevenshtein(s1: string, s2: string): number {
   if (s1 === s2) return 0;
   if (!s1.length) return s2.length;
@@ -62,7 +70,7 @@ function simplifyMarathiName(name: string): string {
 }
 
 export function detectDuplicateCustomers(
-  customers: Customer[],
+  customers: any[],
   dismissedPairIds: Set<string> = new Set()
 ): DuplicatePair[] {
   if (!customers || customers.length === 0) return [];
@@ -70,9 +78,9 @@ export function detectDuplicateCustomers(
   const results: DuplicatePair[] = [];
   const addedPairKeys = new Set<string>();
 
-  const addMatch = (cA: Customer, cB: Customer, score: number, reason: string) => {
+  const addMatch = (cA: any, cB: any, score: number, reason: string) => {
     if (cA.id === cB.id) return;
-    const pairKey = [cA.id, cB.id].sort().join(':::');
+    const pairKey = [String(cA.id), String(cB.id)].sort().join(':::');
     if (addedPairKeys.has(pairKey)) return;
 
     const pairId = `pair-${pairKey}`;
@@ -88,8 +96,8 @@ export function detectDuplicateCustomers(
     });
   };
 
-  // 1. Phone Number Hash Map (Instant match)
-  const phoneMap = new Map<string, Customer[]>();
+  // 1. Phone Number Hash Map
+  const phoneMap = new Map<string, any[]>();
 
   for (const c of customers) {
     const p = normalizePhone(c.phone);
@@ -114,8 +122,8 @@ export function detectDuplicateCustomers(
     }
   });
 
-  // 2. Village / City based Bucketing for Name Similarity (Avoids full N^2 scan)
-  const villageMap = new Map<string, Customer[]>();
+  // 2. Village / Address Bucketing
+  const villageMap = new Map<string, any[]>();
 
   for (const c of customers) {
     const v = normalizeText(c.village || c.address);
@@ -136,7 +144,6 @@ export function detectDuplicateCustomers(
           const nameB = normalizeText(cB.name);
           if (!nameA || !nameB) continue;
 
-          // Quick first character check to skip calculation
           if (nameA[0] !== nameB[0]) continue;
 
           const simpleA = simplifyMarathiName(cA.name);
