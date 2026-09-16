@@ -64,6 +64,11 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [notes, setNotes] = useState('');
   const [cardNumber, setCardNumber] = useState<number>(0);
+  const [modelNo, setModelNo] = useState('');
+  const [serialNo, setSerialNo] = useState('');
+  const [isQuotation, setIsQuotation] = useState(false);
+  const [quotationValidity, setQuotationValidity] = useState('');
+  const [againstBillNo, setAgainstBillNo] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -88,11 +93,16 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
       const b = raw as TransactionEntry;
       setCustomerName(b.customerName || '');
       setPhone(b.customerPhone || '');
+      setVillage(b.village || '');
       setDate(b.date || '');
       setReferenceNo(b.invoiceNo || '');
       setAmount(b.totalAmount || 0);
       setSecondaryAmount(b.dueAmount || 0);
       setItemDetails(b.itemDetails || b.stockItemName || '');
+      setModelNo(b.modelNo || '');
+      setSerialNo(b.serialNo || '');
+      setIsQuotation(Boolean(b.isQuotation));
+      setQuotationValidity(b.quotationValidity || '15 दिवस वैध');
       setPaymentMode(b.paymentMode || 'Cash');
       setNotes(b.notes || '');
     } else if (record.category === 'receipt') {
@@ -101,6 +111,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
         const ct = raw as CardTransaction;
         setCustomerName(ct.customerName || '');
         setPhone(ct.customerPhone || '');
+        setVillage((raw as any).village || (raw.member && raw.member.village) || '');
         setDate(ct.date || '');
         setReferenceNo(ct.receiptNo || '');
         setAmount(ct.amount || 0);
@@ -111,10 +122,14 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
         const te = raw as TransactionEntry;
         setCustomerName(te.customerName || '');
         setPhone(te.customerPhone || '');
+        setVillage(te.village || '');
         setDate(te.date || '');
         setReferenceNo(te.invoiceNo || '');
         setAmount(te.payingNow || te.totalAmount || 0);
+        setAgainstBillNo(te.againstBillNo || te.refBillNo || '');
         setItemDetails(te.itemDetails || '');
+        setModelNo(te.modelNo || '');
+        setSerialNo(te.serialNo || '');
         setPaymentMode(te.paymentMode || 'Cash');
         setNotes(te.notes || '');
       }
@@ -164,12 +179,17 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
         ...raw,
         customerName: customerName.trim(),
         customerPhone: phone.trim(),
+        village: village.trim(),
         invoiceNo: referenceNo.trim(),
         date: date || raw.date,
         totalAmount: Number(amount) || 0,
         dueAmount: Number(secondaryAmount) || 0,
         payingNow: Math.max(0, (Number(amount) || 0) - (Number(secondaryAmount) || 0)),
         itemDetails: itemDetails.trim(),
+        modelNo: modelNo.trim(),
+        serialNo: serialNo.trim(),
+        isQuotation,
+        quotationValidity: isQuotation ? quotationValidity.trim() : undefined,
         paymentMode,
         notes: notes.trim(),
       };
@@ -180,6 +200,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
           ...raw,
           customerName: customerName.trim(),
           customerPhone: phone.trim(),
+          village: village.trim(),
           receiptNo: referenceNo.trim(),
           date: date || raw.date,
           amount: Number(amount) || 0,
@@ -192,11 +213,16 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
           ...raw,
           customerName: customerName.trim(),
           customerPhone: phone.trim(),
+          village: village.trim(),
           invoiceNo: referenceNo.trim(),
           date: date || raw.date,
           payingNow: Number(amount) || 0,
           totalAmount: 0,
-          itemDetails: itemDetails.trim() || 'उधारी जमा पावती',
+          againstBillNo: againstBillNo.trim() || undefined,
+          refBillNo: againstBillNo.trim() || undefined,
+          itemDetails: itemDetails.trim() || (againstBillNo ? `उधारी जमा पावती (बिल #${againstBillNo.trim()})` : 'उधारी जमा पावती'),
+          modelNo: modelNo.trim(),
+          serialNo: serialNo.trim(),
           paymentMode,
           notes: notes.trim(),
         };
@@ -435,6 +461,57 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
           {/* Sales Bill Specific Fields */}
           {record.category === 'bill' && (
             <>
+              {/* Document Type Selector */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                    दस्तऐवज स्वरूप (Bill / Quotation):
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isQuotation ? '📋 हे अधिकृत अंदाजपत्रक (कोटेशन) आहे' : '🧾 हे टॅक्स विक्री बिल आहे'}
+                  </span>
+                </div>
+                <div className="flex items-center bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuotation(false)}
+                    className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
+                      !isQuotation
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    🧾 विक्री बिल
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuotation(true)}
+                    className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
+                      isQuotation
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    📋 कोटेशन
+                  </button>
+                </div>
+              </div>
+
+              {isQuotation && (
+                <div>
+                  <label className="block text-xs font-bold text-amber-800 dark:text-amber-400 mb-1">
+                    कोटेशन वैधता (Quotation Validity)
+                  </label>
+                  <input
+                    type="text"
+                    value={quotationValidity}
+                    onChange={(e) => setQuotationValidity(e.target.value)}
+                    placeholder="उदा. 15 दिवस वैध (15 Days)"
+                    className="w-full px-3 py-2 border border-amber-300 dark:border-amber-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -494,6 +571,22 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  गाव / पत्ता (Village / Location)
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    placeholder="उदा. HINGNI, KELZAR, WARDHA"
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   वस्तूचे तपशील / प्रॉडक्ट (Item Details)
                 </label>
                 <input
@@ -503,6 +596,34 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   placeholder="उदा. Cooler, LED TV 32, Mixer"
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
+              </div>
+
+              {/* Model & Serial / IMEI Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div>
+                  <label className="block text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-1">
+                    मॉडेल क्रमांक (Model No)
+                  </label>
+                  <input
+                    type="text"
+                    value={modelNo}
+                    onChange={(e) => setModelNo(e.target.value)}
+                    placeholder="उदा. LG-260L-INV"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-amber-700 dark:text-amber-400 mb-1">
+                    सिरीयल / IMEI क्रमांक (Serial No)
+                  </label>
+                  <input
+                    type="text"
+                    value={serialNo}
+                    onChange={(e) => setSerialNo(e.target.value)}
+                    placeholder="उदा. SN-8942109"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -608,6 +729,22 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  गाव / शहर (Village)
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    placeholder="उदा. HINGNI, KELZAR"
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -635,6 +772,22 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <option value="Online">Online / UPI</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  संदर्भ बिल क्रमांक (Against Bill No / Reference Invoice)
+                </label>
+                <input
+                  type="text"
+                  value={againstBillNo}
+                  onChange={(e) => setAgainstBillNo(e.target.value)}
+                  placeholder="उदा. 1042 किंवा SSE/2024/05"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+                <span className="text-[11px] text-slate-500">
+                  (ग्राहकाने ज्या बिलाविरुद्ध ही पावती भरली आहे, तो बिल नंबर येथे टाका)
+                </span>
               </div>
 
               <div>

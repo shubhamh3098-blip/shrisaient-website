@@ -134,6 +134,12 @@ export function cleanCustomerName(rawName: string): { cleanName: string; extract
   s = s.replace(/KOSHLYA\b/gi, 'KAUSHALYA');
   s = s.replace(/DIPAK CARBHE\b/gi, 'DIPAK CHARBHE');
   s = s.replace(/PRMILA\b/gi, 'PREMILA');
+  s = s.replace(/\bSANAJY\b/gi, 'SANJAY');
+  s = s.replace(/\bDHANRAJ NANDNE\b/gi, 'DHANRAJ NANDANE');
+  s = s.replace(/\bWAR CHIMULKAR\b/gi, 'RAMESHWAR CHIMULKAR');
+  s = s.replace(/\bKUNAK SONPITALE\b/gi, 'KUNAL SONPITALE');
+  s = s.replace(/\bVIJAY RATOD\b/gi, 'VIJAY RATHOD');
+  s = s.replace(/\bCHETAN KANGALI\b/gi, 'CHETAN KANGALE');
 
   let extractedVillage: string | undefined;
   const match = s.match(/\(([^)]+)\)/);
