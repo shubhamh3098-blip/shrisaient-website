@@ -13,29 +13,30 @@ function normalizeText(text?: string): string {
 function normalizePhone(phone?: string): string {
   if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
-  if (digits.length > 10) return digits.slice(-10);
+  if (digits.length >= 10) return digits.slice(-10);
   return digits;
 }
 
-// Levenshtein distance calculation
-function levenshteinDistance(s1: string, s2: string): number {
-  const m = s1.length;
-  const n = s2.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+// Fast Levenshtein distance using 2 rows instead of full matrix
+function fastLevenshtein(s1: string, s2: string): number {
+  if (s1 === s2) return 0;
+  if (!s1.length) return s2.length;
+  if (!s2.length) return s1.length;
 
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  let prev = Array.from({ length: s2.length + 1 }, (_, i) => i);
+  let curr = new Array(s2.length + 1);
 
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (s1[i - 1] === s2[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1];
-      } else {
-        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-      }
+  for (let i = 0; i < s1.length; i++) {
+    curr[0] = i + 1;
+    for (let j = 0; j < s2.length; j++) {
+      const cost = s1[i] === s2[j] ? 0 : 1;
+      curr[j + 1] = Math.min(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost);
     }
+    const temp = prev;
+    prev = curr;
+    curr = temp;
   }
-  return dp[m][n];
+  return prev[s2.length];
 }
 
 function stringSimilarity(s1: string, s2: string): number {
@@ -43,14 +44,12 @@ function stringSimilarity(s1: string, s2: string): number {
   if (s1 === s2) return 1;
   const maxLen = Math.max(s1.length, s2.length);
   if (maxLen === 0) return 1;
-  const dist = levenshteinDistance(s1, s2);
-  return 1 - dist / maxLen;
+  return 1 - fastLevenshtein(s1, s2) / maxLen;
 }
 
-// Standardize common Marathi names variations
 function simplifyMarathiName(name: string): string {
   let norm = normalizeText(name);
-  norm = norm
+  return norm
     .replace(/\brao\b/g, 'rav')
     .replace(/\brav\b/g, 'rao')
     .replace(/\bbabu\b/g, 'bapu')
@@ -58,88 +57,104 @@ function simplifyMarathiName(name: string): string {
     .replace(/\bcontractor\b/g, '')
     .replace(/\belectricals\b/g, '')
     .replace(/\bshri\b/g, '')
-    .replace(/\b(satoda|wardha|arvi|hinganghat)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return norm;
 }
 
 export function detectDuplicateCustomers(
   customers: Customer[],
   dismissedPairIds: Set<string> = new Set()
 ): DuplicatePair[] {
+  if (!customers || customers.length === 0) return [];
+
   const results: DuplicatePair[] = [];
-  const visitedPairs = new Set<string>();
+  const addedPairKeys = new Set<string>();
 
-  for (let i = 0; i < customers.length; i++) {
-    for (let j = i + 1; j < customers.length; j++) {
-      const cA = customers[i];
-      const cB = customers[j];
+  const addMatch = (cA: Customer, cB: Customer, score: number, reason: string) => {
+    if (cA.id === cB.id) return;
+    const pairKey = [cA.id, cB.id].sort().join(':::');
+    if (addedPairKeys.has(pairKey)) return;
 
-      const pairKey = [cA.id, cB.id].sort().join(':::');
-      if (visitedPairs.has(pairKey)) continue;
-      visitedPairs.add(pairKey);
+    const pairId = `pair-${pairKey}`;
+    if (dismissedPairIds.has(pairId)) return;
 
-      const pairId = `pair-${pairKey}`;
-      if (dismissedPairIds.has(pairId)) continue;
+    addedPairKeys.add(pairKey);
+    results.push({
+      id: pairId,
+      custA: cA,
+      custB: cB,
+      reason,
+      matchScore: score,
+    });
+  };
 
-      const phoneA = normalizePhone(cA.phone);
-      const phoneB = normalizePhone(cB.phone);
+  // 1. Phone Number Hash Map (Instant match)
+  const phoneMap = new Map<string, Customer[]>();
 
-      const nameA = normalizeText(cA.name);
-      const nameB = normalizeText(cB.name);
-
-      const simpleA = simplifyMarathiName(cA.name);
-      const simpleB = simplifyMarathiName(cB.name);
-
-      const villageA = normalizeText(cA.village || cA.address);
-      const villageB = normalizeText(cB.village || cB.address);
-
-      let isDuplicate = false;
-      let reason = '';
-      let score = 0;
-
-      // 1. Same 10-digit phone number
-      if (phoneA && phoneB && phoneA === phoneB && phoneA.length === 10) {
-        isDuplicate = true;
-        score = 0.95;
-        reason = `समान मोबाईल नंबर (${phoneA}) दोन्ही खात्यांमध्ये नोंदवला आहे.`;
-      }
-      // 2. High name similarity + Marathi variation (e.g. Sheshrao Bhagat vs Sheshrav Bhagat)
-      else if (
-        stringSimilarity(nameA, nameB) >= 0.78 ||
-        stringSimilarity(simpleA, simpleB) >= 0.8 ||
-        (nameA.includes('shesh') && nameB.includes('shesh'))
-      ) {
-        isDuplicate = true;
-        score = 0.85;
-        const place = cA.village || cB.village || 'वर्धा / सातोडा';
-        reason = `एकाच व्यक्तीचे नाव: "${cA.name}" व "${cB.name}" (${place})`;
-      }
-      // 3. Same village and very close name
-      else if (
-        villageA &&
-        villageB &&
-        (villageA.includes(villageB) || villageB.includes(villageA)) &&
-        stringSimilarity(nameA, nameB) >= 0.65
-      ) {
-        isDuplicate = true;
-        score = 0.8;
-        reason = `एकाच गावातील समान नाव: "${cA.name}" आणि "${cB.name}" (${cA.village || cB.village})`;
-      }
-
-      if (isDuplicate) {
-        results.push({
-          id: pairId,
-          custA: cA,
-          custB: cB,
-          reason,
-          matchScore: score,
-        });
-      }
+  for (const c of customers) {
+    const p = normalizePhone(c.phone);
+    if (p.length === 10) {
+      if (!phoneMap.has(p)) phoneMap.set(p, []);
+      phoneMap.get(p)!.push(c);
     }
   }
 
-  // Sort higher score first
+  phoneMap.forEach((matchedList, phone) => {
+    if (matchedList.length > 1) {
+      for (let i = 0; i < matchedList.length; i++) {
+        for (let j = i + 1; j < matchedList.length; j++) {
+          addMatch(
+            matchedList[i],
+            matchedList[j],
+            0.98,
+            `समान मोबाईल नंबर (${phone}) दोन्ही खात्यांमध्ये नोंदवला आहे.`
+          );
+        }
+      }
+    }
+  });
+
+  // 2. Village / City based Bucketing for Name Similarity (Avoids full N^2 scan)
+  const villageMap = new Map<string, Customer[]>();
+
+  for (const c of customers) {
+    const v = normalizeText(c.village || c.address);
+    if (v.length >= 3) {
+      if (!villageMap.has(v)) villageMap.set(v, []);
+      villageMap.get(v)!.push(c);
+    }
+  }
+
+  villageMap.forEach((group, village) => {
+    if (group.length > 1 && group.length <= 150) {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const cA = group[i];
+          const cB = group[j];
+
+          const nameA = normalizeText(cA.name);
+          const nameB = normalizeText(cB.name);
+          if (!nameA || !nameB) continue;
+
+          // Quick first character check to skip calculation
+          if (nameA[0] !== nameB[0]) continue;
+
+          const simpleA = simplifyMarathiName(cA.name);
+          const simpleB = simplifyMarathiName(cB.name);
+
+          const sim = stringSimilarity(simpleA, simpleB);
+          if (sim >= 0.82) {
+            addMatch(
+              cA,
+              cB,
+              0.85,
+              `एकाच गावातील (${village}) समान नाव: "${cA.name}" आणि "${cB.name}"`
+            );
+          }
+        }
+      }
+    }
+  });
+
   return results.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 }
