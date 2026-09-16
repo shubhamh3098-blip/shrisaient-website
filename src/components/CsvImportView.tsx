@@ -1,1407 +1,1161 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  FileSpreadsheet,
-  Upload,
-  Download,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  CreditCard,
-  Building2,
-  Receipt,
-  ArrowRight,
-  Database,
-  Layers,
-  Sparkles,
-  Trash2,
-  RefreshCw,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
   Users,
-  ShoppingCart,
-  Eye,
-  Package,
-  Tag
+  Search,
+  Plus,
+  Phone,
+  MapPin,
+  IndianRupee,
+  Share2,
+  CheckCircle,
+  AlertCircle,
+  BookOpen,
+  Receipt,
+  RotateCw,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  ArrowUpDown,
+  Sparkles,
+  LayoutGrid,
+  Table as TableIcon,
+  Download,
+  Calculator,
+  GitMerge,
 } from 'lucide-react';
-import {
-  CardMember,
-  CardSchemeId,
-  CardTransaction,
-  Customer,
-  Dealer,
-  PurchaseEntry,
-  StockItem,
-  TransactionEntry
-} from '../types';
-import { SCHEMES_CONFIG } from '../utils/storage';
-import { processUniversalCsv, UniversalImportResult } from '../utils/universalImporter';
+import { BusinessSettings, Customer, TransactionEntry, CardTransaction } from '../types';
+import { CustomerLedgerModal } from './CustomerLedgerModal';
+import { QuickCustomerHisabModal } from './QuickCustomerHisabModal';
+import { exportCustomersToCsv } from '../utils/csvExporter';
+import { detectDuplicateCustomers } from '../utils/duplicateDetector';
+import { DuplicateCustomerMergeModal } from './DuplicateCustomerMergeModal';
 
-interface CsvImportViewProps {
-  onImportBills: (bills: TransactionEntry[]) => void;
-  onImportReceipts: (receipts: CardTransaction[]) => void;
-  onImportCardMembers: (members: CardMember[], autoReceipts?: CardTransaction[]) => void;
-  onImportPurchases: (purchases: PurchaseEntry[], dealers: Dealer[]) => void;
-  onUniversalImport?: (data: {
-    bills: TransactionEntry[];
-    salesReceipts?: TransactionEntry[];
-    cardMembers: CardMember[];
-    cardTransactions: CardTransaction[];
-    customers: Customer[];
-    stockItems?: StockItem[];
-  }) => void;
-  onClearZeroBills?: () => void;
-  onFullResetData?: () => void;
-  onClearCardsData?: () => void;
-  onClearBillsData?: () => void;
-  existingCardMembers?: CardMember[];
-  existingDealers?: Dealer[];
-  existingBills?: TransactionEntry[];
-  existingReceipts?: CardTransaction[];
-  existingCustomers?: Customer[];
-  existingPurchases?: PurchaseEntry[];
-  existingStock?: StockItem[];
-  onSwitchTab?: (tab: any) => void;
+interface CustomersViewProps {
+  customers: Customer[];
+  transactions?: TransactionEntry[];
+  cardTransactions?: CardTransaction[];
+  onAddCustomer: (customer: Omit<Customer, 'id'>) => void;
+  onSettlePayment: (
+    customerId: string,
+    amount: number,
+    mode: 'Cash' | 'Online',
+    notes: string,
+    customReceiptNo?: string,
+    refBillNo?: string,
+    customDate?: string
+  ) => void;
+  onRecalculateLedgers?: () => void;
+  onOpenQuickPavti?: (customer?: Customer | null, billNo?: string, amount?: number) => void;
+  onMergeCustomers?: (
+    primaryId: string,
+    duplicateId: string,
+    mergedData: {
+      name: string;
+      phone: string;
+      village?: string;
+      address?: string;
+    }
+  ) => void;
+  settings: BusinessSettings;
 }
 
-type ImportTab = 'universal' | 'manual';
-type ImportType = 'cards' | 'bills' | 'receipts' | 'purchases';
+const PAGE_SIZE = 24;
 
-const normKey = (k: any): string => {
-  if (!k) return '';
-  return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
-};
-
-const getField = (row: Record<string, any>, candidates: string[], defaultValue = ''): string => {
-  const normMap: Record<string, string> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (v !== undefined && v !== null && String(v).trim() !== '') {
-      normMap[normKey(k)] = String(v).trim();
-    }
-  }
-  for (const cand of candidates) {
-    const nk = normKey(cand);
-    if (normMap[nk] !== undefined && normMap[nk] !== '') {
-      return normMap[nk];
-    }
-  }
-  return defaultValue;
-};
-
-const parseNum = (val: any, defaultVal = 0): number => {
-  if (val === undefined || val === null || val === '') return defaultVal;
-  const cleaned = String(val).replace(/[^0-9.-]/g, '');
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? defaultVal : n;
-};
-
-const normalizeDate = (dStr: string): string => {
-  if (!dStr) return new Date().toISOString().split('T')[0];
-  const clean = dStr.trim().replace(/\//g, '-');
-  const parts = clean.split('-');
-  if (parts.length === 3) {
-    const p1 = parts[0].trim();
-    const p2 = parts[1].trim();
-    const p3 = parts[2].trim();
-    if (p1.length <= 2 && p3.length === 4) {
-      return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
-    }
-    if (p1.length <= 2 && p3.length === 2) {
-      return `20${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
-    }
-    if (p1.length === 4) {
-      return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
-    }
-  }
-  return clean || new Date().toISOString().split('T')[0];
-};
-
-export const CsvImportView: React.FC<CsvImportViewProps> = ({
-  onImportBills,
-  onImportReceipts,
-  onImportCardMembers,
-  onImportPurchases,
-  onUniversalImport,
-  onClearZeroBills,
-  onFullResetData,
-  onClearCardsData,
-  onClearBillsData,
-  existingCardMembers = [],
-  existingDealers = [],
-  existingBills = [],
-  existingReceipts = [],
-  existingCustomers = [],
-  existingPurchases = [],
-  existingStock = [],
-  onSwitchTab,
+export const CustomersView: React.FC<CustomersViewProps> = ({
+  customers = [],
+  transactions = [],
+  cardTransactions = [],
+  onAddCustomer,
+  onSettlePayment,
+  onRecalculateLedgers,
+  onOpenQuickPavti,
+  onMergeCustomers,
+  settings,
 }) => {
-  const [importMode, setImportMode] = useState<ImportTab>('universal');
-  const [activeImportType, setActiveImportType] = useState<ImportType>('cards');
-  const [targetSchemeId, setTargetSchemeId] = useState<string>('auto');
-  const [csvText, setCsvText] = useState('');
-  const [parsedRows, setParsedRows] = useState<any[]>([]);
-  const [universalResult, setUniversalResult] = useState<UniversalImportResult | null>(null);
-  const [universalActiveTab, setUniversalActiveTab] = useState<'products' | 'bills' | 'receipts' | 'cards' | 'customers'>('products');
-  const [parseError, setParseError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showAuditModal, setShowAuditModal] = useState(false);
-  const [auditFilter, setAuditFilter] = useState<string>('all');
-  const [lastImportedSummary, setLastImportedSummary] = useState<{
-    date: string;
-    billsCount: number;
-    receiptsCount: number;
-    cardMembersCount: number;
-    customersCount: number;
-    purchasesCount: number;
-    productsCount?: number;
-    sampleRows: Array<{ type: string; title: string; ref?: string; amount?: number }>;
-  } | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'due' | 'high-due' | 'cleared'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'due-desc' | 'due-asc'>('due-desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showAll, setShowAll] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
-  const handleProcessCsvString = (text: string) => {
-    setParseError('');
-    setSuccessMessage('');
-    if (!text.trim()) {
-      setParsedRows([]);
-      setUniversalResult(null);
-      return;
-    }
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [settleModalCust, setSettleModalCust] = useState<Customer | null>(null);
+  const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState<Customer | null>(null);
+  const [quickHisabCustomer, setQuickHisabCustomer] = useState<Customer | null>(null);
+  const [showQuickHisabModal, setShowQuickHisabModal] = useState(false);
 
-    try {
-      // 1. Run Universal Smart Importer & Cleaner
-      const uniRes = processUniversalCsv(text);
-      setUniversalResult(uniRes);
+  // Duplicate accounts detection state
+  const [showDuplicateMergeModal, setShowDuplicateMergeModal] = useState(false);
+  const [selectedDuplicatePairId, setSelectedDuplicatePairId] = useState<string | undefined>(undefined);
+  const [dismissedPairIds, setDismissedPairIds] = useState<Set<string>>(new Set());
 
-      // 2. Also populate standard row previews
-      parseCSVContent(text);
-    } catch (err: any) {
-      setParseError(`CSV प्रक्रिया करताना त्रुटी आली: ${err.message}`);
-    }
-  };
+const duplicatePairs = useMemo(() => {
+  return detectDuplicateCustomers(customers || [], dismissedPairIds);
+}, [customers, dismissedPairIds]);
 
-  const parseCSVContent = (content: string) => {
-    try {
-      const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-      if (lines.length < 2) {
-        setParseError('CSV फाईलमध्ये किमान १ हेडर आणि १ डेटा ओळ असणे आवश्यक आहे.');
-        setParsedRows([]);
-        return;
+  // Add customer form states
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newVillage, setNewVillage] = useState('');
+
+  // Settle form states
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settleMode, setSettleMode] = useState<'Cash' | 'Online'>('Cash');
+  const [settleNotes, setSettleNotes] = useState('');
+
+  // Defensive calculations for overall totals
+  const { totalCustomers, totalUdhar, customersWithDueCount } = useMemo(() => {
+    let sumUdhar = 0;
+    let dueCount = 0;
+    (customers || []).forEach((c) => {
+      if (!c) return;
+      const due = Number(c.balanceDue) || 0;
+      if (due > 0) {
+        sumUdhar += due;
+        dueCount++;
       }
-
-      const rawHeaders = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((h) =>
-        h.trim().replace(/^["']|["']$/g, '')
-      );
-
-      const rows: any[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const currentLine = lines[i];
-        const values = currentLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((val) =>
-          val.trim().replace(/^["']|["']$/g, '')
-        );
-
-        if (!values.some((v) => v && v.length > 0)) continue;
-
-        const rowObj: Record<string, string> = {};
-        rawHeaders.forEach((header, index) => {
-          if (header) {
-            rowObj[header] = values[index] !== undefined ? values[index] : '';
-          }
-        });
-        rows.push(rowObj);
-      }
-      setParsedRows(rows);
-    } catch (err: any) {
-      setParseError(`CSV Parsing Error: ${err.message}`);
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setCsvText(text);
-      handleProcessCsvString(text);
+    });
+    return {
+      totalCustomers: (customers || []).length,
+      totalUdhar: sumUdhar,
+      customersWithDueCount: dueCount,
     };
-    reader.readAsText(file);
-  };
+  }, [customers]);
 
-  const resolveCardScheme = (cardNum: number, rawSchemeText: string): { schemeId: CardSchemeId; schemeName: string } => {
-    if (targetSchemeId !== 'auto') {
-      const found = SCHEMES_CONFIG.find((s) => s.id === targetSchemeId);
-      if (found) return { schemeId: found.id as CardSchemeId, schemeName: found.name };
-    }
+  // Robust, crash-proof filtering & sorting
+  const filtered = useMemo(() => {
+    const q = (search || '').toLowerCase().trim();
 
-    const text = (rawSchemeText || '').toLowerCase();
-    if (text.includes('scheme 1') || text.includes('scheme1')) return { schemeId: 'scheme1', schemeName: 'Scheme 1 (योजना 1)' };
-    if (text.includes('scheme 2') || text.includes('scheme2')) return { schemeId: 'scheme2', schemeName: 'Scheme 2 (योजना 2)' };
-    if (text.includes('scheme 3') || text.includes('scheme3')) return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
+    return (customers || [])
+      .filter((c) => {
+        if (!c) return false;
 
-    if (cardNum >= 4001 && cardNum <= 6000) return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
-    if (cardNum >= 3001 && cardNum <= 3999) return { schemeId: 'scheme2', schemeName: 'Scheme 2 (योजना 2)' };
-    return { schemeId: 'scheme1', schemeName: 'Scheme 1 (योजना 1)' };
-  };
+        const nameStr = String(c.name || '').toLowerCase();
+        const phoneStr = String(c.phone || '');
+        const addrStr = String(c.address || '').toLowerCase();
+        const villStr = String(c.village || '').toLowerCase();
 
-  const handleCommitUniversal = () => {
-    if (!universalResult) return;
+        const matchesSearch =
+          !q ||
+          nameStr.includes(q) ||
+          phoneStr.includes(q) ||
+          addrStr.includes(q) ||
+          villStr.includes(q);
 
-    const totalReceiptsCount = (universalResult.salesReceipts?.length || 0) + universalResult.cardTransactions.length;
+        if (!matchesSearch) return false;
 
-    // Collect sample rows for verification
-    const sampleRows: Array<{ type: string; title: string; ref?: string; amount?: number }> = [];
-    universalResult.bills.slice(0, 8).forEach(b => sampleRows.push({ type: 'विक्री बिल', title: `${b.customerName}${b.stockItemName ? ` (${b.stockItemName})` : ''}`, ref: b.invoiceNo, amount: b.totalAmount }));
-    if (universalResult.stockItems && universalResult.stockItems.length > 0) {
-      universalResult.stockItems.slice(0, 6).forEach(s => sampleRows.push({ type: 'प्रॉडक्ट / वस्तू', title: s.name, ref: s.code, amount: s.sellingPrice }));
-    }
-    universalResult.cardTransactions.slice(0, 8).forEach(c => sampleRows.push({ type: 'योजना पावती', title: `कार्ड #${c.cardNumber} (${c.customerName})`, ref: c.receiptNo, amount: c.amount }));
-    if (universalResult.salesReceipts) {
-      universalResult.salesReceipts.slice(0, 8).forEach(r => sampleRows.push({ type: 'उधारी जमा', title: r.customerName, ref: r.invoiceNo, amount: r.payingNow }));
-    }
-    universalResult.cardMembers.slice(0, 8).forEach(m => sampleRows.push({ type: 'कार्ड मेंबर', title: `${m.customerName} (#${m.cardNumber})`, ref: m.schemeName, amount: m.totalDeposited }));
-    universalResult.customers.slice(0, 8).forEach(cust => sampleRows.push({ type: 'ग्राहक खाते', title: cust.name, ref: cust.phone, amount: cust.balanceDue }));
+        const due = Number(c.balanceDue) || 0;
+        if (filterType === 'due') return due > 0;
+        if (filterType === 'high-due') return due >= 5000;
+        if (filterType === 'cleared') return due <= 0;
+        return true;
+      })
+      .sort((a, b) => {
+        const dueA = Number(a?.balanceDue) || 0;
+        const dueB = Number(b?.balanceDue) || 0;
 
-    if (onUniversalImport) {
-      onUniversalImport({
-        bills: universalResult.bills,
-        salesReceipts: universalResult.salesReceipts || [],
-        cardMembers: universalResult.cardMembers,
-        cardTransactions: universalResult.cardTransactions,
-        customers: universalResult.customers,
-        stockItems: universalResult.stockItems || [],
+        if (sortBy === 'due-desc') return dueB - dueA;
+        if (sortBy === 'due-asc') return dueA - dueB;
+        return String(a?.name || '').localeCompare(String(b?.name || ''));
       });
-    } else {
-      if (universalResult.bills.length > 0) onImportBills(universalResult.bills);
-      if (universalResult.salesReceipts && universalResult.salesReceipts.length > 0) onImportBills(universalResult.salesReceipts);
-      if (universalResult.cardMembers.length > 0) onImportCardMembers(universalResult.cardMembers, universalResult.cardTransactions);
-      else if (universalResult.cardTransactions.length > 0) onImportReceipts(universalResult.cardTransactions);
-    }
+  }, [customers, search, filterType, sortBy]);
 
-    const prodCount = universalResult.stockItems?.length || 0;
+  // Pagination chunking to eliminate mobile/laptop freezing
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const displayedCustomers = useMemo(() => {
+    if (showAll) return filtered;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage, showAll]);
 
-    setLastImportedSummary({
-      date: new Date().toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      billsCount: universalResult.bills.length,
-      receiptsCount: totalReceiptsCount,
-      cardMembersCount: universalResult.cardMembers.length,
-      customersCount: universalResult.customers.length,
-      purchasesCount: 0,
-      productsCount: prodCount,
-      sampleRows,
+  const handleSendReminder = (c: Customer) => {
+    if (!c) return;
+    const due = Number(c.balanceDue) || 0;
+    const text = encodeURIComponent(
+      `Namaste ${c.name || 'Customer'},\nThis is a gentle reminder from *${settings.businessName || 'Shri Sai Enterprises'}* regarding your outstanding balance of *₹${due.toLocaleString()}*.\nKindly clear the payment at your earliest convenience via Cash or UPI.\nContact: ${settings.phone || '8766486915'}\nWebsite: ${settings.domainName || 'shrisaient.in'}`
+    );
+    const phone = String(c.phone || '').replace(/[^0-9]/g, '');
+    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
+
+  const submitAddCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || !newPhone.trim()) return;
+
+    onAddCustomer({
+      name: newName.trim(),
+      phone: newPhone.trim(),
+      address: newAddress.trim() || undefined,
+      village: newVillage.trim() || undefined,
+      totalPurchased: 0,
+      totalPaid: 0,
+      balanceDue: 0,
+      lastVisit: new Date().toISOString().split('T')[0],
     });
 
-    setSuccessMessage(
-      `सफलतापूर्वक सेव्ह झाले! ${universalResult.bills.length} विक्री बिले, ${prodCount} प्रॉडक्ट्स/वस्तू, ${totalReceiptsCount} जमा पावत्या, ${universalResult.cardMembers.length} कार्ड मेंबर्स आणि ${universalResult.customers.length} ग्राहक खाती सिस्टीममध्ये सुरक्षित सेव्ह झाली आहेत!`
-    );
-    setUniversalResult(null);
-    setCsvText('');
-    setParsedRows([]);
+    setNewName('');
+    setNewPhone('');
+    setNewAddress('');
+    setNewVillage('');
+    setShowAddModal(false);
   };
 
-  const handleCommitManual = () => {
-    if (parsedRows.length === 0) return;
-    try {
-      if (activeImportType === 'cards') {
-        const newCards: CardMember[] = [];
-        const autoReceipts: CardTransaction[] = [];
+  const submitSettlePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(settleAmount);
+    if (!settleModalCust || !amount || amount <= 0) return;
 
-        parsedRows.forEach((r, idx) => {
-          const cardNum = parseNum(getField(r, ['CARD.NO', 'Card No', 'CardNumber', 'CardNo']), 1001);
-          const customerName = getField(r, ['NAME', 'Customer Name', 'CustomerName', 'Name'], `Member #${cardNum}`);
-          const village = getField(r, ['VILLEGE', 'Village', 'City', 'Address']);
-          const phone = getField(r, ['MOBILE.NO', 'Mobile', 'Phone', 'CustomerPhone']);
-          const sheetNo = getField(r, ['SHEET NO', 'SheetNo']);
-          const dateRaw = getField(r, ['DATE', 'Date']);
-          const joiningDate = normalizeDate(dateRaw);
-          const openingAmt = parseNum(getField(r, ['OPENING AMT', 'Saving Balance', 'OpeningAmt', 'Balance']), 0);
-
-          const { schemeId, schemeName } = resolveCardScheme(cardNum, getField(r, ['Scheme', 'SchemeId']));
-          const cardId = `cm-${schemeId}-${cardNum}`;
-
-          newCards.push({
-            id: cardId,
-            cardNumber: cardNum,
-            schemeId,
-            schemeName,
-            customerName,
-            phone: phone || '',
-            village: village || undefined,
-            sheetNo: sheetNo || undefined,
-            openingAmt: openingAmt > 0 ? openingAmt : undefined,
-            address: village ? `${village}, Wardha` : '',
-            joiningDate,
-            registrationFee: 50,
-            registrationFeePaid: true,
-            totalDeposited: openingAmt,
-            totalRefunded: 0,
-            netBalance: openingAmt,
-            status: 'Active',
-            notes: `Imported via CSV record${sheetNo ? ` • Sheet #${sheetNo}` : ''}`,
-          });
-
-          if (openingAmt > 0) {
-            autoReceipts.push({
-              id: `rcpt-opn-${schemeId}-${cardNum}-${idx}`,
-              cardId,
-              cardNumber: cardNum,
-              schemeId,
-              customerName,
-              customerPhone: phone || undefined,
-              receiptNo: `REC-OPN-${cardNum}`,
-              date: joiningDate,
-              type: 'WeeklyPayment',
-              weekNumber: 1,
-              amount: openingAmt,
-              paymentMode: 'Cash',
-              remarks: `Initial/Opening Deposit of ₹${openingAmt}`,
-              balanceAfter: openingAmt,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        });
-
-        onImportCardMembers(newCards, autoReceipts);
-        setSuccessMessage(`सफलता: ${newCards.length} कार्ड मेंबर्स लोड झाले आणि ₹ जमा पासबुकमध्ये क्रेडिट झाले!`);
-      } else if (activeImportType === 'bills') {
-        const newBills: TransactionEntry[] = parsedRows.map((r, idx) => {
-          const invoiceNo = getField(r, ['Bill No', 'InvoiceNo', 'BillNo', 'Bill_No', 'Bill', 'INV NO'], `INV-${Date.now().toString().slice(-4)}-${idx + 1}`);
-          const date = normalizeDate(getField(r, ['Date', 'BillDate', 'Bill Date', 'DATE']));
-          const customerName = getField(r, ['Customer Name', 'NAME', 'Name', 'CustomerName', 'Customer'], 'Customer');
-          const mobile = getField(r, ['Mobile', 'MOBILE.NO', 'Mobile No', 'Phone', 'Contact']);
-          const village = getField(r, ['Village', 'VILLEGE', 'Town', 'City', 'Address']);
-
-          let totalAmount = parseNum(getField(r, ['Grand Total', 'TotalAmount', 'Total', 'SubTotal', 'Sub Total', 'Bill Amount', 'GRAND TOTAL']), 0);
-          const payingNow = parseNum(getField(r, ['Amount Paid', 'PaidAmount', 'Paid', 'Cash Paid', 'AMOUNT PAID']), 0);
-          const dueAmount = parseNum(getField(r, ['Balance Due', 'DueAmount', 'Due', 'BALANCE DUE', 'Balance']), 0);
-
-          if (totalAmount === 0 && (payingNow > 0 || dueAmount > 0)) {
-            totalAmount = payingNow + dueAmount;
-          }
-
-          const rawProduct = getField(r, ['Product', 'Product Name', 'ProductName', 'Item', 'Item Name', 'ItemName', 'Particulars', 'Description', 'Goods', 'Vastu', 'Sahitya']);
-          const rawQty = parseNum(getField(r, ['Quantity', 'Qty', 'Pieces', 'Nos', 'Count', 'Nag']), 1);
-          const rawRate = parseNum(getField(r, ['Rate', 'Price', 'UnitPrice', 'Unit Price', 'MRP', 'Bhav', 'Dar']), 0);
-          const rawCat = getField(r, ['Category', 'Type', 'Group', 'Class', 'Vibhag']);
-
-          const itemsSummary = rawProduct || getField(r, ['Items Summary', 'ItemDetails', 'Items', 'Particulars'], 'Sales Invoice');
-          const remarks = getField(r, ['Remarks', 'Agent', 'Notes']);
-
-          return {
-            id: `inv-imp-${Date.now()}-${idx}`,
-            invoiceNo,
-            date,
-            customerName,
-            customerPhone: mobile,
-            village: village || undefined,
-            stockItemName: rawProduct || undefined,
-            quantity: rawQty > 0 ? rawQty : 1,
-            unitPrice: rawRate > 0 ? rawRate : (totalAmount > 0 && rawQty > 0 ? Math.round(totalAmount / rawQty) : undefined),
-            category: rawCat || undefined,
-            itemDetails: itemsSummary + (rawQty > 1 ? ` (${rawQty} नग)` : '') + (village ? ` (${village})` : ''),
-            totalAmount,
-            payingNow,
-            dueAmount: dueAmount > 0 ? dueAmount : Math.max(0, totalAmount - payingNow),
-            paymentMode: (getField(r, ['Payment Mode', 'PaymentMode', 'Mode'], 'Cash').toLowerCase().includes('online') ? 'Online' : 'Cash') as 'Cash' | 'Online',
-            notes: remarks ? `Remarks: ${remarks}` : `Bill: Total ₹${totalAmount}, Paid ₹${payingNow}, Due ₹${dueAmount}${rawProduct ? ` | वस्तू: ${rawProduct}` : ''}`,
-            createdAt: new Date().toISOString(),
-          };
-        });
-
-        onImportBills(newBills);
-        setSuccessMessage(`सफलता: ${newBills.length} विक्री बिल लोड झाले आणि All Entries अपडेट झाली!`);
-      } else if (activeImportType === 'receipts') {
-        const schemeReceipts: CardTransaction[] = [];
-        const customerReceiptEntries: TransactionEntry[] = [];
-
-        parsedRows.forEach((r, idx) => {
-          // Check for CANCEL in any field
-          const rowVals = Object.values(r).map((v) => String(v || '').toUpperCase());
-          if (rowVals.some((v) => v.includes('CANCEL') || v.includes('CANCE;L'))) {
-            return;
-          }
-
-          const rawRcptVal = getField(r, ['Receipt No', 'ReceiptNo', 'VoucherNo', 'Sr', 'No', 'SlNo', '']);
-          const receiptNo = rawRcptVal ? (/^\d+$/.test(rawRcptVal) ? `REC-${rawRcptVal}` : rawRcptVal) : `REC-${Date.now().toString().slice(-4)}-${idx + 1}`;
-          const date = normalizeDate(getField(r, ['Date', 'Receipt Date', 'DATE', 'Bill Date', 'Tarikh']));
-          const customerName = getField(r, ['Customer Name', 'NAME', 'Name', 'Customer', 'Grahak'], 'Customer');
-          const village = getField(r, ['Village', 'VILLAGE', 'VILLEGE', 'City', 'Town', 'Address']);
-          const rawCardNo = getField(r, ['Card No', 'CARD.NO', 'CardNumber']);
-          const cardNum = parseNum(rawCardNo, 0);
-          const amount = parseNum(getField(r, ['Amount Received', 'Amount', 'AMOUNT RECEIVED', 'AMOUNT', 'Total Received', 'Rakkam', 'Jama']), 0);
-          const againstBill = getField(r, ['Against Bill No', 'Ref Bill No', 'Bill No', 'AgainstBillNo']);
-          const receivedBy = getField(r, ['Received By', 'RECIVED BY', 'ReceivedBy', 'RecivedBy', 'Collector', 'Agent', 'Staff']);
-          const remarks = getField(r, ['Remarks', 'Notes', 'REMARKS']) || (receivedBy ? `जमा घेणारा: ${receivedBy}` : '');
-          const rawMode = getField(r, ['Payment Mode', 'Mode', 'PAYMENT MODE'], 'Cash');
-          const paymentMode: 'Cash' | 'Online' =
-            rawMode.toLowerCase().includes('online') ||
-            rawMode.toLowerCase().includes('upi') ||
-            receivedBy.toLowerCase().includes('online')
-              ? 'Online'
-              : 'Cash';
-
-          if (!customerName || (customerName === 'Customer' && amount === 0)) {
-            return;
-          }
-
-          // If card number is provided AND not against a sales bill
-          if (cardNum > 0 && !againstBill) {
-            const { schemeId } = resolveCardScheme(cardNum, remarks);
-            schemeReceipts.push({
-              id: `rec-imp-${Date.now()}-${idx}`,
-              cardId: `cm-${schemeId}-${cardNum}`,
-              cardNumber: cardNum,
-              schemeId,
-              customerName,
-              receiptNo,
-              date,
-              type: 'WeeklyPayment',
-              amount,
-              paymentMode,
-              remarks: remarks || `Scheme Payment Receipt: ${receiptNo}`,
-              balanceAfter: amount,
-              createdAt: new Date().toISOString(),
-            });
-          } else {
-            // Customer credit recovery / udhari settlement receipt against bill
-            customerReceiptEntries.push({
-              id: `rcpt-entry-${Date.now()}-${idx}`,
-              invoiceNo: receiptNo,
-              date,
-              customerName,
-              village: village || undefined,
-              itemDetails: againstBill
-                ? `उधारी जमा (पावती #${receiptNo} - बिल #${againstBill})${receivedBy ? ` [जमा: ${receivedBy}]` : ''}`
-                : `उधारी जमा पावती #${receiptNo}${receivedBy ? ` [जमा: ${receivedBy}]` : ''}${village ? ` (${village})` : ''}`,
-              totalAmount: 0,
-              payingNow: amount,
-              dueAmount: 0,
-              paymentMode,
-              refBillNo: againstBill || undefined,
-              againstBillNo: againstBill || undefined,
-              entryType: 'Receipt',
-              notes: remarks
-                ? `पावती: ${receiptNo} | संदर्भ बिल: ${againstBill || 'Direct'} | ${remarks}`
-                : `पावती: ${receiptNo} | संदर्भ बिल: ${againstBill || 'Direct'}${receivedBy ? ` | जमा: ${receivedBy}` : ''}`,
-              createdAt: new Date().toISOString(),
-            });
-          }
-        });
-
-        if (schemeReceipts.length > 0) {
-          onImportReceipts(schemeReceipts);
-        }
-        if (customerReceiptEntries.length > 0) {
-          onImportBills(customerReceiptEntries);
-        }
-
-        setSuccessMessage(
-          `सफलता: ${customerReceiptEntries.length} ग्राहक उधारी जमा पावत्या (Sales Receipts) आणि ${schemeReceipts.length} कार्ड योजना पावत्या योग्य खात्यात जोडल्या गेल्या!`
-        );
-      }
-      setCsvText('');
-      setParsedRows([]);
-    } catch (err: any) {
-      setParseError(`Error importing: ${err.message}`);
-    }
+    onSettlePayment(settleModalCust.id, amount, settleMode, settleNotes);
+    setSettleModalCust(null);
+    setSettleAmount('');
+    setSettleNotes('');
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      {/* Header & Emergency Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-5">
+      {/* Header with English Primary & Small Marathi Subtext */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Database className="w-6 h-6 text-indigo-600" />
-            <span>CSV डेटा इम्पोर्ट & व्यवस्थापन</span>
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            फायली थेट अपलोड करा, डेटाची शुद्धता तपासा आणि सिस्टीममधील सर्व रेकॉर्ड्स मास्टर सर्चमध्ये पाहा.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[var(--tactile-text-heading)] tracking-tight">
+              Customer Directory & Khata
+            </h1>
+            <span className="text-xs px-2 py-0.5 rounded-md bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-[var(--tactile-text-muted)] font-medium">
+              ग्राहक खातेवही
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[var(--tactile-text-muted)] mt-0.5">
+            Manage customer accounts, outstanding balances (Udhar), and instant ledger statements.
+            <span className="ml-1 text-[11px] text-[var(--tactile-text-dim)]">(उधारी बाकी हिशोब व व्हॉट्सॲप स्मरणपत्र)</span>
           </p>
         </div>
 
-        {/* Emergency Cleanup & Reset Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {onClearCardsData && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('तुम्हाला सर्व कार्ड्स व योजना हप्ते (Card Scheme Data) 100% पूर्णपणे क्लिअर करायचे आहेत का?')) {
-                  onClearCardsData();
-                  setSuccessMessage('सर्व कार्ड्स व साप्ताहिक हप्ते यशस्वीपणे क्लिअर झाले आहेत!');
-                  setLastImportedSummary(null);
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
-            >
-              <CreditCard className="w-3.5 h-3.5 text-purple-600" />
-              <span>कार्ड डेटा क्लिअर करा</span>
-            </button>
-          )}
-
-          {onClearBillsData && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('तुम्हाला सर्व जुनी विक्री बिले व ग्राहक यादी (Sales Bills Data) 100% पूर्णपणे क्लिअर करायची आहे का?')) {
-                  onClearBillsData();
-                  setSuccessMessage('सर्व विक्री बिले व ग्राहक यादी यशस्वीपणे क्लिअर झाली आहे!');
-                  setLastImportedSummary(null);
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-600" />
-              <span>सेल्स बिले क्लिअर करा</span>
-            </button>
-          )}
-
-          {onClearZeroBills && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('तुम्हाला सर्व ₹0 वाले चुकीचे इम्पोर्ट झालेले बिल काढून टाकायचे आहेत का?')) {
-                  onClearZeroBills();
-                  setSuccessMessage('सर्व ₹0 चे चुकीचे बिल यशस्वीपणे काढून टाकले आहेत!');
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-amber-600" />
-              <span>₹0 चे बिल साफ़ करा</span>
-            </button>
-          )}
-
-          {onFullResetData && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('सावधान: तुम्हाला सर्व जुना डेटा (बिले, कार्ड्स, ग्राहक) 100% पूर्णपणे क्लिअर करून स्वच्छ करायचा आहे का?')) {
-                  onFullResetData();
-                  setSuccessMessage('सर्व जुना डेटा यशस्वीपणे पूर्ण क्लिअर झाला आहे!');
-                  setLastImportedSummary(null);
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>सर्व जुना डेटा 100% क्लिअर करा</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Live System Imported Database Status Banner */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 text-white border border-indigo-700/40 shadow-md space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>सिस्टीममध्ये उपलब्ध असलेला सध्याचा डेटा</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono font-bold border border-emerald-500/30">
-                  {existingBills.length + existingReceipts.length + existingCardMembers.length + existingCustomers.length + existingPurchases.length} एकूण नोंदी
-                </span>
-              </h2>
-              <p className="text-xs text-indigo-200/80 mt-0.5">
-                खालील सर्व डेटाबेस सिस्टीममध्ये सुरक्षित साठवलेला असून मास्टर सर्चमध्ये शोधण्यासाठी सज्ज आहे.
-              </p>
-            </div>
-          </div>
-
-          {onSwitchTab && (
-            <button
-              type="button"
-              onClick={() => onSwitchTab('uploaded-data')}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-sm self-start sm:self-auto shrink-0"
-            >
-              <Database className="w-4 h-4" />
-              <span>🔍 मास्टर सर्च उघडा (सर्व डेटा शोधा) ➜</span>
-            </button>
-          )}
-        </div>
-
-        {/* 5 Data Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 pt-1">
-          <div
-            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
-            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
-          >
-            <div className="flex items-center justify-between text-xs text-indigo-200 font-semibold">
-              <span>विक्री बिले</span>
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
-            </div>
-            <div className="text-xl font-black text-white mt-1 font-mono">
-              {existingBills.length.toLocaleString()}
-            </div>
-            <span className="text-[10px] text-indigo-300">Invoices</span>
-          </div>
-
-          <div
-            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
-            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
-          >
-            <div className="flex items-center justify-between text-xs text-purple-200 font-semibold">
-              <span>जमा पावत्या</span>
-              <Receipt className="w-3.5 h-3.5 text-purple-400" />
-            </div>
-            <div className="text-xl font-black text-white mt-1 font-mono">
-              {existingReceipts.length.toLocaleString()}
-            </div>
-            <span className="text-[10px] text-purple-300">Receipts</span>
-          </div>
-
-          <div
-            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
-            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
-          >
-            <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
-              <span>कार्ड सभासद</span>
-              <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-            </div>
-            <div className="text-xl font-black text-white mt-1 font-mono">
-              {existingCardMembers.length.toLocaleString()}
-            </div>
-            <span className="text-[10px] text-amber-300">Scheme Cards</span>
-          </div>
-
-          <div
-            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
-            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
-          >
-            <div className="flex items-center justify-between text-xs text-teal-200 font-semibold">
-              <span>ग्राहक खाती</span>
-              <Users className="w-3.5 h-3.5 text-teal-400" />
-            </div>
-            <div className="text-xl font-black text-white mt-1 font-mono">
-              {existingCustomers.length.toLocaleString()}
-            </div>
-            <span className="text-[10px] text-teal-300">Customers</span>
-          </div>
-
-          <div
-            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
-            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer col-span-2 sm:col-span-1"
-          >
-            <div className="flex items-center justify-between text-xs text-rose-200 font-semibold">
-              <span>खरेदी आवक</span>
-              <ShoppingCart className="w-3.5 h-3.5 text-rose-400" />
-            </div>
-            <div className="text-xl font-black text-white mt-1 font-mono">
-              {existingPurchases.length.toLocaleString()}
-            </div>
-            <span className="text-[10px] text-rose-300">Purchases</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Recently Imported Inspection Panel (If import just occurred) */}
-      {lastImportedSummary && (
-        <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-400 dark:border-emerald-600 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 dark:border-emerald-800 pb-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <div>
-                <h3 className="text-sm font-black text-emerald-950 dark:text-emerald-200">
-                  🎉 नुकताच इम्पोर्ट झालेला डेटा (वेळ: {lastImportedSummary.date})
-                </h3>
-                <p className="text-xs text-emerald-800 dark:text-emerald-400 mt-0.5">
-                  खालील नोंदी सिस्टीममध्ये यशस्वीरित्या जमा करण्यात आल्या आहेत:
-                </p>
-              </div>
-            </div>
-            {onSwitchTab && (
-              <button
-                type="button"
-                onClick={() => onSwitchTab('uploaded-data')}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>मास्टर सर्चमध्ये हा डेटा पाहा</span>
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-            <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-300 border border-blue-200">
-              🛒 {lastImportedSummary.billsCount} विक्री बिले
-            </span>
-            <span className="px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-900 dark:text-purple-300 border border-purple-200">
-              🧾 {lastImportedSummary.receiptsCount} जमा पावत्या
-            </span>
-            <span className="px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-300 border border-amber-200">
-              💳 {lastImportedSummary.cardMembersCount} कार्ड सभासद
-            </span>
-            <span className="px-3 py-1 rounded-lg bg-teal-100 dark:bg-teal-900/40 text-teal-900 dark:text-teal-300 border border-teal-200">
-              👥 {lastImportedSummary.customersCount} ग्राहक खाती
-            </span>
-          </div>
-
-          {lastImportedSummary.sampleRows.length > 0 && (
-            <div className="overflow-x-auto rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-emerald-100/50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-300 font-bold border-b border-emerald-200 dark:border-emerald-800">
-                  <tr>
-                    <th className="px-3 py-2">प्रकार</th>
-                    <th className="px-3 py-2">नाव / तपशील</th>
-                    <th className="px-3 py-2">संदर्भ / पावती / बिल क्र.</th>
-                    <th className="px-3 py-2 text-right">रक्कम</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {lastImportedSummary.sampleRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-emerald-50/50 dark:hover:bg-slate-800/50">
-                      <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-300">
-                        {r.type}
-                      </td>
-                      <td className="px-3 py-2 font-semibold text-slate-900 dark:text-white">
-                        {r.title}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">
-                        {r.ref || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        ₹{(r.amount || 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Success Notification Banner */}
-      {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 text-sm font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-            {onSwitchTab && (
-              <button
-                type="button"
-                onClick={() => onSwitchTab('uploaded-data')}
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>मास्टर सर्चमध्ये तपासा</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setSuccessMessage('')}
-              className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer ml-1"
-            >
-              ✕ बंद करा
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Top Navigation Mode Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Hisab & Print Calculator Button */}
           <button
-            type="button"
-            onClick={() => setImportMode('universal')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
-              importMode === 'universal'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-            }`}
+            onClick={() => {
+              setQuickHisabCustomer(null);
+              setShowQuickHisabModal(true);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-500/25 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="मोबाईल हिशोब कॅल्क्युलेटर (उदा. दिवाण 7000, 3000 दिले, 1500 पावती)"
           >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>स्मार्ट ऑटो-डिटेक्टर (5-in-1 Universal)</span>
+            <Calculator className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <div className="flex flex-col text-left leading-tight">
+              <span>Quick Hisab & Print</span>
+              <span className="text-[9px] text-amber-700 dark:text-amber-300 font-normal">हिशोब कॅल्क्युलेटर</span>
+            </div>
           </button>
 
+          {/* Duplicate Khata Merge Button */}
           <button
-            type="button"
-            onClick={() => setImportMode('manual')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
-              importMode === 'manual'
-                ? 'bg-slate-900 dark:bg-slate-700 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+            onClick={() => {
+              if (duplicatePairs.length > 0) {
+                setSelectedDuplicatePairId(duplicatePairs[0].id);
+              }
+              setShowDuplicateMergeModal(true);
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ${
+              duplicatePairs.length > 0
+                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-400 animate-pulse'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
             }`}
+            title="दोन सारखी ग्राहक खाती शोधून त्यांचा हिशोब एकत्र करा"
           >
-            <Layers className="w-4 h-4" />
-            <span>मॅन्युअल इम्पोर्ट (Category Wise)</span>
-          </button>
-
-          {onSwitchTab && (
-            <button
-              type="button"
-              onClick={() => onSwitchTab('uploaded-data')}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs"
-            >
-              <Database className="w-4 h-4 text-emerald-600" />
-              <span>🔍 मास्टर सर्च</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {importMode === 'universal' ? (
-        <div className="space-y-6">
-          {/* Universal Header & Rules Banner */}
-          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-950 text-white p-6 rounded-3xl shadow-md relative overflow-hidden">
-            <div className="relative z-10 space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>स्वयंचलित स्पेलिंग, तारीख व खाते दुरुस्ती प्रणाली सक्रिय</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                कोणतीही CSV फाईल टाका — आपोआप ओळखून अचूक ठिकाणी सेव्ह होईल!
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-                ही प्रणाली ५ पैकी कोणत्याही फाईलमधील स्पेलिंग चुका (उदा. <i>KELHZAR ➔ Kelzar</i>, <i>VAYFAD ➔ Waifad</i>, <i>NI,LIMA ➔ NILIMA</i>), नावातील कंसात असलेले गाव वेगळे करणे, फोन नंबर दुरुस्ती, आणि चुकीचे मायनस बॅलन्स आपोआप दुरुस्त करून थेट योग्य लेजरमध्ये जमा करते.
-              </p>
-
-              {/* Destination Badges */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
-                  <div className="text-[11px] text-slate-300 font-medium">१. विक्री बिले</div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
-                    <FileText className="w-3.5 h-3.5 text-amber-400" />
-                    <span>All Entries & Ledger</span>
-                  </div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
-                  <div className="text-[11px] text-slate-300 font-medium">२. ग्राहक खाती</div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
-                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Customers Khata</span>
-                  </div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
-                  <div className="text-[11px] text-slate-300 font-medium">३. बचत योजना</div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
-                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Card Scheme 1, 2, 3</span>
-                  </div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
-                  <div className="text-[11px] text-slate-300 font-medium">४. जमा पावत्या</div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
-                    <Receipt className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Receipts & Passbook</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Load Server Files */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>रेडी सॅम्पल फाईल त्वरित लोड करा:</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                खालील बटणावर क्लिक करून थेट उपलब्ध CSV तपासून टेस्ट करू शकता:
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/data/scheme2.csv');
-                    const text = await res.text();
-                    setCsvText(text);
-                    handleProcessCsvString(text);
-                  } catch (e: any) {
-                    setParseError('Scheme 2 फाईल लोड करता आली नाही: ' + e.message);
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Scheme 2 लोड करा</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/data/scheme3.csv');
-                    const text = await res.text();
-                    setCsvText(text);
-                    handleProcessCsvString(text);
-                  } catch (e: any) {
-                    setParseError('Scheme 3 फाईल लोड करता आली नाही: ' + e.message);
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Scheme 3 लोड करा</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/data/receipts_against_bill.csv');
-                    const text = await res.text();
-                    setCsvText(text);
-                    handleProcessCsvString(text);
-                  } catch (e: any) {
-                    setParseError('Receipts फाईल लोड करता आली नाही: ' + e.message);
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
-              >
-                <Receipt className="w-3.5 h-3.5 text-purple-600" />
-                <span>🧾 ग्राहक पावती (Receipts) लोड करा</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Upload Dropzone */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="relative border-2 border-dashed border-indigo-300 hover:border-indigo-600 rounded-2xl p-8 text-center bg-indigo-50/40 hover:bg-indigo-50/70 transition cursor-pointer">
-              <input
-                type="file"
-                accept=".csv,text/csv,text/plain"
-                onChange={handleFileUpload}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              />
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <p className="text-sm font-bold text-slate-800">
-                  कोणतीही CSV फाईल निवडण्यासाठी येथे क्लिक करा किंवा ड्रॅग करा
-                </p>
-                <p className="text-xs text-slate-500">
-                  (Scheme 1, Scheme 2, Scheme 3, Sales Bills, किंवा Receipts फाईल)
-                </p>
-              </div>
-            </div>
-
-            {parseError && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                <span>{parseError}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Universal Result Analysis & Destination Mapping */}
-          {universalResult && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
-              {/* Header Analysis Box */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white uppercase tracking-wider">
-                      {universalResult.detectedType === 'bills' && '🛒 Sales Invoices (विक्री बिले)'}
-                      {universalResult.detectedType === 'receipts' && '🧾 Receipts / Payments (पावत्या)'}
-                      {universalResult.detectedType === 'cards_raw' && '💳 Card Scheme Members (कार्ड योजना)'}
-                      {universalResult.detectedType === 'cards_master' && '💳 Card Scheme Master (मास्टर कार्ड्स)'}
-                      {universalResult.detectedType === 'unknown' && '📄 CSV फाईल'}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">
-                      ओळखण्यात आलेली फाईल
-                    </span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-900 mt-1">
-                    {universalResult.summaryText}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCommitUniversal}
-                  className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2 transition"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>✓ सर्व दुरुस्त डेटा योग्य ठिकाणी सेव्ह करा</span>
-                </button>
-              </div>
-
-              {/* Destination Breakdown Counters */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50">
-                  <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-amber-600" />
-                    <span>विक्री बिले (Sales Invoices)</span>
-                  </div>
-                  <div className="text-2xl font-black text-amber-950 mt-2">
-                    {universalResult.bills.length}
-                  </div>
-                  <div className="text-[11px] text-amber-700 mt-0.5">
-                    {universalResult.bills.length > 0 ? 'नवीन बिले लेजरमध्ये जातील' : 'एकही विक्री बिल नाही (पावत्या फाईल)'}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50">
-                  <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                    <CreditCard className="w-4 h-4 text-indigo-600" />
-                    <span>कार्ड्स मेंबर्स (Card Schemes)</span>
-                  </div>
-                  <div className="text-2xl font-black text-indigo-950 mt-2">
-                    {universalResult.cardMembers.length}
-                  </div>
-                  <div className="text-[11px] text-indigo-700 mt-0.5">योजना सभासद जोडले जातील</div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50">
-                  <div className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                    <Receipt className="w-4 h-4 text-purple-600" />
-                    <span>जमा पावत्या (Receipts)</span>
-                  </div>
-                  <div className="text-2xl font-black text-purple-950 mt-2">
-                    {(universalResult.salesReceipts?.length || 0) + universalResult.cardTransactions.length}
-                  </div>
-                  <div className="text-[11px] text-purple-700 mt-0.5">
-                    {universalResult.cardTransactions.length > 0 && (universalResult.salesReceipts?.length || 0) > 0
-                      ? `${universalResult.cardTransactions.length} कार्ड योजना + ${universalResult.salesReceipts?.length || 0} ग्राहक जमा`
-                      : universalResult.cardTransactions.length > 0
-                      ? `${universalResult.cardTransactions.length} कार्ड योजना पावत्या जमा होतील`
-                      : `${universalResult.salesReceipts?.length || 0} ग्राहक उधारी जमा पावत्या`}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50">
-                  <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    <span>ग्राहक खाती (Khata Ledger)</span>
-                  </div>
-                  <div className="text-2xl font-black text-blue-950 mt-2">
-                    {universalResult.customers.length}
-                  </div>
-                  <div className="text-[11px] text-blue-700 mt-0.5">खाती अपडेट / शिल्लक जमा होईल</div>
-                </div>
-              </div>
-
-              {/* Audit & Error Corrections Report Box */}
-              <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/80 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
-                      {universalResult.auditIssues.length}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">
-                        स्वयंचलित दुरुस्ती अहवाल (Automated Audit & Fixes)
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        {universalResult.auditIssues.length} विसंगती व स्पेलिंग चुका सापडल्या आणि आपोआप सुधारल्या गेल्या.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowAuditModal(!showAuditModal)}
-                    className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs self-start sm:self-auto"
-                  >
-                    <span>{showAuditModal ? 'तपशील लपवा' : 'सर्व दुरुस्त्या तपासा'}</span>
-                    {showAuditModal ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                {/* Audit Issues List Accordion */}
-                {showAuditModal && (
-                  <div className="space-y-3 pt-2 border-t border-slate-200">
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {['all', 'spelling', 'date', 'phone', 'amount', 'card_number'].map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setAuditFilter(cat)}
-                          className={`px-3 py-1 rounded-lg font-bold capitalize cursor-pointer transition ${
-                            auditFilter === cat
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {cat === 'all' && `सर्व दुरुस्त्या (${universalResult.auditIssues.length})`}
-                          {cat === 'spelling' && 'स्पेलिंग व गावे'}
-                          {cat === 'date' && 'तारीख स्वरूप'}
-                          {cat === 'phone' && 'मोबाईल नंबर'}
-                          {cat === 'amount' && 'चुकीची रक्कम'}
-                          {cat === 'card_number' && 'कार्ड नंबर वाटप'}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white text-xs">
-                      <table className="w-full text-left">
-                        <thead className="bg-slate-100 font-bold text-slate-700 sticky top-0 border-b border-slate-200">
-                          <tr>
-                            <th className="p-2.5">प्रकार</th>
-                            <th className="p-2.5">वर्णन</th>
-                            <th className="p-2.5 text-rose-600">मूळ फाईलमध्ये (अगोदर)</th>
-                            <th className="p-2.5 text-emerald-700">दुरुस्त केलेले रूप (आता)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {universalResult.auditIssues
-                            .filter((iss) => auditFilter === 'all' || iss.type === auditFilter)
-                            .slice(0, 50)
-                            .map((iss, i) => (
-                              <tr key={i} className="hover:bg-slate-50">
-                                <td className="p-2.5 font-bold uppercase text-[10px] text-slate-500">
-                                  {iss.type}
-                                </td>
-                                <td className="p-2.5 text-slate-700">{iss.description}</td>
-                                <td className="p-2.5 font-mono text-rose-700 bg-rose-50/50">{iss.original}</td>
-                                <td className="p-2.5 font-mono font-bold text-emerald-800 bg-emerald-50/50">{iss.corrected}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+            <GitMerge className="w-4 h-4" />
+            <div className="flex flex-col text-left leading-tight">
+              <span className="flex items-center gap-1">
+                Merge Khata
+                {duplicatePairs.length > 0 && (
+                  <span className="bg-slate-950 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">
+                    {duplicatePairs.length}
+                  </span>
                 )}
-              </div>
-
-              {/* Bills Preview Table showing Product, Total, Advance, and Balance */}
-              {universalResult.bills && universalResult.bills.length > 0 && (
-                <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-indigo-600" />
-                        <span>विक्री बिले तपशील (Product, Total, Advance & Balance Preview)</span>
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        फाईलमधून शोधण्यात आलेली बिले, वस्तू (Product), एकूण रक्कम (Total), अॅडव्हान्स (Advance) आणि बाकी (Balance)
-                      </p>
-                    </div>
-                    <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 self-start sm:self-auto">
-                      एकूण {universalResult.bills.length} बिले
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto max-h-72 overflow-y-auto border border-slate-200 rounded-xl">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
-                        <tr>
-                          <th className="p-2.5">बिल # / तारीख</th>
-                          <th className="p-2.5">ग्राहक</th>
-                          <th className="p-2.5">प्रॉडक्ट / साहित्य (Product)</th>
-                          <th className="p-2.5 text-right">एकूण (Total)</th>
-                          <th className="p-2.5 text-right text-emerald-700">अॅडव्हान्स (Advance/Paid)</th>
-                          <th className="p-2.5 text-right text-amber-700">बाकी (Balance)</th>
-                          <th className="p-2.5 text-center">मोड</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {universalResult.bills.slice(0, 50).map((bill, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/80">
-                            <td className="p-2.5 whitespace-nowrap">
-                              <span className="font-mono font-bold text-slate-800">#{bill.invoiceNo}</span>
-                              <div className="text-[11px] text-slate-400">{bill.date}</div>
-                            </td>
-                            <td className="p-2.5">
-                              <div className="font-semibold text-slate-900">{bill.customerName}</div>
-                              {bill.village && <div className="text-[11px] text-slate-500">{bill.village}</div>}
-                            </td>
-                            <td className="p-2.5 max-w-xs">
-                              <div className="font-bold text-indigo-950 truncate">
-                                {bill.stockItemName || bill.itemDetails || '-'}
-                              </div>
-                              {bill.quantity && bill.quantity > 1 && (
-                                <div className="text-[10px] text-slate-400">नग: {bill.quantity}</div>
-                              )}
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                              ₹{bill.totalAmount.toLocaleString()}
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                              ₹{bill.payingNow.toLocaleString()}
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
-                              ₹{bill.dueAmount.toLocaleString()}
-                            </td>
-                            <td className="p-2.5 text-center whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                                {bill.paymentMode || 'Cash'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              </span>
+              <span className="text-[9px] opacity-80 font-normal">खाती विलीनीकरण</span>
             </div>
+          </button>
+
+          {/* Download CSV button */}
+          <button
+            onClick={() => exportCustomersToCsv(filtered, 'ShriSai_Customers_Khata')}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Download Customers Khata CSV"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <div className="flex flex-col text-left leading-tight">
+              <span>Download CSV</span>
+              <span className="text-[9px] text-emerald-700/80 font-normal">ग्राहक खाती एक्सपोर्ट</span>
+            </div>
+          </button>
+
+          {onRecalculateLedgers && (
+            <button
+              onClick={() => {
+                onRecalculateLedgers();
+                alert('सर्व ग्राहकांचे जुने बिल आणि जमा पावत्या ताडून हिशोब बरोबर केला गेला आहे!');
+              }}
+              title="Recalculate customer balances against all sales bills & receipts"
+              className="px-3 py-2 rounded-xl tactile-btn-secondary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-blue-600" />
+              <div className="flex flex-col text-left leading-tight">
+                <span>Recheck Balances</span>
+                <span className="text-[9px] text-[var(--tactile-text-dim)]">खातेवही ताडून पहा</span>
+              </div>
+            </button>
           )}
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 rounded-xl tactile-btn-primary text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            <div className="flex flex-col text-left leading-tight">
+              <span>+ Add Customer</span>
+              <span className="text-[9px] text-white/80 font-normal">नवीन ग्राहक नोंदवा</span>
+            </div>
+          </button>
         </div>
-      ) : (
-        /* Manual Import Category Interface */
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { type: 'cards' as ImportType, label: '1. Card Members (योजना ग्राहक)', desc: 'Scheme 1, 2, 3 फाइल', icon: CreditCard },
-              { type: 'bills' as ImportType, label: '2. Sales Bills (दुकान बिल/बिक्री)', desc: 'Total, Paid, Due फाइल', icon: FileText },
-              { type: 'receipts' as ImportType, label: '3. Receipts (जमा रसीदें)', desc: 'Amount Received फाइल', icon: Receipt },
-              { type: 'purchases' as ImportType, label: '4. Purchases (सप्लायर खरीदी)', desc: 'Dealer Purchases', icon: Building2 },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeImportType === item.type;
-              return (
-                <button
-                  key={item.type}
-                  onClick={() => {
-                    setActiveImportType(item.type);
-                    setParsedRows([]);
-                  }}
-                  className={`p-4 rounded-2xl border text-left cursor-pointer transition ${
-                    isActive ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <Icon className={`w-6 h-6 ${isActive ? 'text-emerald-400' : 'text-slate-600'}`} />
-                    {isActive && <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>}
-                  </div>
-                  <div className="font-bold text-sm">{item.label}</div>
-                  <div className={`text-xs ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>{item.desc}</div>
-                </button>
-              );
-            })}
+      </div>
+
+      {/* KPI Overview Cards with High Contrast & Clear Marathi hints */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div className="tactile-card p-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Total Customers</p>
+              <span className="text-[10px] text-[var(--tactile-text-dim)]">एकूण ग्राहक</span>
+            </div>
+            <p className="text-2xl font-black text-[var(--tactile-text-heading)] mt-1 font-mono-num">
+              {totalCustomers}
+            </p>
+            <p className="text-[11px] text-[var(--tactile-text-muted)] mt-0.5">
+              {customersWithDueCount} with pending dues
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600">
+            <Users className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="tactile-card p-4 border-amber-500/40 bg-amber-500/5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-amber-800 dark:text-amber-300 font-bold">Total Market Udhar</p>
+              <span className="text-[10px] text-amber-700/80 dark:text-amber-400">एकूण बाजार उधारी बाकी</span>
+            </div>
+            <p className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1 font-mono-num">
+              ₹{totalUdhar.toLocaleString()}
+            </p>
+            <p className="text-[11px] text-amber-700/80 dark:text-amber-400 mt-0.5">
+              Across {customersWithDueCount} balance accounts
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
+            <IndianRupee className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="tactile-card p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Fast Filter</p>
+              <span className="text-[10px] text-[var(--tactile-text-dim)]">जलद फिल्टर</span>
+            </div>
+            <span className="text-xs font-mono font-bold text-[var(--tactile-primary)]">
+              {filtered.length} Results
+            </span>
           </div>
 
-          {activeImportType === 'cards' && (
-            <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-indigo-950 text-sm">Target Scheme Selection (यह फाइल किस योजना की है?)</h3>
-                <p className="text-xs text-indigo-800">चुनें कि यह फाइल Scheme 1, 2 या 3 किसकी है:</p>
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
+            <button
+              onClick={() => {
+                setFilterType(filterType === 'due' ? 'all' : 'due');
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
+                filterType === 'due'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+              }`}
+            >
+              <span>Dues Only (बाकी)</span>
+            </button>
+            <button
+              onClick={() => {
+                setFilterType(filterType === 'cleared' ? 'all' : 'cleared');
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
+                filterType === 'cleared'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+              }`}
+            >
+              <span>Cleared (शून्य बाकी)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Potential Duplicate Accounts Detected Banner (संभाव्य डुप्लिकेट खाती आढळली) */}
+      {duplicatePairs.length > 0 && (
+        <div className="rounded-2xl p-4 sm:p-5 bg-amber-500/10 border-2 border-amber-500/40 text-slate-900 dark:text-white shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0 mt-0.5">
+              <GitMerge className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-sm sm:text-base text-amber-950 dark:text-amber-200">
+                  संभाव्य डुप्लिकेट खाती आढळली ({duplicatePairs.length})
+                </h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-700">
+                  अकाउंटिंग दुरुस्ती
+                </span>
               </div>
-              <select
-                value={targetSchemeId}
-                onChange={(e) => setTargetSchemeId(e.target.value)}
-                className="px-4 py-2 bg-white border border-indigo-300 rounded-xl font-bold text-sm text-indigo-950"
+              <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
+                {duplicatePairs[0].custA.name} ({duplicatePairs[0].custA.phone || duplicatePairs[0].custA.village || 'खाते १'}) आणि {duplicatePairs[0].custB.name} ({duplicatePairs[0].custB.phone || duplicatePairs[0].custB.village || 'खाते २'}) हे एकाच व्यक्तीचे २ खाते असू शकतात.
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 font-medium">
+                कारण: {duplicatePairs[0].reason}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+            <button
+              onClick={() => {
+                setSelectedDuplicatePairId(duplicatePairs[0].id);
+                setShowDuplicateMergeModal(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
+            >
+              <GitMerge className="w-4 h-4" />
+              <span>हिशोब तपासा व एकत्र करा (Review Hisab & Merge)</span>
+            </button>
+            <button
+              onClick={() => {
+                setDismissedPairIds((prev) => new Set(prev).add(duplicatePairs[0].id));
+              }}
+              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg text-xs font-bold cursor-pointer"
+              title="ही २ वेगळी खाती ठेवा (Dismiss)"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SEARCH BAR - 100% VISIBLE TEXT WITH HIGH CONTRAST & CLEAR BUTTON */}
+      <div className="tactile-card p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Main Search Input - High Contrast & Mobile Proof (text-base on mobile <640px) */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by customer name, phone number, village or address..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-base sm:text-sm placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#0D5C4D] shadow-xs"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                title="Clear Search"
               >
-                <option value="auto">✨ Auto-Detect (कार्ड नंबर से पहचानें)</option>
-                <option value="scheme1">Scheme 1 (योजना 1)</option>
-                <option value="scheme2">Scheme 2 (योजना 2)</option>
-                <option value="scheme3">Scheme 3 (योजना 3)</option>
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort Selector & View Toggle */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-sm sm:text-xs text-[var(--tactile-text-main)] flex-1 sm:flex-none">
+              <ArrowUpDown className="w-3.5 h-3.5 text-[var(--tactile-text-muted)] shrink-0" />
+              <span className="text-xs sm:text-[11px] font-medium text-[var(--tactile-text-muted)] hidden sm:inline">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent text-sm sm:text-xs font-bold text-[var(--tactile-text-main)] focus:outline-none cursor-pointer w-full"
+              >
+                <option value="due-desc">Highest Udhar First (जास्त उधारी)</option>
+                <option value="due-asc">Lowest Udhar First (कमी उधारी)</option>
+                <option value="name">Customer Name A-Z (नावाप्रमाणे)</option>
               </select>
             </div>
-          )}
 
-          {/* Upload Dropzone */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 text-center bg-slate-50 cursor-pointer">
-              <input
-                type="file"
-                accept=".csv,text/csv,text/plain"
-                onChange={handleFileUpload}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              />
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <Upload className="w-8 h-8 text-blue-600" />
-                <p className="text-sm font-bold text-slate-800">CSV फाईल निवडण्यासाठी येथे क्लिक करा</p>
-                <p className="text-xs text-slate-400">Excel किंवा Google Sheets मधील .csv फाईल</p>
-              </div>
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] rounded-xl p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
+                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+                }`}
+                title="कार्ड व्ह्यू"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
+                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+                }`}
+                title="टेबल व्ह्यू"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Table</span>
+              </button>
             </div>
-
-            {parseError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
-                {parseError}
-              </div>
-            )}
           </div>
         </div>
-      )}
 
-      {/* Manual Rows Preview & Confirm Table (if rows parsed) */}
-      {parsedRows.length > 0 && importMode === 'manual' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-bold text-slate-900 text-lg">डेटा प्रीव्ह्यू ({parsedRows.length} रेकॉर्ड्स मिळाले)</h3>
-              <p className="text-xs text-slate-500">तपासून खालील हिरव्या बटनावर क्लिक करून सेव्ह करा.</p>
-            </div>
-            <button
-              onClick={handleCommitManual}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md cursor-pointer"
-            >
-              ✓ Confirm & Save {parsedRows.length} Records Now
-            </button>
+        {/* Quick Filter Chips */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs sm:text-[11px] font-bold text-[var(--tactile-text-muted)] mr-1">Quick:</span>
+            {[
+              { id: 'all', label: 'All Clients', mr: 'सर्व' },
+              { id: 'due', label: 'With Balance Due', mr: 'उधारी बाकी' },
+              { id: 'high-due', label: 'High Dues (₹5,000+)', mr: 'मोठी उधारी' },
+              { id: 'cleared', label: 'Zero Balance', mr: 'पूर्ण जमा' },
+            ].map((chip) => (
+              <button
+                key={chip.id}
+                onClick={() => {
+                  setFilterType(chip.id as any);
+                  setCurrentPage(1);
+                }}
+                className={`px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-sm sm:text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  filterType === chip.id
+                    ? 'tactile-btn-primary text-white font-bold'
+                    : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+                }`}
+              >
+                <span>{chip.label}</span>
+                <span className="text-xs sm:text-[9px] opacity-75 font-normal">({chip.mr})</span>
+              </button>
+            ))}
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-100">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+          <div className="text-xs sm:text-[11px] text-[var(--tactile-text-dim)] font-mono">
+            Showing {displayedCustomers.length} of {filtered.length} customers
+          </div>
+        </div>
+      </div>
+
+      {/* Customer List: Cards or Table */}
+      {displayedCustomers.length === 0 ? (
+        <div className="tactile-card p-12 text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-full bg-[var(--tactile-surface-inset)] flex items-center justify-center text-[var(--tactile-text-muted)]">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-[var(--tactile-text-heading)]">
+            No Customers Found
+          </h3>
+          <p className="text-sm sm:text-xs text-[var(--tactile-text-muted)] max-w-sm mx-auto">
+            {search
+              ? `No customer matching "${search}". Check spelling or clear search.`
+              : 'No customers recorded yet in this category.'}
+          </p>
+          {search && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setFilterType('all');
+              }}
+              className="px-4 py-2.5 rounded-xl tactile-btn-secondary text-sm sm:text-xs font-bold cursor-pointer"
+            >
+              Reset Search & Filters
+            </button>
+          )}
+        </div>
+      ) : viewMode === 'table' ? (
+        /* Customer List Table with Increased Base Font Size (<640px) */
+        <div className="tactile-card overflow-hidden shadow-2xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm sm:text-xs">
+              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-[var(--tactile-border)]">
                 <tr>
-                  <th className="p-2.5">#</th>
-                  {activeImportType === 'cards' && (
-                    <>
-                      <th className="p-2.5">Card No</th>
-                      <th className="p-2.5">Customer Name</th>
-                      <th className="p-2.5">Village</th>
-                      <th className="p-2.5">Opening Amt</th>
-                      <th className="p-2.5">Date</th>
-                    </>
-                  )}
-                  {activeImportType === 'bills' && (
-                    <>
-                      <th className="p-2.5">Bill No</th>
-                      <th className="p-2.5">Customer</th>
-                      <th className="p-2.5">Total Amount</th>
-                      <th className="p-2.5">Paid Amount</th>
-                      <th className="p-2.5">Balance Due</th>
-                    </>
-                  )}
-                  {activeImportType === 'receipts' && (
-                    <>
-                      <th className="p-2.5">Receipt No</th>
-                      <th className="p-2.5">Customer</th>
-                      <th className="p-2.5">Amount</th>
-                      <th className="p-2.5">Against Bill</th>
-                    </>
-                  )}
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs">ग्राहक (Customer Name)</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">मोबाईल / गाव</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">एकूण खरेदी (Total)</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">जमा (Paid)</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">उधारी बाकी (Due)</th>
+                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-center whitespace-nowrap">कृती (Actions)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {parsedRows.slice(0, 10).map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50">
-                    <td className="p-2.5 text-slate-400">{idx + 1}</td>
-                    {activeImportType === 'cards' && (
-                      <>
-                        <td className="p-2.5 font-bold text-indigo-700">#{getField(row, ['CARD.NO', 'Card No'])}</td>
-                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['NAME', 'Customer Name'])}</td>
-                        <td className="p-2.5 text-slate-600">{getField(row, ['VILLEGE', 'Village'])}</td>
-                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['OPENING AMT', 'Saving Balance']))}</td>
-                        <td className="p-2.5 text-slate-500">{normalizeDate(getField(row, ['DATE', 'Date']))}</td>
-                      </>
-                    )}
-                    {activeImportType === 'bills' && (
-                      <>
-                        <td className="p-2.5 font-bold text-amber-700">{getField(row, ['Bill No', 'InvoiceNo'])}</td>
-                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['Customer Name', 'NAME'])}</td>
-                        <td className="p-2.5 font-bold text-slate-900">₹{parseNum(getField(row, ['Grand Total', 'Total']))}</td>
-                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['Amount Paid', 'Paid']))}</td>
-                        <td className="p-2.5 font-bold text-rose-600">₹{parseNum(getField(row, ['Balance Due', 'Due']))}</td>
-                      </>
-                    )}
-                    {activeImportType === 'receipts' && (
-                      <>
-                        <td className="p-2.5 font-bold text-blue-700">{getField(row, ['Receipt No'])}</td>
-                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['Customer Name'])}</td>
-                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['Amount Received']))}</td>
-                        <td className="p-2.5 font-mono text-amber-700">{getField(row, ['Against Bill No', 'Ref Bill No'])}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-[var(--tactile-border-subtle)]">
+                {displayedCustomers.map((c) => {
+                  const due = Number(c?.balanceDue) || 0;
+                  const totalPurchased = Number(c?.totalPurchased) || 0;
+                  const totalPaid = Number(c?.totalPaid) || 0;
+
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                      <td className="py-3.5 px-3 sm:px-4">
+                        <div className="font-bold text-base sm:text-sm text-[var(--tactile-text-heading)]">
+                          {c.name || 'Unnamed Customer'}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-sm sm:text-xs font-mono text-[var(--tactile-text-main)]">
+                          <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
+                          <span>{c.phone || '-'}</span>
+                        </div>
+                        {(c.address || c.village) && (
+                          <div className="flex items-center gap-1 text-xs sm:text-[11px] text-[var(--tactile-text-dim)] mt-0.5">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[140px]">
+                              {[c.address, c.village].filter(Boolean).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
+                        <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
+                          ₹{totalPurchased.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
+                        <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
+                          ₹{totalPaid.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
+                        {due > 0 ? (
+                          <span className="font-black text-base sm:text-sm text-amber-700 dark:text-amber-400 font-mono-num bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
+                            ₹{due.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                            Cleared • जमा
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedLedgerCustomer(c)}
+                            className="py-1.5 px-2.5 rounded-lg tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            title="खातेवही उघडा"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Statement</span>
+                          </button>
+                          <button
+                            onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
+                            className="py-1.5 px-2.5 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            title="रक्कम जमा करा / पावती फाडा"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>+ Pay</span>
+                          </button>
+                          <button
+                            title="हिशोब कॅल्क्युलेटर (उदा. बिल, अ‍ॅडव्हान्स, पावती)"
+                            onClick={() => {
+                              setQuickHisabCustomer(c);
+                              setShowQuickHisabModal(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
+                          >
+                            <Calculator className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge with another account)"
+                            onClick={() => {
+                              const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
+                              if (matchingPair) {
+                                setSelectedDuplicatePairId(matchingPair.id);
+                              } else {
+                                setSelectedDuplicatePairId(undefined);
+                              }
+                              setShowDuplicateMergeModal(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
+                          >
+                            <GitMerge className="w-3.5 h-3.5" />
+                          </button>
+                          {due > 0 && (
+                            <button
+                              title="Send WhatsApp Due Reminder"
+                              onClick={() => handleSendReminder(c)}
+                              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+      ) : (
+        /* Customer Cards Grid with Increased Base Font Size (<640px) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {displayedCustomers.map((c) => {
+            const due = Number(c?.balanceDue) || 0;
+            const totalPurchased = Number(c?.totalPurchased) || 0;
+            const totalPaid = Number(c?.totalPaid) || 0;
+
+            return (
+              <div
+                key={c.id}
+                className="tactile-card p-4 flex flex-col justify-between space-y-3 tactile-card-hover"
+              >
+                <div>
+                  {/* Customer Name & Status Badge - text-base on mobile (<640px) */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base sm:text-sm font-extrabold text-[var(--tactile-text-heading)] truncate">
+                        {c.name || 'Unnamed Customer'}
+                      </h3>
+                      <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-muted)] mt-1">
+                        <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
+                        <span className="font-mono">{c.phone || 'No Phone'}</span>
+                      </div>
+                    </div>
+
+                    {due > 0 ? (
+                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-sm sm:text-xs font-black bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0 font-mono-num">
+                        Due: ₹{due.toLocaleString()}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-xs sm:text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
+                        Cleared • जमा
+                      </span>
+                    )}
+                  </div>
+
+                  {(c.address || c.village) && (
+                    <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-dim)] mt-2">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
+                        {[c.address, c.village].filter(Boolean).join(', ')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Financial Metrics with English Primary & Marathi hint */}
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--tactile-border-subtle)] text-sm sm:text-xs">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Billed</span>
+                        <span className="text-[11px] sm:text-[9px] text-[var(--tactile-text-dim)]">एकूण खरेदी</span>
+                      </div>
+                      <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
+                        ₹{totalPurchased.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Paid</span>
+                        <span className="text-[11px] sm:text-[9px] text-emerald-600 font-medium">एकूण जमा</span>
+                      </div>
+                      <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
+                        ₹{totalPaid.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Action Buttons - Increased Font Size for Small Screens */}
+                <div className="space-y-1.5 pt-2 border-t border-[var(--tactile-border-subtle)]">
+                  {/* Full Ledger & Bills Statement Button */}
+                  <button
+                    onClick={() => setSelectedLedgerCustomer(c)}
+                    className="w-full py-2.5 sm:py-2 px-3 rounded-xl tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <BookOpen className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" />
+                    <span>Statement & Bills (खातेवही)</span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
+                      className="flex-1 py-2 sm:py-1.5 px-3 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer text-center flex items-center justify-center gap-1"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>+ Receive Payment</span>
+                    </button>
+
+                    <button
+                      title="हिशोब कॅल्क्युलेटर व पावती प्रिंट (Quick Hisab)"
+                      onClick={() => {
+                        setQuickHisabCustomer(c);
+                        setShowQuickHisabModal(true);
+                      }}
+                      className="p-2 sm:p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
+                    >
+                      <Calculator className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge Accounts)"
+                      onClick={() => {
+                        const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
+                        if (matchingPair) {
+                          setSelectedDuplicatePairId(matchingPair.id);
+                        } else {
+                          setSelectedDuplicatePairId(undefined);
+                        }
+                        setShowDuplicateMergeModal(true);
+                      }}
+                      className="p-2 sm:p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
+                    >
+                      <GitMerge className="w-4 h-4" />
+                    </button>
+
+                    {due > 0 && (
+                      <button
+                        title="Send WhatsApp Due Reminder (व्हॉट्सॲप स्मरणपत्र)"
+                        onClick={() => handleSendReminder(c)}
+                        className="p-2 sm:p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {/* Pagination Controls - Keeps mobile & laptop super fast */}
+      {filtered.length > PAGE_SIZE && (
+        <div className="tactile-card p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-[var(--tactile-text-muted)] font-medium">
+            Page <strong className="text-[var(--tactile-text-heading)]">{currentPage}</strong> of{' '}
+            <strong className="text-[var(--tactile-text-heading)]">{totalPages}</strong> (
+            {filtered.length} customers)
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)] hover:bg-[var(--tactile-surface)] transition cursor-pointer"
+            >
+              {showAll ? 'Show Pages (24 per page)' : 'View All'}
+            </button>
+
+            {!showAll && (
+              <>
+                <button
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Customer Ledger Statement Modal */}
+      {selectedLedgerCustomer && (
+        <CustomerLedgerModal
+          customer={selectedLedgerCustomer}
+          transactions={transactions}
+          cardTransactions={cardTransactions}
+          settings={settings}
+          onClose={() => setSelectedLedgerCustomer(null)}
+          onReceivePayment={(c, billNo, dueAmount) => {
+            if (onOpenQuickPavti) {
+              onOpenQuickPavti(c, billNo, dueAmount);
+            } else {
+              setSettleModalCust(c);
+              if (dueAmount) setSettleAmount(String(dueAmount));
+            }
+          }}
+        />
+      )}
+
+      {/* Add Customer Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
+              <div>
+                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
+                  Add New Customer
+                </h3>
+                <p className="text-[11px] text-[var(--tactile-text-muted)]">
+                  नवीन ग्राहक खाते नोंदणी
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={submitAddCustomer} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Customer / Business Name * <span className="text-[10px] text-[var(--tactile-text-dim)]">(ग्राहकाचे नाव)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. Ramesh Sharma or Patil Electricals"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Phone / WhatsApp Number * <span className="text-[10px] text-[var(--tactile-text-dim)]">(मोबाईल नंबर)</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="e.g. 9822112233"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Village / City <span className="text-[10px] text-[var(--tactile-text-dim)]">(गाव / शहर)</span>
+                </label>
+                <input
+                  type="text"
+                  value={newVillage}
+                  onChange={(e) => setNewVillage(e.target.value)}
+                  placeholder="e.g. Wardha, Arvi, Hinganghat, Seloo"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Address Details <span className="text-[10px] text-[var(--tactile-text-dim)]">(पत्ता)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  placeholder="Shop number, landmark, area..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl tactile-btn-primary text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Save Customer (जतन करा)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Settle / Receive Payment Modal */}
+      {settleModalCust && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
+              <div>
+                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
+                  Receive Payment (उधारी जमा पावती)
+                </h3>
+                <p className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                  {settleModalCust.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setSettleModalCust(null)}
+                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-center justify-between">
+              <span className="text-amber-800 dark:text-amber-300 font-bold">Current Balance Due:</span>
+              <span className="font-black text-amber-700 dark:text-amber-400 text-base font-mono-num">
+                ₹{(Number(settleModalCust.balanceDue) || 0).toLocaleString()}
+              </span>
+            </div>
+
+            <form onSubmit={submitSettlePayment} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Amount Received (₹) * <span className="text-[10px] text-[var(--tactile-text-dim)]">(जमा रक्कम)</span>
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  placeholder={String(settleModalCust.balanceDue || '')}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-black text-base placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-inner font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Payment Mode <span className="text-[10px] text-[var(--tactile-text-dim)]">(पेमेंट प्रकार)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSettleMode('Cash')}
+                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      settleMode === 'Cash'
+                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
+                    }`}
+                  >
+                    Cash (रोख)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettleMode('Online')}
+                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      settleMode === 'Online'
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
+                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
+                    }`}
+                  >
+                    Online / UPI (गुगल पे)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
+                  Notes / Reference <span className="text-[10px] text-[var(--tactile-text-dim)]">(नोंद / पावती संदर्भ)</span>
+                </label>
+                <input
+                  type="text"
+                  value={settleNotes}
+                  onChange={(e) => setSettleNotes(e.target.value)}
+                  placeholder="e.g. Cleared pending invoice, GPay Txn ID"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => setSettleModalCust(null)}
+                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md cursor-pointer"
+                >
+                  Record Payment (पावती नोंदवा)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Customer Hisab Calculator Modal */}
+      {showQuickHisabModal && (
+        <QuickCustomerHisabModal
+          initialCustomer={quickHisabCustomer}
+          customers={customers}
+          settings={settings}
+          onClose={() => {
+            setShowQuickHisabModal(false);
+            setQuickHisabCustomer(null);
+          }}
+          onSaveQuickHisab={(data) => {
+            if (data.customerId && data.receiptPaid > 0) {
+              onSettlePayment(
+                data.customerId,
+                data.receiptPaid,
+                'Cash',
+                `${data.itemDetails} - जमा पावती हिशोब. ${data.notes || ''}`
+              );
+            }
+          }}
+        />
+      )}
+
+      {/* Duplicate Customer Accounts Merge Modal */}
+      <DuplicateCustomerMergeModal
+        isOpen={showDuplicateMergeModal}
+        customers={customers}
+        transactions={transactions}
+        duplicatePairs={duplicatePairs}
+        initialSelectedPairId={selectedDuplicatePairId}
+        onClose={() => {
+          setShowDuplicateMergeModal(false);
+          setSelectedDuplicatePairId(undefined);
+        }}
+        onDismissPair={(pairId) => {
+          setDismissedPairIds((prev) => new Set(prev).add(pairId));
+        }}
+        onMerge={(primaryId, duplicateId, mergedData) => {
+          if (onMergeCustomers) {
+            onMergeCustomers(primaryId, duplicateId, mergedData);
+          }
+          setShowDuplicateMergeModal(false);
+          setSelectedDuplicatePairId(undefined);
+        }}
+      />
     </div>
   );
 };
