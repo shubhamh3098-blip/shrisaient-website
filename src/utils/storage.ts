@@ -1,3 +1,4 @@
+export const INITIAL_CUSTOMERS: any[] = [];
 import {
   BusinessSettings,
   CardMember,
@@ -114,8 +115,6 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     color: 'from-cyan-600 to-blue-900',
   },
 ];
-
-
 export const INITIAL_STOCK: StockItem[] = [
   {
     id: 'stk-tv32',
@@ -314,15 +313,6 @@ export const INITIAL_STOCK: StockItem[] = [
   },
 ];
 
-export const INITIAL_CUSTOMERS: Customer[] = [];
-export const INITIAL_TRANSACTIONS: TransactionEntry[] = [];
-export const INITIAL_PURCHASES: PurchaseEntry[] = [];
-export const INITIAL_STAFF: StaffMember[] = [];
-export const INITIAL_EXPENSES: ExpenseEntry[] = [];
-export const INITIAL_DEALERS: Dealer[] = [];
-export const INITIAL_DEALER_PAYMENTS: DealerPayment[] = [];
-export const INITIAL_CARD_MEMBERS: CardMember[] = [];
-export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [];
 
 export const INITIAL_TRANSACTIONS: TransactionEntry[] = [
   {
