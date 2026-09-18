@@ -6,11 +6,9 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Edit2,
-  Trash2,
-  Download
+  Trash2
 } from 'lucide-react';
 import { StockItem } from '../types';
-import { exportStockToCsv } from '../utils/csvExporter';
 
 interface StockViewProps {
   stock: StockItem[];
@@ -92,23 +90,13 @@ export const StockView: React.FC<StockViewProps> = ({
             Real-time stock quantities, pricing, and auto-deduction on sales.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportStockToCsv(stock)}
-            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Download inventory list in CSV / Excel format"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-            Export CSV
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            + Add New Stock Item
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          + Add New Stock Item
+        </button>
       </div>
 
       {/* KPI Stats */}
@@ -175,10 +163,10 @@ export const StockView: React.FC<StockViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((item, idx) => {
+              {filtered.map((item) => {
                 const isLow = item.quantity <= item.minStockLevel;
                 return (
-                  <tr key={`${item.id}-${idx}`} className="hover:bg-slate-50/80 transition">
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3.5 px-4">
                       <p className="font-semibold text-slate-900">{item.name}</p>
                       <span className="text-[11px] font-mono text-slate-400">

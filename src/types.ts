@@ -1,4 +1,4 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5' | 'scheme6' | string;
+export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5';
 
 export interface CardSchemeConfig {
   id: CardSchemeId;
@@ -78,6 +78,18 @@ export interface DealerPayment {
   createdAt: string;
 }
 
+export interface SaleItemDetail {
+  id: string;
+  stockItemId?: string;
+  productName: string;
+  modelNumber?: string;
+  serialNumber?: string;
+  serialNumbers?: string[];
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
 export interface TransactionEntry {
   id: string;
   invoiceNo: string;
@@ -91,20 +103,36 @@ export interface TransactionEntry {
   stockItemId?: string;
   stockItemName?: string;
   quantity?: number;
-  unitPrice?: number;
-  category?: string;
+  modelNumber?: string;
+  model?: string;
+  serialNumber?: string;
+  docType?: 'invoice' | 'quotation';
+  agentName?: string;
   itemDetails: string;
+  itemsDetail?: SaleItemDetail[];
   totalAmount: number;
   payingNow: number;
   dueAmount: number; // totalAmount - payingNow
   paymentMode: 'Cash' | 'Online';
-  refBillNo?: string;
-  againstBillNo?: string;
-  entryType?: 'Bill' | 'Receipt';
-  modelNo?: string;
-  serialNo?: string;
-  isQuotation?: boolean;
-  quotationValidity?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface BillReceiptEntry {
+  id: string;
+  receiptNo: string; // Sequence: 1078, 1079, 1080...
+  date: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerVillage?: string;
+  againstInvoiceNo?: string; // Reference bill number e.g. "3848", "B-201"
+  billTotal?: number;
+  previousBalance: number; // आधीची बाकी
+  amountPaid: number; // आज जमा केलेली रक्कम
+  remainingBalance: number; // शिल्लक बाकी
+  paymentMode: 'Cash' | 'Online';
+  agentName?: string; // Shubham Shende, Bhushan Lidbe, Suraj Pendam, Ninad Hole, Counter
   notes?: string;
   createdAt: string;
 }
@@ -122,7 +150,7 @@ export interface Customer {
   linkedCardNumber?: number;
   linkedSchemeId?: CardSchemeId;
   lastVisit?: string;
-  lastTransactionDate?: string;
+  createdAt?: string;
 }
 
 export interface StockItem {
@@ -139,22 +167,24 @@ export interface StockItem {
   description?: string;
 }
 
-export interface PurchaseLineItem {
-  id?: string;
+export interface PurchaseItemDetail {
+  id: string;
   description: string;
-  hsn?: string;
-  quantity: number;
+  hsn: string;
+  qty: number;
   rate: number;
-  discount?: number;
+  discount: number;
   taxableAmount: number;
-  cgstRate?: number;
-  cgstAmount?: number;
-  sgstRate?: number;
-  sgstAmount?: number;
+  taxRate: number;
+  cgstRate: number;
+  cgstAmount: number;
+  sgstRate: number;
+  sgstAmount: number;
   igstRate?: number;
   igstAmount?: number;
+  taxAmount: number;
   totalAmount: number;
-  serialNumbers?: string[]; // e.g. ["602NRZX294301", "602NRQV293652"]
+  serialNumbers?: string[];
 }
 
 export interface PurchaseEntry {
@@ -165,34 +195,50 @@ export interface PurchaseEntry {
   supplierAddress?: string;
   supplierPhone?: string;
   supplierGstin?: string;
+  supplierState?: string;
+  
+  // Buyer Details
+  buyerName?: string;
+  buyerGstin?: string;
+  buyerAddress?: string;
+  
+  // Order & Logistics
   poNo?: string;
   poDate?: string;
+  location?: string;
   salesConsultant?: string;
   approvedBy?: string;
-  location?: string;
-  items: string;
-  lineItems?: PurchaseLineItem[];
-  taxableAmount?: number;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  totalAmount: number;
-  paidAmount: number;
-  status: 'Paid' | 'Partial' | 'Pending';
-  paymentMode: 'Cash' | 'Online' | 'Cheque';
   transporter?: string;
   vehicleNo?: string;
   ewayBillNo?: string;
   irn?: string;
-  ackDate?: string;
-  bankDetails?: {
-    bankName?: string;
+
+  // Items
+  items: string;
+  itemsDetail?: PurchaseItemDetail[];
+
+  // Financials & Tax
+  subtotal?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTax?: number;
+  totalAmount: number;
+  paidAmount: number;
+  status: 'Paid' | 'Partial' | 'Pending';
+  paymentMode: 'Cash' | 'Online' | 'Cheque';
+  
+  // Supplier Bank Details
+  supplierBank?: {
     accountName?: string;
     accountNo?: string;
-    ifsc?: string;
+    ifscCode?: string;
+    bankName?: string;
     branch?: string;
   };
+
   notes?: string;
+  autoUpdateStock?: boolean;
 }
 
 export interface StaffMember {
@@ -213,6 +259,16 @@ export interface ExpenseEntry {
   description: string;
   amount: number;
   paymentMode: 'Cash' | 'Online';
+}
+
+export interface AgentAdvance {
+  id: string;
+  agentName: string;
+  date: string;
+  amount: number;
+  paymentMode: 'Cash' | 'Online';
+  notes?: string;
+  createdAt: string;
 }
 
 export interface DeliveryRatesConfig {
@@ -269,35 +325,12 @@ export interface AuthUser {
   loggedInAt: string;
 }
 
-export interface AgentAdvanceEntry {
-  id: string;
-  agentName: string;
-  date: string; // YYYY-MM-DD
-  amount: number;
-  paymentMode: 'Cash' | 'Online';
-  notes?: string;
-  createdAt: string;
-}
-
-export interface AgentDaySummary {
-  date: string;
-  agentName: string;
-  collectionAmount: number;
-  collectionCount: number;
-  collectionCommission: number; // 4%
-  newCardsCount: number;
-  newCardsBonus: number; // ₹50 per card
-  grossEarnings: number; // 4% comm + bonus
-  advancesPaid: number;
-  netPayable: number;
-}
-
 export type ActiveTab = 
   | 'dashboard'
   | 'add-entry'
   | 'all-entries'
+  | 'bill-receipts'
   | 'card-scheme'
-  | 'agent-hisab'
   | 'customers'
   | 'stock'
   | 'purchases'
@@ -305,7 +338,18 @@ export type ActiveTab =
   | 'csv-import'
   | 'uploaded-data'
   | 'staff'
+  | 'agent-commission'
   | 'expenses'
   | 'settings';
+
+export interface MergedCustomerRecord {
+  secondaryId: string;
+  secondaryName: string;
+  secondaryPhone?: string;
+  primaryId: string;
+  primaryName: string;
+  primaryPhone?: string;
+  mergedAt: string;
+}
 
 

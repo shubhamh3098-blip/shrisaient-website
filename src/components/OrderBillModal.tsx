@@ -53,7 +53,7 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
     const itemsList = order.items
       .map(
         (it, idx) =>
-          `${idx + 1}. *${it.name}* x ${it.quantity} = ₹${(Number(it.total) || 0).toLocaleString()}`
+          `${idx + 1}. *${it.name}* x ${it.quantity} = ₹${it.total.toLocaleString()}`
       )
       .join('\n');
 
@@ -69,9 +69,9 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
       `--------------------------------\n` +
       `*खरेदी केलेल्या वस्तू (Items):*\n${itemsList}\n` +
       `--------------------------------\n` +
-      `*एकूण वस्तू मूल्य (Subtotal):* ₹${(Number(order.subtotal) || 0).toLocaleString()}\n` +
+      `*एकूण वस्तू मूल्य (Subtotal):* ₹${order.subtotal.toLocaleString()}\n` +
       `*डिलिव्हरी शुल्क (Delivery Charge):* ${order.deliveryFee === 0 ? 'मोफत (FREE)' : `₹${order.deliveryFee}`}\n` +
-      `*एकूण देय रक्कम (Grand Total):* ₹${(Number(order.grandTotal) || 0).toLocaleString()}\n` +
+      `*एकूण देय रक्कम (Grand Total):* ₹${order.grandTotal.toLocaleString()}\n` +
       `*पेमेंट प्रकार:* कॅश ऑन डिलिव्हरी (COD) / UPI\n` +
       (order.notes ? `*टीप:* ${order.notes}\n` : '') +
       `--------------------------------\n` +
@@ -115,8 +115,8 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:static print:bg-white">
+      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-fade-in my-auto print:my-0 print:border-none print:shadow-none print:rounded-none print:max-w-none">
         {/* Top Control Bar (Hidden when printing) */}
         <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
@@ -269,10 +269,10 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
                       {item.quantity}
                     </td>
                     <td className="py-2 px-3 text-right text-slate-600">
-                      ₹{(Number(item.unitPrice) || 0).toLocaleString()}
+                      ₹{item.unitPrice.toLocaleString()}
                     </td>
                     <td className="py-2 px-3 text-right font-bold text-slate-900">
-                      ₹{(Number(item.total) || 0).toLocaleString()}
+                      ₹{item.total.toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -307,7 +307,7 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
             <div className="w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 font-mono">
               <div className="flex justify-between text-slate-600">
                 <span>उप-एकूण (Subtotal):</span>
-                <span className="font-bold text-slate-900">₹{(Number(order.subtotal) || 0).toLocaleString()}</span>
+                <span className="font-bold text-slate-900">₹{order.subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>होम डिलिव्हरी शुल्क:</span>
@@ -317,7 +317,7 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
               </div>
               <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
                 <span>एकूण देय रक्कम:</span>
-                <span className="text-base text-blue-700">₹{(Number(order.grandTotal) || 0).toLocaleString()}</span>
+                <span className="text-base text-blue-700">₹{order.grandTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>

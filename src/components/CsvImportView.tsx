@@ -1,1161 +1,2100 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Users,
+  FileSpreadsheet,
+  Upload,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  CreditCard,
+  Building2,
+  Receipt,
+  ArrowRight,
+  Database,
+  RefreshCw,
   Search,
-  Plus,
+  Check,
+  X,
+  Sparkles,
+  ShieldCheck,
+  Trash2,
+  Filter,
+  Eye,
   Phone,
   MapPin,
-  IndianRupee,
-  Share2,
-  CheckCircle,
-  AlertCircle,
-  BookOpen,
-  Receipt,
-  RotateCw,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  ArrowUpDown,
-  Sparkles,
-  LayoutGrid,
-  Table as TableIcon,
-  Download,
-  Calculator,
-  GitMerge,
+  HelpCircle,
+  Layers
 } from 'lucide-react';
-import { BusinessSettings, Customer, TransactionEntry, CardTransaction } from '../types';
-import { CustomerLedgerModal } from './CustomerLedgerModal';
-import { QuickCustomerHisabModal } from './QuickCustomerHisabModal';
-import { exportCustomersToCsv } from '../utils/csvExporter';
-import { detectDuplicateCustomers } from '../utils/duplicateDetector';
-import { DuplicateCustomerMergeModal } from './DuplicateCustomerMergeModal';
+import {
+  CardMember,
+  CardSchemeId,
+  CardTransaction,
+  Customer,
+  Dealer,
+  PurchaseEntry,
+  TransactionEntry
+} from '../types';
 
-interface CustomersViewProps {
-  customers: Customer[];
-  transactions?: TransactionEntry[];
-  cardTransactions?: CardTransaction[];
-  onAddCustomer: (customer: Omit<Customer, 'id'>) => void;
-  onSettlePayment: (
-    customerId: string,
-    amount: number,
-    mode: 'Cash' | 'Online',
-    notes: string,
-    customReceiptNo?: string,
-    refBillNo?: string,
-    customDate?: string
-  ) => void;
-  onRecalculateLedgers?: () => void;
-  onOpenQuickPavti?: (customer?: Customer | null, billNo?: string, amount?: number) => void;
-  onMergeCustomers?: (
-    primaryId: string,
-    duplicateId: string,
-    mergedData: {
-      name: string;
-      phone: string;
-      village?: string;
-      address?: string;
-    }
-  ) => void;
-  settings: BusinessSettings;
+interface CsvImportViewProps {
+  onImportBills: (bills: TransactionEntry[]) => void;
+  onImportReceipts: (receipts: CardTransaction[]) => void;
+  onImportCardMembers: (members: CardMember[]) => void;
+  onImportPurchases: (purchases: PurchaseEntry[], dealers: Dealer[]) => void;
+  onImportCustomers?: (customers: Customer[]) => void;
+  existingCardMembers?: CardMember[];
+  existingDealers?: Dealer[];
+  existingCustomers?: Customer[];
+  existingBills?: TransactionEntry[];
+  existingReceipts?: CardTransaction[];
+  onResetData?: (mode: 'all' | 'zero-bills') => void;
+  onSwitchTab?: (tab: any) => void;
 }
 
-const PAGE_SIZE = 24;
+type MainTab = 'universal' | 'manual' | 'search';
+type ManualImportType = 'bills' | 'receipts' | 'cards' | 'purchases';
 
-export const CustomersView: React.FC<CustomersViewProps> = ({
-  customers = [],
-  transactions = [],
-  cardTransactions = [],
-  onAddCustomer,
-  onSettlePayment,
-  onRecalculateLedgers,
-  onOpenQuickPavti,
-  onMergeCustomers,
-  settings,
-}) => {
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'due' | 'high-due' | 'cleared'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'due-desc' | 'due-asc'>('due-desc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showAll, setShowAll] = useState(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+// Comprehensive Village & Spelling Correction Dictionary (Wardha / Vidarbha area)
+const SPELLING_MAP: Record<string, string> = {
+  KELHZAR: 'Kelzar',
+  KELZAR: 'Kelzar',
+  KELJHAR: 'Kelzar',
+  VAYFAD: 'Waifad',
+  WAYFAD: 'Waifad',
+  VAIFAD: 'Waifad',
+  NILIMA: 'Nilima',
+  BORI: 'Bori',
+  BORIKAMPTEE: 'Bori',
+  'BORI KAMPTEE': 'Bori',
+  HINGNI: 'Hingni',
+  HINGANI: 'Hingni',
+  HINGANGHAT: 'Hinganghat',
+  ANTERGAON: 'Antergaon',
+  ANTARGAON: 'Antergaon',
+  'SINDI MEGHE': 'Sindi Meghe',
+  SINDI: 'Sindi Meghe',
+  SELU: 'Seloo',
+  SELOO: 'Seloo',
+  DEOLI: 'Deoli',
+  ARVI: 'Arvi',
+  PIPRI: 'Pipri',
+  'PIPRI MEGHE': 'Pipri',
+  SATODA: 'Satoda',
+  SHIVNAGAR: 'Shivnagar',
+  DEVNAGAR: 'Devnagar',
+  'KANHOLI BARA': 'Kanholi Bara',
+  KANHOLI: 'Kanholi Bara',
+  WARDHA: 'Wardha',
+  'ANAND NAGAR': 'Anand Nagar',
+  'PUNJAB COLONY': 'Punjab Colony',
+};
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [settleModalCust, setSettleModalCust] = useState<Customer | null>(null);
-  const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState<Customer | null>(null);
-  const [quickHisabCustomer, setQuickHisabCustomer] = useState<Customer | null>(null);
-  const [showQuickHisabModal, setShowQuickHisabModal] = useState(false);
+// Clean spelling helper
+function normalizeVillage(raw: string): { cleaned: string; wasCorrected: boolean } {
+  if (!raw) return { cleaned: '', wasCorrected: false };
+  const upper = raw.trim().toUpperCase().replace(/[\.,]/g, '');
+  if (SPELLING_MAP[upper]) {
+    const isDifferent = SPELLING_MAP[upper].toUpperCase() !== raw.trim().toUpperCase();
+    return { cleaned: SPELLING_MAP[upper], wasCorrected: isDifferent };
+  }
+  // Title case fallback
+  const titleCase = raw
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return { cleaned: titleCase, wasCorrected: false };
+}
 
-  // Duplicate accounts detection state
-  const [showDuplicateMergeModal, setShowDuplicateMergeModal] = useState(false);
-  const [selectedDuplicatePairId, setSelectedDuplicatePairId] = useState<string | undefined>(undefined);
-  const [dismissedPairIds, setDismissedPairIds] = useState<Set<string>>(new Set());
+// Clean names and extract village if in brackets: "ARUN SAYRE (ANTERGAON)"
+function parseNameAndVillage(rawName: string, existingVillage?: string): {
+  cleanName: string;
+  extractedVillage: string;
+  wasExtracted: boolean;
+} {
+  let cleanName = rawName ? rawName.trim() : '';
+  let extractedVillage = existingVillage ? existingVillage.trim() : '';
+  let wasExtracted = false;
 
-const duplicatePairs = useMemo(() => {
-  return detectDuplicateCustomers(customers || [], dismissedPairIds);
-}, [customers, dismissedPairIds]);
+  const bracketMatch = cleanName.match(/\(([^)]+)\)|\[([^\]]+)\]/);
+  if (bracketMatch) {
+    const villageCandidate = (bracketMatch[1] || bracketMatch[2] || '').trim();
+    cleanName = cleanName.replace(/\(([^)]+)\)|\[([^\]]+)\]/, '').trim();
+    if (!extractedVillage && villageCandidate) {
+      extractedVillage = normalizeVillage(villageCandidate).cleaned;
+      wasExtracted = true;
+    }
+  }
 
-  // Add customer form states
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newAddress, setNewAddress] = useState('');
-  const [newVillage, setNewVillage] = useState('');
+  // Capitalize name properly
+  cleanName = cleanName.replace(/\s+/g, ' ');
 
-  // Settle form states
-  const [settleAmount, setSettleAmount] = useState('');
-  const [settleMode, setSettleMode] = useState<'Cash' | 'Online'>('Cash');
-  const [settleNotes, setSettleNotes] = useState('');
+  return { cleanName, extractedVillage, wasExtracted };
+}
 
-  // Defensive calculations for overall totals
-  const { totalCustomers, totalUdhar, customersWithDueCount } = useMemo(() => {
-    let sumUdhar = 0;
-    let dueCount = 0;
-    (customers || []).forEach((c) => {
-      if (!c) return;
-      const due = Number(c.balanceDue) || 0;
-      if (due > 0) {
-        sumUdhar += due;
-        dueCount++;
-      }
-    });
-    return {
-      totalCustomers: (customers || []).length,
-      totalUdhar: sumUdhar,
-      customersWithDueCount: dueCount,
-    };
-  }, [customers]);
+// Clean phone numbers
+function cleanPhoneNumber(rawPhone: string): { phone: string; wasFormatted: boolean } {
+  if (!rawPhone) return { phone: '', wasFormatted: false };
+  const str = rawPhone.toString().trim().toLowerCase();
+  // If phone is 0, 00, -, NA, etc., it means the customer has NO phone number
+  if (
+    str === '0' ||
+    str === '00' ||
+    str === 'na' ||
+    str === 'n/a' ||
+    str === 'none' ||
+    str === 'null' ||
+    str === 'nil' ||
+    str === '-' ||
+    str === '#value!'
+  ) {
+    return { phone: '', wasFormatted: false };
+  }
+  const digits = rawPhone.toString().replace(/\D/g, '');
+  // Ignore single zeros, short numbers, and repetitive dummy sequences (e.g. 0000000000)
+  if (!digits || digits.length < 10) return { phone: '', wasFormatted: false };
+  if (/^(\d)\1{9,}$/.test(digits) || digits === '1234567890') {
+    return { phone: '', wasFormatted: false };
+  }
+  if (digits.length === 10) {
+    return { phone: digits, wasFormatted: rawPhone.trim() !== digits };
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return { phone: digits.slice(2), wasFormatted: true };
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return { phone: digits.slice(1), wasFormatted: true };
+  }
+  return { phone: digits.slice(-10), wasFormatted: false };
+}
 
-  // Robust, crash-proof filtering & sorting
-  const filtered = useMemo(() => {
-    const q = (search || '').toLowerCase().trim();
+// Clean and normalize dates to standard YYYY-MM-DD
+function normalizeDateStr(rawDate?: string): string {
+  if (!rawDate) return new Date().toISOString().split('T')[0];
+  const str = rawDate.trim();
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return str;
+}
 
-    return (customers || [])
-      .filter((c) => {
-        if (!c) return false;
-
-        const nameStr = String(c.name || '').toLowerCase();
-        const phoneStr = String(c.phone || '');
-        const addrStr = String(c.address || '').toLowerCase();
-        const villStr = String(c.village || '').toLowerCase();
-
-        const matchesSearch =
-          !q ||
-          nameStr.includes(q) ||
-          phoneStr.includes(q) ||
-          addrStr.includes(q) ||
-          villStr.includes(q);
-
-        if (!matchesSearch) return false;
-
-        const due = Number(c.balanceDue) || 0;
-        if (filterType === 'due') return due > 0;
-        if (filterType === 'high-due') return due >= 5000;
-        if (filterType === 'cleared') return due <= 0;
-        return true;
-      })
-      .sort((a, b) => {
-        const dueA = Number(a?.balanceDue) || 0;
-        const dueB = Number(b?.balanceDue) || 0;
-
-        if (sortBy === 'due-desc') return dueB - dueA;
-        if (sortBy === 'due-asc') return dueA - dueB;
-        return String(a?.name || '').localeCompare(String(b?.name || ''));
-      });
-  }, [customers, search, filterType, sortBy]);
-
-  // Pagination chunking to eliminate mobile/laptop freezing
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const displayedCustomers = useMemo(() => {
-    if (showAll) return filtered;
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage, showAll]);
-
-  const handleSendReminder = (c: Customer) => {
-    if (!c) return;
-    const due = Number(c.balanceDue) || 0;
-    const text = encodeURIComponent(
-      `Namaste ${c.name || 'Customer'},\nThis is a gentle reminder from *${settings.businessName || 'Shri Sai Enterprises'}* regarding your outstanding balance of *₹${due.toLocaleString()}*.\nKindly clear the payment at your earliest convenience via Cash or UPI.\nContact: ${settings.phone || '8766486915'}\nWebsite: ${settings.domainName || 'shrisaient.in'}`
+// Flexible case/punctuation-insensitive field retriever
+function getRowField(row: Record<string, string>, aliases: string[]): string {
+  const keys = Object.keys(row);
+  for (const alias of aliases) {
+    const cleanAlias = alias.toLowerCase().replace(/[\s._-]/g, '');
+    const matchedKey = keys.find(
+      (k) => k.toLowerCase().replace(/[\s._-]/g, '') === cleanAlias
     );
-    const phone = String(c.phone || '').replace(/[^0-9]/g, '');
-    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(url, '_blank');
+    if (matchedKey && row[matchedKey] !== undefined && row[matchedKey].toString().trim() !== '') {
+      return row[matchedKey].toString().trim();
+    }
+  }
+  return '';
+}
+
+function getRowNumberField(row: Record<string, string>, aliases: string[]): number {
+  const val = getRowField(row, aliases);
+  if (!val) return 0;
+  const cleaned = val.replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export const CsvImportView: React.FC<CsvImportViewProps> = ({
+  onImportBills,
+  onImportReceipts,
+  onImportCardMembers,
+  onImportPurchases,
+  existingCardMembers = [],
+  existingDealers = [],
+  existingCustomers = [],
+  existingBills = [],
+  existingReceipts = [],
+  onResetData,
+  onSwitchTab,
+}) => {
+  // Main Navigation Tabs (matching Screenshot 2)
+  const [activeMainTab, setActiveMainTab] = useState<MainTab>('universal');
+  const [activeManualType, setActiveManualType] = useState<ManualImportType>('bills');
+
+  // Input States
+  const [csvText, setCsvText] = useState<string>('');
+  const [fileName, setFileName] = useState<string>('');
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [showPasteArea, setShowPasteArea] = useState<boolean>(false);
+
+  // Parsed & Cleaned universal records
+  const [detectedType, setDetectedType] = useState<
+    'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases' | 'unknown'
+  >('unknown');
+  const [detectedRecords, setDetectedRecords] = useState<any[]>([]);
+  const [cleanStats, setCleanStats] = useState<{
+    spellingFixed: number;
+    villagesExtracted: number;
+    phonesFormatted: number;
+    zeroBillsFixed: number;
+    totalRows: number;
+    totalSales: number;
+    totalPaid: number;
+    totalDue: number;
+  }>({
+    spellingFixed: 0,
+    villagesExtracted: 0,
+    phonesFormatted: 0,
+    zeroBillsFixed: 0,
+    totalRows: 0,
+    totalSales: 0,
+    totalPaid: 0,
+    totalDue: 0,
+  });
+
+  // Reset Modal
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  // Search tab state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchFilterCategory, setSearchFilterCategory] = useState<'all' | 'cards' | 'bills' | 'receipts'>('all');
+
+  // Sample CSV Templates for Manual Mode
+  const manualTemplates: Record<ManualImportType, { filename: string; content: string; desc: string }> = {
+    bills: {
+      filename: 'sample_old_bills.csv',
+      desc: 'Old Sales Invoices & Customer Bills',
+      content: `InvoiceNo,Date,CustomerName,CustomerPhone,CardNumber,Village,ItemDetails,TotalAmount,PaidAmount,DueAmount,PaymentMode
+INV-2025-0101,2025-11-12,Ramesh Patil (Wardha),9822012345,1001,Wardha,Copper Wire 2.5mm 10 coils,15000,10000,5000,Cash
+INV-2025-0102,2025-11-15,Mahesh Kulkarni,9823098765,,Kelzar,Modular switches 20 pcs,4800,4800,0,Online
+INV-2025-0103,2025-12-01,Sunita More (Waifad),9765412980,1002,Waifad,LED Battens 20W (15 pcs),3750,3750,0,Cash
+INV-2025-0104,2026-01-10,Vikas Jadhav,9421876543,1045,Antergaon,Distribution Box 8 Way + MCBs,6200,4000,2200,Cash`,
+    },
+    receipts: {
+      filename: 'sample_weekly_receipts.csv',
+      desc: 'Weekly Card Payment & Refund Receipts (साप्ताहिक जमा व परतावा)',
+      content: `ReceiptNo,CardNo,SchemeId,CustomerName,Date,WeekNo,Amount,Type,PaymentMode,Remarks
+REC-SCH1-101,1030,scheme1,SANGITA UTTAM PATIL,2025-06-08,1,450,WeeklyPayment,Cash,Week 1 payment
+REC-SCH2-102,3191,scheme2,SUNIL DANDAGE,2024-11-15,2,1000,WeeklyPayment,Cash,Week 2 payment
+REC-SCH3-103,4107,scheme3,RANJANA SHAMBHARKAR,2025-07-12,1,600,WeeklyPayment,Cash,Week 1 deposit
+REF-SCH1-104,1001,scheme1,Prakash Shinde,2026-09-04,,5000,Refund,Cash,Customer return refund`,
+    },
+    cards: {
+      filename: 'sample_card_members.csv',
+      desc: 'Card Scheme Members (NAME, CARD.NO, VILLEGE, MOBILE.NO, OPENING AMT, DATE, SHEET NO)',
+      content: `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
+RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793
+VAISHALI BAVNE,4304,HINGNI,,100,18-10-2025,5104
+SANGITA,4181,DEVNAGAR,,200,01-10-2025,5110
+SUNIL DANDAGE,3191,PIPRI,8855881081,3000,01-11-2024,
+PRASHANT BHALE,3201,SATODA,,100,01-11-2024,
+SANGITA UTTAM PATIL,1030,HINGNI,7972811639,450,01-06-2025,
+YAMUNA PRABHAKAR KAIKADI,1029,HINGNI,8698041323,200,01-06-2025,`,
+    },
+    purchases: {
+      filename: 'sample_dealer_purchases.csv',
+      desc: 'Dealer / Supplier Old Purchases (e.g. Manisha Enterprises)',
+      content: `BillNo,Date,DealerName,Items,TotalAmount,PaidAmount,PaymentMode
+PUR-7701,2026-08-10,Manisha Enterprises,Wires and modular accessories,95000,75000,Online
+PUR-7702,2026-08-25,Manisha Enterprises,PVC pipes & conduits lot,50000,40000,Online
+PUR-7703,2026-08-15,Polycab Distributors Ltd.,Submersible cables 4mm,72500,72500,Online
+PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,20000,Online`,
+    },
   };
 
-  const submitAddCustomer = (e: React.FormEvent) => {
+  // Download sample helper
+  const handleDownloadSample = (type: ManualImportType) => {
+    const item = manualTemplates[type];
+    const blob = new Blob([item.content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', item.filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Universal Smart CSV Parser & Error Cleaner
+  const processAndCleanCSV = (
+    content: string,
+    customFileName = '',
+    preferredType?: 'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases'
+  ) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!content.trim()) {
+      setDetectedRecords([]);
+      setDetectedType('unknown');
+      return;
+    }
+
+    try {
+      // Split content into lines handling \r\n, \r, or \n
+      const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        setErrorMessage('CSV फाईलमध्ये हेडर आणि किमान १ डेटा ओळ असणे आवश्यक आहे.');
+        setDetectedRecords([]);
+        return;
+      }
+
+      // Detect delimiter: tab (pasted from Excel), semicolon, or comma
+      const firstLine = lines[0];
+      const tabMatches = (firstLine.match(/\t/g) || []).length;
+      const semiMatches = (firstLine.match(/;/g) || []).length;
+      const commaMatches = (firstLine.match(/,/g) || []).length;
+      let delimiter = ',';
+      if (tabMatches > commaMatches && tabMatches >= semiMatches) {
+        delimiter = '\t';
+      } else if (semiMatches > commaMatches && semiMatches > tabMatches) {
+        delimiter = ';';
+      }
+
+      const splitLine = (l: string): string[] => {
+        if (delimiter === '\t') {
+          return l.split('\t').map((v) => v.trim().replace(/^["']|["']$/g, ''));
+        }
+        if (delimiter === ';') {
+          return l.split(';').map((v) => v.trim().replace(/^["']|["']$/g, ''));
+        }
+        return l.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((v) =>
+          v.trim().replace(/^["']|["']$/g, '')
+        );
+      };
+
+      // Parse headers
+      const rawHeaders = splitLine(lines[0]);
+      const upperHeaders = rawHeaders.map((h) => h.toUpperCase());
+
+      // Detect Data Type Automatically
+      let detected: 'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases' | 'unknown' = 'unknown';
+
+      const hasCardNo = upperHeaders.some((h) => h.includes('CARD') || h.includes('CARD.NO') || h.includes('CARDNO'));
+      const hasVillage = upperHeaders.some((h) => h.includes('VILLEGE') || h.includes('VILLAGE') || h.includes('CITY'));
+      const hasOpeningAmt = upperHeaders.some((h) => h.includes('OPENING') || h.includes('DEPOSIT') || h.includes('AMT'));
+      const hasInvoiceNo = upperHeaders.some((h) => h.includes('INVOICE') || h.includes('BILLNO') || h.includes('BILL NO') || h.includes('BILL.NO') || h.includes('BILL_NO') || h.includes('BILL'));
+      const hasReceiptNo = upperHeaders.some((h) => h.includes('RECEIPT') || h.includes('WEEK') || h.includes('REC-') || h.includes('RECIVED BY') || h.includes('RECEIVED BY') || h.includes('पावती') || h.includes('REC NO') || h.includes('REC. NO') || h.includes('PAWATI'));
+      const hasDealerName = upperHeaders.some((h) => h.includes('DEALER') || h.includes('SUPPLIER'));
+      const hasSalesColumns = upperHeaders.some((h) => h.includes('PRODUCT') || h.includes('ADVANCE') || h.includes('BALANCE') || h.includes('ITEM') || h.includes('विक्री') || h.includes('खरेदी'));
+
+      let spellingFixedCount = 0;
+      let villagesExtractedCount = 0;
+      let phonesFormattedCount = 0;
+      let zeroBillsFixedCount = 0;
+
+      const parsedRows: any[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) continue;
+        const values = splitLine(line);
+        // Only skip if the line is completely blank
+        if (!values.some((v) => v.trim().length > 0)) continue;
+
+        const row: Record<string, string> = {};
+        rawHeaders.forEach((header, idx) => {
+          row[header] = values[idx] || '';
+        });
+        // Also keep indexed values for positional fallbacks
+        (row as any)._rawValues = values;
+        parsedRows.push(row);
+      }
+
+      if (parsedRows.length === 0) {
+        setErrorMessage('कोणतीही वैध डेटा ओळ सापडली नाही.');
+        return;
+      }
+
+      // Inspect first 20 rows to determine Card Scheme vs Bills
+      const sampleCardNumbers: number[] = [];
+      parsedRows.slice(0, 20).forEach((r) => {
+        const val = parseInt(r['CARD.NO'] || r['CARD NO'] || r.CardNo || r.cardNumber || r.CardNumber || '0');
+        if (val > 0) sampleCardNumbers.push(val);
+      });
+
+      const fileLower = customFileName.toLowerCase();
+
+      if (preferredType) {
+        detected = preferredType;
+      } else if (hasDealerName || fileLower.includes('purchase') || fileLower.includes('dealer')) {
+        detected = 'purchases';
+      } else if (hasReceiptNo || upperHeaders.includes('WEEKNO') || upperHeaders.includes('WEEK') || upperHeaders.includes('RECIVED BY') || upperHeaders.includes('RECEIVED BY') || fileLower.includes('receipt') || fileLower.includes('पावती')) {
+        detected = 'receipts';
+      } else if (
+        hasInvoiceNo ||
+        hasSalesColumns ||
+        upperHeaders.includes('ITEMDETAILS') ||
+        upperHeaders.includes('ITEMS') ||
+        fileLower.includes('bill') ||
+        fileLower.includes('sale') ||
+        fileLower.includes('विक्री')
+      ) {
+        detected = 'bills';
+      } else if (hasCardNo && (hasVillage || hasOpeningAmt || sampleCardNumbers.length > 0)) {
+        // Scheme Cards! Determine which scheme (1, 2, or 3)
+        const avgCard = sampleCardNumbers.length > 0
+          ? sampleCardNumbers.reduce((a, b) => a + b, 0) / sampleCardNumbers.length
+          : 0;
+
+        if (avgCard >= 4001 || fileLower.includes('scheme 3') || fileLower.includes('scheme3')) {
+          detected = 'scheme3';
+        } else if (avgCard >= 3001 || fileLower.includes('scheme 2') || fileLower.includes('scheme2')) {
+          detected = 'scheme2';
+        } else {
+          detected = 'scheme1';
+        }
+      } else {
+        detected = 'customers';
+      }
+
+      // Pre-compute fast lookup Maps for existing bills to eliminate O(N^2) lag
+      const billByCardMap = new Map<number, string>();
+      const billByPhoneMap = new Map<string, string>();
+      const billByNameMap = new Map<string, string>();
+      if (existingBills && existingBills.length > 0) {
+        for (let b = 0; b < existingBills.length; b++) {
+          const eb = existingBills[b];
+          if (eb.dueAmount > 0 && eb.invoiceNo) {
+            if (eb.cardNumber) billByCardMap.set(eb.cardNumber, eb.invoiceNo);
+            const digits = (eb.customerPhone || '').replace(/\D/g, '');
+            if (digits.length >= 10) billByPhoneMap.set(digits, eb.invoiceNo);
+            if (eb.customerName) billByNameMap.set(eb.customerName.toLowerCase().trim(), eb.invoiceNo);
+          }
+        }
+      }
+
+      // Clean rows with Spelling Normalizer & Bracket Village Extractor
+      const cleanedRows = parsedRows.map((r, index) => {
+        const rawBillNo = getRowField(r, [
+          'BILL NO',
+          'BILL_NO',
+          'BILL NUMBER',
+          'BILLNO',
+          'BillNo',
+          'billNo',
+          'INVOICE NO',
+          'INVOICE_NO',
+          'INVOICENO',
+          'INVOICE',
+          'InvoiceNo',
+          'VOUCHER NO',
+          'VCH NO',
+          'BILL',
+          'INV NO',
+          'INV_NO',
+          'INVNO',
+          'SR NO',
+          'SR. NO',
+          'SL NO',
+          'NO',
+          'BILL #',
+          'INV #',
+          'SALE NO',
+          'SALES NO',
+          'बिल नंबर',
+          'बिल क्र.',
+          'बिल नं',
+        ]);
+
+        const rawDate = getRowField(r, [
+          'DATE',
+          'BILL DATE',
+          'INVOICE DATE',
+          'BILL_DATE',
+          'INVOICE_DATE',
+          'BILLDATE',
+          'INVOICEDATE',
+          'DOC DATE',
+          'TRANSACTION DATE',
+          'ENTRY DATE',
+          'तारीख',
+          'दिनांक',
+        ]);
+
+        const rawVillage = getRowField(r, [
+          'VILLEGE',
+          'VILLAGE',
+          'CITY',
+          'TOWN',
+          'ADDRESS',
+          'LOCATION',
+          'AREA',
+          'गाव',
+          'पत्ता',
+        ]);
+
+        const explicitName = getRowField(r, [
+          'NAME',
+          'CUSTOMER NAME',
+          'CUSTOMER',
+          'PARTY NAME',
+          'PARTY',
+          'CLIENT',
+          'ACCOUNT NAME',
+          'ACCOUNT',
+          'A/C NAME',
+          'M/S',
+          'NAME OF PARTY',
+          'NAME OF CUSTOMER',
+          'ग्राहकाचे नाव',
+          'नाव',
+        ]);
+
+        const rawName =
+          explicitName ||
+          (rawBillNo ? `ग्राहक (बिल #${rawBillNo}${rawVillage ? ` - ${rawVillage}` : ''})` : `ग्राहक #${index + 1}`);
+
+        const rawPhone = getRowField(r, [
+          'MOBILE.NO',
+          'MOBILE NO',
+          'MOBILE NUMBER',
+          'MOBILE',
+          'PHONE',
+          'PHONE NUMBER',
+          'CONTACT',
+          'CONTACT NO',
+          'TEL',
+          'CELL',
+          'WHATSAPP',
+          'मोबाईल',
+        ]);
+
+        // 1. Extract village from name brackets: "ARUN SAYRE (ANTERGAON)"
+        const nameParsed = parseNameAndVillage(rawName, rawVillage);
+        if (nameParsed.wasExtracted) villagesExtractedCount++;
+
+        // 2. Clean village spelling
+        const villageNorm = normalizeVillage(nameParsed.extractedVillage);
+        if (villageNorm.wasCorrected) spellingFixedCount++;
+
+        // 3. Clean Phone
+        const phoneClean = cleanPhoneNumber(rawPhone);
+        if (phoneClean.wasFormatted) phonesFormattedCount++;
+
+        // 4. Clean ₹0 bills / calculate advance and balance if it's bill
+        const rawTotal = getRowNumberField(r, [
+          'TOTAL',
+          'TOTAL AMOUNT',
+          'TOTAL AMT',
+          'BILL AMOUNT',
+          'BILL AMT',
+          'NET AMOUNT',
+          'NET AMT',
+          'AMOUNT',
+          'AMT',
+          'DEBIT',
+          'DEBIT AMOUNT',
+          'GRAND TOTAL',
+          'SALES',
+          'PRICE',
+          'VALUE',
+          'खरेदी',
+          'रक्कम',
+        ]);
+
+        const rawPaid = getRowNumberField(r, [
+          'ADVANCE',
+          'PAID AMOUNT',
+          'PAID AMT',
+          'PAID',
+          'RECEIVED',
+          'REC AMOUNT',
+          'REC AMT',
+          'CREDIT',
+          'CREDIT AMOUNT',
+          'DEPOSIT',
+          'CASH',
+          'जमा',
+        ]);
+
+        const rawDue = getRowNumberField(r, [
+          'BALANCE',
+          'BAL',
+          'DUE',
+          'DUE AMOUNT',
+          'DUE AMT',
+          'PENDING',
+          'BALANCE DUE',
+          'OUTSTANDING',
+          'बाकी',
+          'शिल्लक',
+        ]);
+
+        let finalTotal = rawTotal;
+        let finalPaid = rawPaid;
+        let finalDue = rawDue;
+
+        if (finalTotal === 0 && (finalPaid > 0 || finalDue > 0)) {
+          finalTotal = finalPaid + finalDue;
+          zeroBillsFixedCount++;
+        } else if (finalTotal > 0) {
+          if (finalDue === 0 && finalPaid > 0 && finalPaid < finalTotal) {
+            finalDue = Math.max(0, finalTotal - finalPaid);
+          } else if (finalPaid === 0 && finalDue > 0 && finalDue < finalTotal) {
+            finalPaid = Math.max(0, finalTotal - finalDue);
+          } else if (finalPaid === 0 && finalDue === 0) {
+            finalDue = finalTotal;
+          }
+        }
+
+        const cardNum =
+          getRowNumberField(r, [
+            'CARD.NO',
+            'CARD NO',
+            'CARD NUMBER',
+            'CARDNO',
+            'CARD',
+          ]) || undefined;
+
+        const openingAmt = getRowNumberField(r, [
+          'OPENING AMT',
+          'OPENING AMOUNT',
+          'OPENING BALANCE',
+          'OPENING',
+          'DEPOSIT',
+          'ठेव',
+        ]);
+
+        const sheetNo = getRowField(r, [
+          'SHEET NO',
+          'SHEET_NO',
+          'SHEETNO',
+          'SHEET',
+          'PAGE NO',
+        ]);
+
+        // Extract receipt specific fields with comprehensive aliases
+        let receiptNo = getRowField(r, [
+          'RECEIPT NO',
+          'RECEIPT_NO',
+          'RECEIPTNO',
+          'RECEIPT',
+          'RECEIPT #',
+          'RECEIPT NUMBER',
+          'REC NO',
+          'REC_NO',
+          'REC. NO',
+          'REC.NO',
+          'REC NO.',
+          'REC #',
+          'PAWATI NO',
+          'PAWATI_NO',
+          'PAWATI NO.',
+          'PAWATINO',
+          'PAWATI',
+          'PAWATI NUMBER',
+          'VOUCHER NO',
+          'VOUCHER_NO',
+          'VCH NO',
+          'VCH_NO',
+          'पावती नं',
+          'पावती नंबर',
+          'पावती क्र.',
+          'पावती क्रमांक',
+          'पावती क्र',
+          'अनुक्रमांक',
+          'क्रमांक',
+          'क्र.',
+          'SR NO',
+          'SR. NO',
+          'SR.NO',
+          'SR NO.',
+          'SRNO',
+          'SL NO',
+          'SL. NO',
+          'SL.NO',
+          'S.NO',
+          'S.NO.',
+          'NO',
+          'NO.',
+          'NUMBER',
+          '#',
+          'ID',
+          'CODE',
+        ]);
+
+        if (!receiptNo && detected === 'receipts') {
+          receiptNo = rawBillNo;
+        }
+
+        const rawValues: string[] = (r as any)._rawValues || Object.values(r).map((v) => String(v).trim());
+
+        // Positional fallback for receipts if receiptNo is still empty but Col 0 is a number (e.g. 1072, 1073...)
+        if (!receiptNo && detected === 'receipts' && rawValues.length >= 1 && /^\d+$/.test(rawValues[0])) {
+          receiptNo = rawValues[0];
+        }
+
+        // Positional fallback for customer name if explicit name was missing
+        let effectiveName = nameParsed.cleanName;
+        if ((!explicitName || effectiveName.startsWith('ग्राहक #')) && detected === 'receipts' && rawValues.length >= 3 && rawValues[2] && !/^\d+$/.test(rawValues[2])) {
+          const parsedPosName = parseNameAndVillage(rawValues[2], rawVillage);
+          effectiveName = parsedPosName.cleanName;
+        }
+
+        // Positional fallback for village if missing
+        let effectiveVillage = villageNorm.cleaned;
+        if (!rawVillage && detected === 'receipts' && rawValues.length >= 4 && rawValues[3] && !/^\d+$/.test(rawValues[3])) {
+          effectiveVillage = normalizeVillage(rawValues[3]).cleaned;
+        }
+
+        const invoiceRef = getRowField(r, [
+          'BILL NO',
+          'BILL_NO',
+          'BILLNO',
+          'INVOICE NO',
+          'INVOICE_NO',
+          'INVOICENO',
+          'INV NO',
+          'INV_NO',
+          'BILL',
+          'INV',
+          'बिल नं',
+        ]);
+
+        let rawReceiptAmt = getRowNumberField(r, [
+          'AMOUNT',
+          'AMT',
+          'RECEIPT AMOUNT',
+          'REC AMOUNT',
+          'DEPOSIT',
+          'PAID',
+          'PAID AMOUNT',
+          'रक्कम',
+          'जमा रक्कम',
+          'जमा',
+        ]);
+
+        // Positional fallback for amount if rawReceiptAmt is 0 and col 4 is a number
+        if (rawReceiptAmt === 0 && detected === 'receipts' && rawValues.length >= 5) {
+          const numCandidate = parseFloat(String(rawValues[4] || '').replace(/[^\d.-]/g, ''));
+          if (!isNaN(numCandidate) && numCandidate > 0) {
+            rawReceiptAmt = numCandidate;
+          }
+        }
+
+        const receiptAmt =
+          rawReceiptAmt > 0 ? rawReceiptAmt : rawPaid > 0 ? rawPaid : finalTotal;
+
+        let receivedBy = getRowField(r, [
+          'RECIVED BY',
+          'RECEIVED BY',
+          'REC. BY',
+          'REC BY',
+          'COLLECTOR',
+          'AGENT',
+          'AGENT NAME',
+          'FIELD STAFF',
+          'BY',
+          'COLLECTED BY',
+          'STAFF',
+          'जमा घेणारा',
+          'एजंट',
+          'कर्मचारी',
+        ]);
+
+        // Positional fallback for collector / received by (e.g. BHUSHAN, SHUBHAM)
+        if (!receivedBy && detected === 'receipts' && rawValues.length >= 6 && rawValues[5]) {
+          receivedBy = rawValues[5];
+        }
+
+        const remarks = getRowField(r, [
+          'REMARKS',
+          'NOTES',
+          'PARTICULARS',
+          'DESCRIPTION',
+          'तपशील',
+        ]) || (receivedBy ? `जमा घेणारा: ${receivedBy}` : '');
+
+        const rawType = getRowField(r, ['TYPE', 'NATURE', 'CATEGORY']);
+        const receiptType = rawType.toLowerCase().includes('refund')
+          ? 'Refund'
+          : 'WeeklyPayment';
+
+        const productDetails =
+          getRowField(r, [
+            'PRODUCT',
+            'ITEM',
+            'ITEM DETAILS',
+            'ITEMDETAILS',
+            'PARTICULARS',
+            'DESCRIPTION',
+            'ITEMS',
+            'GOODS',
+            'माल/तपशील',
+          ]) || 'इलेक्ट्रॉनिक्स व गृहोपयोगी वस्तू';
+
+        // Check if there is an existing matching bill for this receipt (O(1) Map lookup)
+        let matchedBillInvoice = invoiceRef;
+        if (!matchedBillInvoice && existingBills.length > 0) {
+          const normName = effectiveName.toLowerCase();
+          const cleanP = phoneClean.phone;
+          matchedBillInvoice =
+            (cardNum ? billByCardMap.get(cardNum) : undefined) ||
+            (cleanP ? billByPhoneMap.get(cleanP) : undefined) ||
+            billByNameMap.get(normName);
+        }
+
+        return {
+          ...r,
+          _rawBillNo: rawBillNo,
+          _rawDate: rawDate,
+          _cleanedName: effectiveName,
+          _cleanedVillage: effectiveVillage,
+          _cleanedPhone: phoneClean.phone,
+          _cardNumber: cardNum,
+          _openingAmt: openingAmt,
+          _sheetNo: sheetNo,
+          _totalAmount: finalTotal,
+          _paidAmount: finalPaid,
+          _dueAmount: finalDue,
+          _receiptNo: receiptNo,
+          _invoiceRef: matchedBillInvoice,
+          _receiptAmount: receiptAmt,
+          _receivedBy: receivedBy,
+          _receiptRemarks: remarks,
+          _receiptType: receiptType,
+          _productDetails: productDetails,
+          _wasSpellingFixed: villageNorm.wasCorrected,
+          _wasVillageExtracted: nameParsed.wasExtracted,
+        };
+      });
+
+      const totalSales = cleanedRows.reduce((sum, r) => sum + (Number(r._totalAmount) || 0), 0);
+      const totalPaid = cleanedRows.reduce((sum, r) => sum + (Number(r._paidAmount) || 0), 0);
+      const totalDue = cleanedRows.reduce((sum, r) => sum + (Number(r._dueAmount) || 0), 0);
+
+      setDetectedType(detected);
+      setDetectedRecords(cleanedRows);
+      setCleanStats({
+        spellingFixed: spellingFixedCount,
+        villagesExtracted: villagesExtractedCount,
+        phonesFormatted: phonesFormattedCount,
+        zeroBillsFixed: zeroBillsFixedCount,
+        totalRows: cleanedRows.length,
+        totalSales,
+        totalPaid,
+        totalDue,
+      });
+    } catch (err: any) {
+      setErrorMessage(`CSV वाचताना त्रुटी आली: ${err.message}`);
+      setDetectedRecords([]);
+    }
+  };
+
+  // Handle Drag & Drop
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!newName.trim() || !newPhone.trim()) return;
-
-    onAddCustomer({
-      name: newName.trim(),
-      phone: newPhone.trim(),
-      address: newAddress.trim() || undefined,
-      village: newVillage.trim() || undefined,
-      totalPurchased: 0,
-      totalPaid: 0,
-      balanceDue: 0,
-      lastVisit: new Date().toISOString().split('T')[0],
-    });
-
-    setNewName('');
-    setNewPhone('');
-    setNewAddress('');
-    setNewVillage('');
-    setShowAddModal(false);
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        setCsvText(text);
+        processAndCleanCSV(text, file.name);
+      };
+      reader.readAsText(file);
+    }
   };
 
-  const submitSettlePayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = parseFloat(settleAmount);
-    if (!settleModalCust || !amount || amount <= 0) return;
-
-    onSettlePayment(settleModalCust.id, amount, settleMode, settleNotes);
-    setSettleModalCust(null);
-    setSettleAmount('');
-    setSettleNotes('');
+  // Handle File Input Selection
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        setCsvText(text);
+        processAndCleanCSV(text, file.name);
+      };
+      reader.readAsText(file);
+    }
   };
+
+  // Fast Sample File Loader (matching screenshot buttons: Scheme 2, Scheme 3)
+  const handleLoadSampleScheme = (schemeNo: 1 | 2 | 3) => {
+    let sampleContent = '';
+    let name = '';
+
+    if (schemeNo === 2) {
+      name = 'Scheme 2 (Cards 3001-3999).csv';
+      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
+SUNIL DANDAGE (PIPRI),3191,PIPRI,8855881081,3000,01-11-2024,
+PRASHANT BHALE,3201,SATODA,,100,01-11-2024,
+MAHADEO BHURLE (KELHZAR),3212,KELHZAR,9657788990,500,01-11-2024,
+SARIKA SANDIP BHANDEKAR,3234,KANHOLI BARA,9096037244,100,01-11-2024,
+SUNIL GHONGADE (SATODA),3027,SATODA,9673448626,500,01-11-2024,
+DILIP RAMRAO THAKRE,3105,SHIVNAGAR,,1000,01-11-2024,
+VANDANA PATIL (VAYFAD),3250,VAYFAD,9822334455,200,01-11-2024,`;
+    } else if (schemeNo === 3) {
+      name = 'Scheme 3 (Cards 4001-6000).csv';
+      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
+RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793
+VAISHALI BAVNE (HINGNI),4304,HINGNI,,100,18-10-2025,5104
+SANGITA (DEVNAGAR),4181,DEVNAGAR,,200,01-10-2025,5110
+NILIMA SURESH RAUT,4220,NILIMA,9175534365,500,15-08-2025,3312
+PRAKASH BUDHBAWARE (ANTERGAON),4150,ANTERGAON,8262988399,800,01-09-2025,4102
+SURAJ GAIKWAD (SINDI MEGHE),4190,SINDI MEGHE,9876543210,1200,10-09-2025,5501`;
+    } else {
+      name = 'Scheme 1 (Cards 1001-2999).csv';
+      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
+SANGITA UTTAM PATIL (HINGNI),1030,HINGNI,7972811639,450,01-06-2025,101
+YAMUNA PRABHAKAR KAIKADI,1029,HINGNI,8698041323,200,01-06-2025,102
+ARUN SAYRE (ANTERGAON),1001,ANTERGAON,9822001122,1300,01-05-2025,103
+KAPIL KHOBRAGADE (ANAND NAGAR),1002,ANAND NAGAR,8877665544,1400,15-05-2025,104
+SANJAY SHANKAR KURADKAR,1005,PUNJAB COLONY,9988776655,560,20-05-2025,105`;
+    }
+
+    setFileName(name);
+    setCsvText(sampleContent);
+    processAndCleanCSV(sampleContent, name);
+  };
+
+  // Commit and Save Cleaned Data into Database (Asynchronous to prevent browser freezing)
+  const handleCommitUniversalImport = () => {
+    if (detectedRecords.length === 0 || isImporting) return;
+
+    setIsImporting(true);
+    setErrorMessage('');
+
+    setTimeout(() => {
+      try {
+        if (detectedType === 'scheme1' || detectedType === 'scheme2' || detectedType === 'scheme3') {
+          const targetSchemeId: CardSchemeId = detectedType;
+          const schemeName =
+            detectedType === 'scheme3'
+              ? 'Scheme 3 (योजना 3)'
+              : detectedType === 'scheme2'
+              ? 'Scheme 2 (योजना 2)'
+              : 'Scheme 1 (योजना 1)';
+
+          const newCards: CardMember[] = detectedRecords.map((r, idx) => {
+            const cardNum = r._cardNumber || (detectedType === 'scheme3' ? 4001 + idx : detectedType === 'scheme2' ? 3001 + idx : 1001 + idx);
+            const opening = r._openingAmt || 0;
+            return {
+              id: `cm-csv-${cardNum}-${Date.now()}-${idx}`,
+              cardNumber: cardNum,
+              schemeId: targetSchemeId,
+              schemeName,
+              customerName: r._cleanedName,
+              phone: r._cleanedPhone,
+              village: r._cleanedVillage || undefined,
+              sheetNo: r._sheetNo || undefined,
+              openingAmt: opening > 0 ? opening : undefined,
+              address: r._cleanedVillage ? `${r._cleanedVillage}, Wardha` : 'Wardha',
+              joiningDate: normalizeDateStr(r.DATE || r.Date),
+              registrationFee: 50,
+              registrationFeePaid: true,
+              totalDeposited: opening,
+              totalRefunded: 0,
+              netBalance: opening,
+              status: 'Active',
+              notes: `Auto-imported & cleaned on ${new Date().toISOString().split('T')[0]}${r._sheetNo ? ` • Sheet #${r._sheetNo}` : ''}`,
+            };
+          });
+
+          onImportCardMembers(newCards);
+          setSuccessMessage(`यशस्वी! ${newCards.length} कार्ड मेंबर्स (${schemeName}) स्पेलिंग व गावांच्या दुरुस्तीसह लेजरमध्ये सेव्ह केले गेले!`);
+        } else if (detectedType === 'bills') {
+          const validRecords = detectedRecords.filter(
+            (r) =>
+              r._totalAmount > 0 ||
+              r._paidAmount > 0 ||
+              r._dueAmount > 0 ||
+              Boolean(r._rawBillNo) ||
+              (r.BillNo && r.BillNo.toString().trim()) ||
+              (r['BILL NO'] && r['BILL NO'].toString().trim()) ||
+              (r.InvoiceNo && r.InvoiceNo.toString().trim()) ||
+              (r._cleanedName && r._cleanedName.trim().length > 0)
+          );
+
+          const newBills: TransactionEntry[] = validRecords.map((r, idx) => {
+            const billNum =
+              r._rawBillNo ||
+              r['BILL NO'] ||
+              r['BILL_NO'] ||
+              r.BillNo ||
+              r.billNo ||
+              r.InvoiceNo ||
+              `INV-${Date.now().toString().slice(-4)}-${idx + 1}`;
+            const billDate = normalizeDateStr(r._rawDate || r.Date || r.DATE);
+
+            return {
+              id: `inv-imp-${Date.now()}-${idx}`,
+              invoiceNo: billNum,
+              date: billDate,
+              customerName: r._cleanedName,
+              customerPhone: r._cleanedPhone,
+              cardNumber: r._cardNumber,
+              village: r._cleanedVillage,
+              itemDetails: r._productDetails || r.PRODUCT || r.Product || r.ItemDetails || 'इलेक्ट्रॉनिक्स व गृहोपयोगी वस्तू',
+              totalAmount: r._totalAmount,
+              payingNow: r._paidAmount,
+              dueAmount: r._dueAmount,
+              paymentMode: (r.PaymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online',
+              notes: `Imported Sales Record • Village: ${r._cleanedVillage || 'Wardha'}${billNum ? ` • Bill #${billNum}` : ''}`,
+              createdAt: new Date().toISOString(),
+            };
+          });
+
+          onImportBills(newBills);
+          setSuccessMessage(`यशस्वी! ${newBills.length} विक्री बिले दुरुस्त करून ऑल एन्ट्रीज व ग्राहकांच्या खात्यावर सेव्ह केली.`);
+        } else if (detectedType === 'receipts') {
+          let creditedBillsCount = 0;
+          const newReceipts: CardTransaction[] = detectedRecords.map((r, idx) => {
+            const cardNum = r._cardNumber || undefined;
+            const amt = r._receiptAmount || r._paidAmount || r._totalAmount || 500;
+            const receiptCode = r._receiptNo ? String(r._receiptNo).trim() : (cardNum ? `REC-${cardNum}-${idx + 1}` : `REC-${idx + 1}`);
+            const date = normalizeDateStr(r._rawDate || r.Date || r.DATE || r.date || r['BILL DATE'] || r['RECEIPT DATE'] || r['तारीख'] || r['दिनांक']);
+            const mode = (r.PaymentMode === 'Online' || r.paymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online';
+            const invoice = r._invoiceRef;
+            if (invoice) creditedBillsCount++;
+
+            const remark = r._receiptRemarks
+              ? `${r._receiptRemarks}${invoice ? ` • बिलामध्ये जमा (Against Bill #${invoice})` : ''}`
+              : invoice
+                ? `बिलामध्ये जमा (Credit Against Bill #${invoice}) • ${r._cleanedVillage || 'Wardha'}`
+                : `साप्ताहिक जमा पावती • ${r._cleanedVillage || 'Wardha'}`;
+
+            return {
+              id: `rec-imp-${Date.now()}-${idx}`,
+              cardId: cardNum ? `cm-${cardNum}` : `gen-${Date.now()}-${idx}`,
+              cardNumber: cardNum || 0,
+              schemeId: cardNum ? (cardNum >= 4001 ? 'scheme3' : cardNum >= 3001 ? 'scheme2' : 'scheme1') : 'scheme1',
+              customerName: r._cleanedName,
+              customerPhone: r._cleanedPhone,
+              receiptNo: receiptCode,
+              date: date,
+              type: r._receiptType || 'WeeklyPayment',
+              amount: amt,
+              paymentMode: mode,
+              remarks: remark,
+              balanceAfter: amt,
+              createdAt: new Date().toISOString(),
+              invoiceNo: invoice, // Attached for bill-credit resolution
+              village: r._cleanedVillage,
+              customerVillage: r._cleanedVillage,
+              collectedBy: r._receivedBy || undefined,
+              agentName: r._receivedBy || undefined,
+            } as CardTransaction;
+          });
+
+          onImportReceipts(newReceipts);
+          const creditMsg = creditedBillsCount > 0 ? ` (${creditedBillsCount} बिलांच्या खात्यावर रक्कम थेट वजा / क्रेडिट झाली)` : '';
+          setSuccessMessage(`यशस्वी! ${newReceipts.length} जमा पावत्या सिस्टीममध्ये नोंदवल्या गेल्या${creditMsg}.`);
+        } else {
+          // Generic customers
+          setSuccessMessage(`यशस्वी! ${detectedRecords.length} रेकॉर्ड्स सिस्टीममध्ये समाविष्ट केले.`);
+        }
+
+        setDetectedRecords([]);
+        setCsvText('');
+        setFileName('');
+      } catch (err: any) {
+        setErrorMessage(`डेटा सेव्ह करताना त्रुटी: ${err.message}`);
+      } finally {
+        setIsImporting(false);
+      }
+    }, 40);
+  };
+
+  // Search filter matching
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    const items: Array<{
+      id: string;
+      category: 'card' | 'bill' | 'receipt';
+      title: string;
+      subtitle: string;
+      village?: string;
+      phone?: string;
+      amount?: number;
+      due?: number;
+      extra?: string;
+    }> = [];
+
+    // Scheme cards
+    if (searchFilterCategory === 'all' || searchFilterCategory === 'cards') {
+      existingCardMembers.forEach((m) => {
+        const str = `${m.cardNumber} ${m.customerName} ${m.village || ''} ${m.phone || ''} ${m.sheetNo || ''}`.toLowerCase();
+        if (!q || str.includes(q)) {
+          items.push({
+            id: m.id,
+            category: 'card',
+            title: `#${m.cardNumber} - ${m.customerName}`,
+            subtitle: m.schemeName,
+            village: m.village,
+            phone: m.phone,
+            amount: m.netBalance || m.totalDeposited,
+            extra: m.sheetNo ? `Sheet #${m.sheetNo}` : undefined,
+          });
+        }
+      });
+    }
+
+    // Bills
+    if (searchFilterCategory === 'all' || searchFilterCategory === 'bills') {
+      existingBills.forEach((b) => {
+        const str = `${b.invoiceNo} ${b.customerName} ${b.village || ''} ${b.customerPhone || ''} ${b.itemDetails}`.toLowerCase();
+        if (!q || str.includes(q)) {
+          items.push({
+            id: b.id,
+            category: 'bill',
+            title: `${b.invoiceNo} - ${b.customerName}`,
+            subtitle: b.itemDetails,
+            village: b.village,
+            phone: b.customerPhone,
+            amount: b.totalAmount,
+            due: b.dueAmount,
+            extra: b.date,
+          });
+        }
+      });
+    }
+
+    // Receipts
+    if (searchFilterCategory === 'all' || searchFilterCategory === 'receipts') {
+      existingReceipts.forEach((r) => {
+        const str = `${r.receiptNo} ${r.customerName} ${r.cardNumber}`.toLowerCase();
+        if (!q || str.includes(q)) {
+          items.push({
+            id: r.id,
+            category: 'receipt',
+            title: `${r.receiptNo} - Card #${r.cardNumber}`,
+            subtitle: r.customerName,
+            amount: r.amount,
+            extra: r.date,
+          });
+        }
+      });
+    }
+
+    return items;
+  }, [searchQuery, searchFilterCategory, existingCardMembers, existingBills, existingReceipts]);
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-5">
-      {/* Header with English Primary & Small Marathi Subtext */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      
+      {/* ========================================================= */}
+      {/* 1. TOP HEADER (Matching Screenshot 2)                     */}
+      {/* ========================================================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[var(--tactile-text-heading)] tracking-tight">
-              Customer Directory & Khata
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              CSV Data Import & Cleanup Tool
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded-md bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-[var(--tactile-text-muted)] font-medium">
-              ग्राहक खातेवही
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] uppercase tracking-wider">
+              Smart 5-in-1
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-[var(--tactile-text-muted)] mt-0.5">
-            Manage customer accounts, outstanding balances (Udhar), and instant ledger statements.
-            <span className="ml-1 text-[11px] text-[var(--tactile-text-dim)]">(उधारी बाकी हिशोब व व्हॉट्सॲप स्मरणपत्र)</span>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
+            पुरानी फाइलें अपलोड करें या 1 क्लिक में गलत ₹0 वाले बिल साफ़ करके फिर से ताज़ा डेटा लोड करें।
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Quick Hisab & Print Calculator Button */}
-          <button
-            onClick={() => {
-              setQuickHisabCustomer(null);
-              setShowQuickHisabModal(true);
-            }}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-500/25 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="मोबाईल हिशोब कॅल्क्युलेटर (उदा. दिवाण 7000, 3000 दिले, 1500 पावती)"
-          >
-            <Calculator className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>Quick Hisab & Print</span>
-              <span className="text-[9px] text-amber-700 dark:text-amber-300 font-normal">हिशोब कॅल्क्युलेटर</span>
-            </div>
-          </button>
+        {/* Top Right Red Button from Screenshot 2 */}
+        <button
+          type="button"
+          onClick={() => setShowResetModal(true)}
+          className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-600/20 active:scale-95 transition cursor-pointer self-start sm:self-auto shrink-0"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>पूरा डेटा रीसेट करे (Start Clean)</span>
+        </button>
+      </div>
 
-          {/* Duplicate Khata Merge Button */}
+      {/* Success / Error Alerts */}
+      {successMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMessage}</span>
+          </div>
           <button
-            onClick={() => {
-              if (duplicatePairs.length > 0) {
-                setSelectedDuplicatePairId(duplicatePairs[0].id);
-              }
-              setShowDuplicateMergeModal(true);
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ${
-              duplicatePairs.length > 0
-                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-400 animate-pulse'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+            onClick={() => setSuccessMessage('')}
+            className="text-xs text-emerald-700 hover:underline font-bold cursor-pointer"
+          >
+            बंद करा
+          </button>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage('')}
+            className="text-xs text-rose-700 hover:underline font-bold cursor-pointer"
+          >
+            बंद करा
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 2. THREE SEGMENTED TABS (From Screenshot 2)               */}
+      {/* ========================================================= */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('universal')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
+              activeMainTab === 'universal'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
-            title="दोन सारखी ग्राहक खाती शोधून त्यांचा हिशोब एकत्र करा"
           >
-            <GitMerge className="w-4 h-4" />
-            <div className="flex flex-col text-left leading-tight">
-              <span className="flex items-center gap-1">
-                Merge Khata
-                {duplicatePairs.length > 0 && (
-                  <span className="bg-slate-950 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                    {duplicatePairs.length}
-                  </span>
-                )}
-              </span>
-              <span className="text-[9px] opacity-80 font-normal">खाती विलीनीकरण</span>
-            </div>
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>✨ स्मार्ट ऑटो-डिटेक्टर & एरर क्लीनर (5-in-1 Universal)</span>
           </button>
 
-          {/* Download CSV button */}
           <button
-            onClick={() => exportCustomersToCsv(filtered, 'ShriSai_Customers_Khata')}
-            className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Download Customers Khata CSV"
+            type="button"
+            onClick={() => setActiveMainTab('manual')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
+              activeMainTab === 'manual'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
           >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>Download CSV</span>
-              <span className="text-[9px] text-emerald-700/80 font-normal">ग्राहक खाती एक्सपोर्ट</span>
-            </div>
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>📑 मॅन्युअल इम्पोर्ट (Category Wise)</span>
           </button>
 
-          {onRecalculateLedgers && (
-            <button
-              onClick={() => {
-                onRecalculateLedgers();
-                alert('सर्व ग्राहकांचे जुने बिल आणि जमा पावत्या ताडून हिशोब बरोबर केला गेला आहे!');
-              }}
-              title="Recalculate customer balances against all sales bills & receipts"
-              className="px-3 py-2 rounded-xl tactile-btn-secondary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-            >
-              <RotateCw className="w-3.5 h-3.5 text-blue-600" />
-              <div className="flex flex-col text-left leading-tight">
-                <span>Recheck Balances</span>
-                <span className="text-[9px] text-[var(--tactile-text-dim)]">खातेवही ताडून पहा</span>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('search')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
+              activeMainTab === 'search'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            <span>🔍 अपलोड झालेला सर्व डेटा शोधा</span>
+          </button>
+        </div>
+
+        {/* Small Red Button under tabs from Screenshot 2 */}
+        <button
+          type="button"
+          onClick={() => setShowResetModal(true)}
+          className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer self-start sm:self-auto"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>डेटा रीसेट (Start Clean)</span>
+        </button>
+      </div>
+
+      {/* ========================================================= */}
+      {/* TAB 1: SMART AUTO-DETECTOR & ERROR CLEANER (Universal)    */}
+      {/* ========================================================= */}
+      {activeMainTab === 'universal' && (
+        <div className="space-y-6 animate-in fade-in">
+          
+          {/* Deep Navy/Indigo Hero Feature Banner (Screenshot 2) */}
+          <div className="rounded-3xl bg-gradient-to-br from-[#0F1E36] via-[#0B1528] to-[#08101E] text-white p-6 sm:p-8 relative overflow-hidden shadow-2xl border border-blue-900/40">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="relative z-10 space-y-4">
+              {/* Active Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>स्वयंचलित स्पेलिंग, तारीख व खाते दुरुस्ती प्रणाली सक्रिय</span>
               </div>
-            </button>
-          )}
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-xl tactile-btn-primary text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>+ Add Customer</span>
-              <span className="text-[9px] text-white/80 font-normal">नवीन ग्राहक नोंदवा</span>
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-snug">
+                कोणतीही CSV फाईल टाका — आपोआप ओळखून अचूक ठिकाणी सेव्ह होईल!
+              </h2>
+
+              <p className="text-xs sm:text-sm text-slate-300 max-w-4xl leading-relaxed">
+                ही प्रणाली ५ पैकी कोणत्याही फाईलमधील स्पेलिंग चुका (उदा. <span className="text-amber-300 font-bold">KELHZAR → Kelzar</span>, <span className="text-amber-300 font-bold">VAYFAD → Waifad</span>, <span className="text-amber-300 font-bold">NILIMA → Nilima</span>), नावातील कंसात असलेले गाव वेगळे करणे, फोन नंबर दुरुस्ती, आणि चुकीचे मायनस बॅलन्स आपोआप दुरुस्त करून थेट योग्य लेजरमध्ये जमा करते.
+              </p>
+
+              {/* 4 Feature Badges Grid from Screenshot 2 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0 font-bold text-xs">
+                    १
+                  </div>
+                  <div>
+                    <span className="block text-[11px] text-slate-400">विक्री बिले</span>
+                    <span className="text-xs font-black text-white flex items-center gap-1">
+                      <Receipt className="w-3 h-3 text-amber-400" />
+                      All Entries & Ledger
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-300 shrink-0 font-bold text-xs">
+                    २
+                  </div>
+                  <div>
+                    <span className="block text-[11px] text-slate-400">ग्राहक खाती</span>
+                    <span className="text-xs font-black text-white flex items-center gap-1">
+                      <CreditCard className="w-3 h-3 text-emerald-400" />
+                      Customers Khata
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-300 shrink-0 font-bold text-xs">
+                    ३
+                  </div>
+                  <div>
+                    <span className="block text-[11px] text-slate-400">बचत योजना</span>
+                    <span className="text-xs font-black text-white flex items-center gap-1">
+                      <Layers className="w-3 h-3 text-amber-400" />
+                      Card Scheme 1, 2, 3
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 shrink-0 font-bold text-xs">
+                    ४
+                  </div>
+                  <div>
+                    <span className="block text-[11px] text-slate-400">जमा पावत्या</span>
+                    <span className="text-xs font-black text-white flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-purple-400" />
+                      Receipts & Passbook
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Overview Cards with High Contrast & Clear Marathi hints */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="tactile-card p-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Total Customers</p>
-              <span className="text-[10px] text-[var(--tactile-text-dim)]">एकूण ग्राहक</span>
-            </div>
-            <p className="text-2xl font-black text-[var(--tactile-text-heading)] mt-1 font-mono-num">
-              {totalCustomers}
-            </p>
-            <p className="text-[11px] text-[var(--tactile-text-muted)] mt-0.5">
-              {customersWithDueCount} with pending dues
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600">
-            <Users className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="tactile-card p-4 border-amber-500/40 bg-amber-500/5 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-amber-800 dark:text-amber-300 font-bold">Total Market Udhar</p>
-              <span className="text-[10px] text-amber-700/80 dark:text-amber-400">एकूण बाजार उधारी बाकी</span>
-            </div>
-            <p className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1 font-mono-num">
-              ₹{totalUdhar.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-amber-700/80 dark:text-amber-400 mt-0.5">
-              Across {customersWithDueCount} balance accounts
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
-            <IndianRupee className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="tactile-card p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Fast Filter</p>
-              <span className="text-[10px] text-[var(--tactile-text-dim)]">जलद फिल्टर</span>
-            </div>
-            <span className="text-xs font-mono font-bold text-[var(--tactile-primary)]">
-              {filtered.length} Results
-            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            <button
-              onClick={() => {
-                setFilterType(filterType === 'due' ? 'all' : 'due');
-                setCurrentPage(1);
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
-                filterType === 'due'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-              }`}
-            >
-              <span>Dues Only (बाकी)</span>
-            </button>
-            <button
-              onClick={() => {
-                setFilterType(filterType === 'cleared' ? 'all' : 'cleared');
-                setCurrentPage(1);
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
-                filterType === 'cleared'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-              }`}
-            >
-              <span>Cleared (शून्य बाकी)</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Potential Duplicate Accounts Detected Banner (संभाव्य डुप्लिकेट खाती आढळली) */}
-      {duplicatePairs.length > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 bg-amber-500/10 border-2 border-amber-500/40 text-slate-900 dark:text-white shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0 mt-0.5">
-              <GitMerge className="w-5 h-5" />
-            </div>
+          {/* Quick Sample File Loaders (Screenshot 2: Scheme 2, Scheme 3 buttons) */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-sm sm:text-base text-amber-950 dark:text-amber-200">
-                  संभाव्य डुप्लिकेट खाती आढळली ({duplicatePairs.length})
+                <span className="text-amber-500 text-base">⚡</span>
+                <h3 className="font-extrabold text-slate-900 text-sm">
+                  रेडी सॅम्पल फाईल त्वरित लोड करा:
                 </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-700">
-                  अकाउंटिंग दुरुस्ती
-                </span>
               </div>
-              <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
-                {duplicatePairs[0].custA.name} ({duplicatePairs[0].custA.phone || duplicatePairs[0].custA.village || 'खाते १'}) आणि {duplicatePairs[0].custB.name} ({duplicatePairs[0].custB.phone || duplicatePairs[0].custB.village || 'खाते २'}) हे एकाच व्यक्तीचे २ खाते असू शकतात.
+              <p className="text-xs text-slate-500 mt-0.5">
+                खालील बटनावर क्लिक करून थेट उपलब्ध CSV तपासून टेस्ट करू शकता:
               </p>
-              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 font-medium">
-                कारण: {duplicatePairs[0].reason}
-              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleLoadSampleScheme(2)}
+                className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>Scheme 2 लोड करा</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleLoadSampleScheme(3)}
+                className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-purple-600" />
+                <span>Scheme 3 लोड करा</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleLoadSampleScheme(1)}
+                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-600" />
+                <span>Scheme 1 लोड करा</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-            <button
-              onClick={() => {
-                setSelectedDuplicatePairId(duplicatePairs[0].id);
-                setShowDuplicateMergeModal(true);
-              }}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
-            >
-              <GitMerge className="w-4 h-4" />
-              <span>हिशोब तपासा व एकत्र करा (Review Hisab & Merge)</span>
-            </button>
-            <button
-              onClick={() => {
-                setDismissedPairIds((prev) => new Set(prev).add(duplicatePairs[0].id));
-              }}
-              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg text-xs font-bold cursor-pointer"
-              title="ही २ वेगळी खाती ठेवा (Dismiss)"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* SEARCH BAR - 100% VISIBLE TEXT WITH HIGH CONTRAST & CLEAR BUTTON */}
-      <div className="tactile-card p-3 sm:p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {/* Main Search Input - High Contrast & Mobile Proof (text-base on mobile <640px) */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Universal Drag & Drop Upload Zone (Screenshot 2) */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition cursor-pointer relative bg-white ${
+              isDragging
+                ? 'border-blue-600 bg-blue-50/50 scale-[1.005]'
+                : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/50'
+            }`}
+          >
             <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by customer name, phone number, village or address..."
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-base sm:text-sm placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#0D5C4D] shadow-xs"
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleFileInput}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
-            {search && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCurrentPage(1);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-                title="Clear Search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Sort Selector & View Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-sm sm:text-xs text-[var(--tactile-text-main)] flex-1 sm:flex-none">
-              <ArrowUpDown className="w-3.5 h-3.5 text-[var(--tactile-text-muted)] shrink-0" />
-              <span className="text-xs sm:text-[11px] font-medium text-[var(--tactile-text-muted)] hidden sm:inline">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent text-sm sm:text-xs font-bold text-[var(--tactile-text-main)] focus:outline-none cursor-pointer w-full"
-              >
-                <option value="due-desc">Highest Udhar First (जास्त उधारी)</option>
-                <option value="due-asc">Lowest Udhar First (कमी उधारी)</option>
-                <option value="name">Customer Name A-Z (नावाप्रमाणे)</option>
-              </select>
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] rounded-xl p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                  viewMode === 'cards'
-                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
-                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-                title="कार्ड व्ह्यू"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cards</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
-                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-                title="टेबल व्ह्यू"
-              >
-                <TableIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Table</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Filter Chips */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs sm:text-[11px] font-bold text-[var(--tactile-text-muted)] mr-1">Quick:</span>
-            {[
-              { id: 'all', label: 'All Clients', mr: 'सर्व' },
-              { id: 'due', label: 'With Balance Due', mr: 'उधारी बाकी' },
-              { id: 'high-due', label: 'High Dues (₹5,000+)', mr: 'मोठी उधारी' },
-              { id: 'cleared', label: 'Zero Balance', mr: 'पूर्ण जमा' },
-            ].map((chip) => (
-              <button
-                key={chip.id}
-                onClick={() => {
-                  setFilterType(chip.id as any);
-                  setCurrentPage(1);
-                }}
-                className={`px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-sm sm:text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                  filterType === chip.id
-                    ? 'tactile-btn-primary text-white font-bold'
-                    : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-              >
-                <span>{chip.label}</span>
-                <span className="text-xs sm:text-[9px] opacity-75 font-normal">({chip.mr})</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="text-xs sm:text-[11px] text-[var(--tactile-text-dim)] font-mono">
-            Showing {displayedCustomers.length} of {filtered.length} customers
-          </div>
-        </div>
-      </div>
-
-      {/* Customer List: Cards or Table */}
-      {displayedCustomers.length === 0 ? (
-        <div className="tactile-card p-12 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-[var(--tactile-surface-inset)] flex items-center justify-center text-[var(--tactile-text-muted)]">
-            <Users className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-[var(--tactile-text-heading)]">
-            No Customers Found
-          </h3>
-          <p className="text-sm sm:text-xs text-[var(--tactile-text-muted)] max-w-sm mx-auto">
-            {search
-              ? `No customer matching "${search}". Check spelling or clear search.`
-              : 'No customers recorded yet in this category.'}
-          </p>
-          {search && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setFilterType('all');
-              }}
-              className="px-4 py-2.5 rounded-xl tactile-btn-secondary text-sm sm:text-xs font-bold cursor-pointer"
-            >
-              Reset Search & Filters
-            </button>
-          )}
-        </div>
-      ) : viewMode === 'table' ? (
-        /* Customer List Table with Increased Base Font Size (<640px) */
-        <div className="tactile-card overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm sm:text-xs">
-              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-[var(--tactile-border)]">
-                <tr>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs">ग्राहक (Customer Name)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">मोबाईल / गाव</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">एकूण खरेदी (Total)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">जमा (Paid)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">उधारी बाकी (Due)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-center whitespace-nowrap">कृती (Actions)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--tactile-border-subtle)]">
-                {displayedCustomers.map((c) => {
-                  const due = Number(c?.balanceDue) || 0;
-                  const totalPurchased = Number(c?.totalPurchased) || 0;
-                  const totalPaid = Number(c?.totalPaid) || 0;
-
-                  return (
-                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                      <td className="py-3.5 px-3 sm:px-4">
-                        <div className="font-bold text-base sm:text-sm text-[var(--tactile-text-heading)]">
-                          {c.name || 'Unnamed Customer'}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 text-sm sm:text-xs font-mono text-[var(--tactile-text-main)]">
-                          <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
-                          <span>{c.phone || '-'}</span>
-                        </div>
-                        {(c.address || c.village) && (
-                          <div className="flex items-center gap-1 text-xs sm:text-[11px] text-[var(--tactile-text-dim)] mt-0.5">
-                            <MapPin className="w-3 h-3 shrink-0" />
-                            <span className="truncate max-w-[140px]">
-                              {[c.address, c.village].filter(Boolean).join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
-                          ₹{totalPurchased.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
-                          ₹{totalPaid.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        {due > 0 ? (
-                          <span className="font-black text-base sm:text-sm text-amber-700 dark:text-amber-400 font-mono-num bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
-                            ₹{due.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                            Cleared • जमा
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => setSelectedLedgerCustomer(c)}
-                            className="py-1.5 px-2.5 rounded-lg tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                            title="खातेवही उघडा"
-                          >
-                            <BookOpen className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Statement</span>
-                          </button>
-                          <button
-                            onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                            className="py-1.5 px-2.5 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                            title="रक्कम जमा करा / पावती फाडा"
-                          >
-                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>+ Pay</span>
-                          </button>
-                          <button
-                            title="हिशोब कॅल्क्युलेटर (उदा. बिल, अ‍ॅडव्हान्स, पावती)"
-                            onClick={() => {
-                              setQuickHisabCustomer(c);
-                              setShowQuickHisabModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
-                          >
-                            <Calculator className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge with another account)"
-                            onClick={() => {
-                              const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
-                              if (matchingPair) {
-                                setSelectedDuplicatePairId(matchingPair.id);
-                              } else {
-                                setSelectedDuplicatePairId(undefined);
-                              }
-                              setShowDuplicateMergeModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
-                          >
-                            <GitMerge className="w-3.5 h-3.5" />
-                          </button>
-                          {due > 0 && (
-                            <button
-                              title="Send WhatsApp Due Reminder"
-                              onClick={() => handleSendReminder(c)}
-                              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
-                            >
-                              <Share2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        /* Customer Cards Grid with Increased Base Font Size (<640px) */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {displayedCustomers.map((c) => {
-            const due = Number(c?.balanceDue) || 0;
-            const totalPurchased = Number(c?.totalPurchased) || 0;
-            const totalPaid = Number(c?.totalPaid) || 0;
-
-            return (
-              <div
-                key={c.id}
-                className="tactile-card p-4 flex flex-col justify-between space-y-3 tactile-card-hover"
-              >
-                <div>
-                  {/* Customer Name & Status Badge - text-base on mobile (<640px) */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-base sm:text-sm font-extrabold text-[var(--tactile-text-heading)] truncate">
-                        {c.name || 'Unnamed Customer'}
-                      </h3>
-                      <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-muted)] mt-1">
-                        <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
-                        <span className="font-mono">{c.phone || 'No Phone'}</span>
-                      </div>
-                    </div>
-
-                    {due > 0 ? (
-                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-sm sm:text-xs font-black bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0 font-mono-num">
-                        Due: ₹{due.toLocaleString()}
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-xs sm:text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
-                        Cleared • जमा
-                      </span>
-                    )}
-                  </div>
-
-                  {(c.address || c.village) && (
-                    <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-dim)] mt-2">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">
-                        {[c.address, c.village].filter(Boolean).join(', ')}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Financial Metrics with English Primary & Marathi hint */}
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--tactile-border-subtle)] text-sm sm:text-xs">
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Billed</span>
-                        <span className="text-[11px] sm:text-[9px] text-[var(--tactile-text-dim)]">एकूण खरेदी</span>
-                      </div>
-                      <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
-                        ₹{totalPurchased.toLocaleString()}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Paid</span>
-                        <span className="text-[11px] sm:text-[9px] text-emerald-600 font-medium">एकूण जमा</span>
-                      </div>
-                      <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
-                        ₹{totalPaid.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Action Buttons - Increased Font Size for Small Screens */}
-                <div className="space-y-1.5 pt-2 border-t border-[var(--tactile-border-subtle)]">
-                  {/* Full Ledger & Bills Statement Button */}
-                  <button
-                    onClick={() => setSelectedLedgerCustomer(c)}
-                    className="w-full py-2.5 sm:py-2 px-3 rounded-xl tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <BookOpen className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" />
-                    <span>Statement & Bills (खातेवही)</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                      className="flex-1 py-2 sm:py-1.5 px-3 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer text-center flex items-center justify-center gap-1"
-                    >
-                      <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>+ Receive Payment</span>
-                    </button>
-
-                    <button
-                      title="हिशोब कॅल्क्युलेटर व पावती प्रिंट (Quick Hisab)"
-                      onClick={() => {
-                        setQuickHisabCustomer(c);
-                        setShowQuickHisabModal(true);
-                      }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
-                    >
-                      <Calculator className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge Accounts)"
-                      onClick={() => {
-                        const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
-                        if (matchingPair) {
-                          setSelectedDuplicatePairId(matchingPair.id);
-                        } else {
-                          setSelectedDuplicatePairId(undefined);
-                        }
-                        setShowDuplicateMergeModal(true);
-                      }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
-                    >
-                      <GitMerge className="w-4 h-4" />
-                    </button>
-
-                    {due > 0 && (
-                      <button
-                        title="Send WhatsApp Due Reminder (व्हॉट्सॲप स्मरणपत्र)"
-                        onClick={() => handleSendReminder(c)}
-                        className="p-2 sm:p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+            
+            <div className="max-w-md mx-auto space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
+                <Upload className="w-8 h-8" />
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Pagination Controls - Keeps mobile & laptop super fast */}
-      {filtered.length > PAGE_SIZE && (
-        <div className="tactile-card p-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-[var(--tactile-text-muted)] font-medium">
-            Page <strong className="text-[var(--tactile-text-heading)]">{currentPage}</strong> of{' '}
-            <strong className="text-[var(--tactile-text-heading)]">{totalPages}</strong> (
-            {filtered.length} customers)
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)] hover:bg-[var(--tactile-surface)] transition cursor-pointer"
-            >
-              {showAll ? 'Show Pages (24 per page)' : 'View All'}
-            </button>
-
-            {!showAll && (
-              <>
-                <button
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Prev</span>
-                </button>
-                <button
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Customer Ledger Statement Modal */}
-      {selectedLedgerCustomer && (
-        <CustomerLedgerModal
-          customer={selectedLedgerCustomer}
-          transactions={transactions}
-          cardTransactions={cardTransactions}
-          settings={settings}
-          onClose={() => setSelectedLedgerCustomer(null)}
-          onReceivePayment={(c, billNo, dueAmount) => {
-            if (onOpenQuickPavti) {
-              onOpenQuickPavti(c, billNo, dueAmount);
-            } else {
-              setSettleModalCust(c);
-              if (dueAmount) setSettleAmount(String(dueAmount));
-            }
-          }}
-        />
-      )}
-
-      {/* Add Customer Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
               <div>
-                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
-                  Add New Customer
-                </h3>
-                <p className="text-[11px] text-[var(--tactile-text-muted)]">
-                  नवीन ग्राहक खाते नोंदणी
+                <p className="font-extrabold text-slate-800 text-base">
+                  {fileName ? (
+                    <span className="text-blue-600">निवडलेली फाईल: {fileName}</span>
+                  ) : (
+                    'CSV किंवा Text फाईल येथे ड्रॅग करा किंवा कॉम्प्युटरवरून निवडा'
+                  )}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Supports UTF-8 CSV, Excel Exports (.csv), Scheme Cards, Bills & Receipts
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <form onSubmit={submitAddCustomer} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Customer / Business Name * <span className="text-[10px] text-[var(--tactile-text-dim)]">(ग्राहकाचे नाव)</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. Ramesh Sharma or Patil Electricals"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Phone / WhatsApp Number * <span className="text-[10px] text-[var(--tactile-text-dim)]">(मोबाईल नंबर)</span>
-                </label>
-                <input
-                  type="tel"
-                  required
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="e.g. 9822112233"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Village / City <span className="text-[10px] text-[var(--tactile-text-dim)]">(गाव / शहर)</span>
-                </label>
-                <input
-                  type="text"
-                  value={newVillage}
-                  onChange={(e) => setNewVillage(e.target.value)}
-                  placeholder="e.g. Wardha, Arvi, Hinganghat, Seloo"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Address Details <span className="text-[10px] text-[var(--tactile-text-dim)]">(पत्ता)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="Shop number, landmark, area..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
+              <div className="pt-2 flex items-center justify-center gap-3">
+                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-mono text-[11px]">
+                  .csv फाईल निवडा
+                </span>
+                <span className="text-slate-400 text-xs font-semibold">• किंवा •</span>
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPasteArea(!showPasteArea);
+                  }}
+                  className="text-xs text-blue-600 hover:underline font-bold"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl tactile-btn-primary text-xs font-bold shadow-md cursor-pointer"
-                >
-                  Save Customer (जतन करा)
+                  {showPasteArea ? 'पेस्ट बॉक्स लपवा' : 'CSV मजकूर थेट पेस्ट करा'}
                 </button>
               </div>
-            </form>
+            </div>
+          </div>
+
+          {/* Optional Direct Paste Area */}
+          {showPasteArea && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <label className="block text-xs font-bold text-slate-700">
+                येथे CSV मजकूर पेस्ट करा (Paste Raw CSV Data):
+              </label>
+              <textarea
+                rows={6}
+                value={csvText}
+                onChange={(e) => {
+                  setCsvText(e.target.value);
+                  processAndCleanCSV(e.target.value, 'Pasted-Data.csv');
+                }}
+                placeholder="NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO&#10;PRAKASH BUDHBAWARE (ANTERGAON),4150,ANTERGAON,8262988399,800,01-09-2025,4102"
+                className="w-full p-3 rounded-xl border border-slate-200 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* CLEANED DATA PREVIEW & ANALYSIS RESULT                    */}
+          {/* ========================================================= */}
+          {detectedRecords.length > 0 && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5 animate-in fade-in">
+              
+              {/* Header Analysis Result */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-500 px-2">प्रकार बदला:</span>
+                      <select
+                        value={detectedType}
+                        onChange={(e) => setDetectedType(e.target.value as any)}
+                        className="bg-white text-xs font-bold text-slate-800 rounded-lg px-2.5 py-1 border border-slate-200 shadow-2xs focus:outline-none cursor-pointer"
+                      >
+                        <option value="bills">विक्री बिले (Bills)</option>
+                        <option value="receipts">जमा पावत्या (Receipts - Credit Against Bill)</option>
+                        <option value="scheme1">योजना कार्ड १ (Card Scheme 1)</option>
+                        <option value="scheme2">योजना कार्ड २ (Card Scheme 2)</option>
+                        <option value="scheme3">योजना कार्ड ३ (Card Scheme 3)</option>
+                        <option value="customers">सामान्य ग्राहक (Customers)</option>
+                        <option value="purchases">खरेदी (Purchases)</option>
+                      </select>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" />
+                      {cleanStats.totalRows} रेकॉर्ड्स सापडले
+                    </span>
+                  </div>
+                  <h3 className="font-extrabold text-slate-900 text-base mt-1">
+                    स्वयंचलित दुरुस्ती अहवाल (Automated Cleanup Report)
+                  </h3>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetectedRecords([]);
+                      setCsvText('');
+                      setFileName('');
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    रद्द करा
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isImporting}
+                    onClick={handleCommitUniversalImport}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg transition ${
+                      isImporting
+                        ? 'bg-slate-400 text-white cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95 cursor-pointer'
+                    }`}
+                  >
+                    {isImporting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>प्रक्रिया सुरू आहे... (Importing...)</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>सिस्टीममध्ये सेव्ह करा (Import & Save)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Cleanup Metrics Pills */}
+              {detectedType === 'bills' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200">
+                    <span className="text-[11px] text-blue-700 font-semibold block">एकूण विक्री बिले (Total Bills)</span>
+                    <span className="text-xl font-black text-blue-950 font-mono">
+                      {cleanStats.totalRows} बिले
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200">
+                    <span className="text-[11px] text-indigo-700 font-semibold block">एकूण खरेदी किंमत (Total Amount)</span>
+                    <span className="text-xl font-black text-indigo-950 font-mono">
+                      ₹{cleanStats.totalSales.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200">
+                    <span className="text-[11px] text-emerald-700 font-semibold block">एकूण जमा (Advance Received)</span>
+                    <span className="text-xl font-black text-emerald-950 font-mono">
+                      ₹{cleanStats.totalPaid.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200">
+                    <span className="text-[11px] text-rose-700 font-semibold block">एकूण बाकी शिल्लक (Balance Due)</span>
+                    <span className="text-xl font-black text-rose-950 font-mono">
+                      ₹{cleanStats.totalDue.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200">
+                    <span className="text-[11px] text-amber-800 font-medium block">स्पेलिंग दुरुस्ती</span>
+                    <span className="text-lg font-black text-amber-900 font-mono">
+                      {cleanStats.spellingFixed} गावे
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200">
+                    <span className="text-[11px] text-blue-800 font-medium block">कंसातील गावे वेगळी केली</span>
+                    <span className="text-lg font-black text-blue-900 font-mono">
+                      {cleanStats.villagesExtracted} नावे
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+                    <span className="text-[11px] text-emerald-800 font-medium block">१०-अंकी फोन फॉरमॅट</span>
+                    <span className="text-lg font-black text-emerald-900 font-mono">
+                      {cleanStats.phonesFormatted} नंबर
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-200">
+                    <span className="text-[11px] text-purple-800 font-medium block">₹0 बिल सुधारणा</span>
+                    <span className="text-lg font-black text-purple-900 font-mono">
+                      {cleanStats.zeroBillsFixed} बिले
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Clean Preview Table */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-96 overflow-y-auto shadow-inner">
+                {detectedType === 'bills' ? (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
+                      <tr>
+                        <th className="p-2.5">#</th>
+                        <th className="p-2.5">बिल नं</th>
+                        <th className="p-2.5">तारीख</th>
+                        <th className="p-2.5">ग्राहक नाव</th>
+                        <th className="p-2.5">गाव</th>
+                        <th className="p-2.5">मोबाईल</th>
+                        <th className="p-2.5">खरेदी वस्तू</th>
+                        <th className="p-2.5 text-right font-black text-slate-900">वस्तू किंमत (Total)</th>
+                        <th className="p-2.5 text-right font-black text-emerald-700">जमा (Advance)</th>
+                        <th className="p-2.5 text-right font-black text-rose-700">उरलेली बाकी (Balance)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {detectedRecords.slice(0, 60).map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/80">
+                          <td className="p-2.5 text-slate-400 font-mono">{i + 1}</td>
+                          <td className="p-2.5 font-mono font-bold text-blue-700">
+                            #{r['BILL NO'] || r.BillNo || r.InvoiceNo || '-'}
+                          </td>
+                          <td className="p-2.5 text-slate-500 font-mono whitespace-nowrap">
+                            {r.DATE || r.Date || '-'}
+                          </td>
+                          <td className="p-2.5 font-bold text-slate-900">
+                            {r._cleanedName}
+                          </td>
+                          <td className="p-2.5">
+                            <span className={r._wasSpellingFixed ? 'text-emerald-700 font-bold' : ''}>
+                              {r._cleanedVillage || '-'}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-mono text-slate-600">
+                            {r._cleanedPhone || '-'}
+                          </td>
+                          <td className="p-2.5 text-slate-700 font-medium max-w-[140px] truncate" title={r._productDetails || r.PRODUCT || ''}>
+                            {r._productDetails || r.PRODUCT || '-'}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-right text-slate-900">
+                            ₹{(r._totalAmount || 0).toLocaleString()}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-right text-emerald-700">
+                            ₹{(r._paidAmount || 0).toLocaleString()}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-right text-rose-700">
+                            ₹{(r._dueAmount || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
+                      <tr>
+                        <th className="p-3">#</th>
+                        <th className="p-3">दुरुस्त केलेले नाव</th>
+                        <th className="p-3">कार्ड नं</th>
+                        <th className="p-3">गाव (Cleaned)</th>
+                        <th className="p-3">मोबाईल नं</th>
+                        <th className="p-3">रक्कम / जमा</th>
+                        <th className="p-3">{detectedType === 'receipts' ? 'क्रेडिट बिल (Bill No)' : 'शीट नं / तारीख'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                      {detectedRecords.slice(0, 50).map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50/80">
+                          <td className="p-3 text-slate-400 font-mono">{i + 1}</td>
+                          <td className="p-3 font-bold text-slate-900">
+                            {r._cleanedName}
+                            {r._wasVillageExtracted && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px]">
+                                Extracted
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono font-bold text-blue-600">
+                            {r._cardNumber ? `#${r._cardNumber}` : '-'}
+                          </td>
+                          <td className="p-3">
+                            <span className={r._wasSpellingFixed ? 'text-emerald-700 font-bold' : ''}>
+                              {r._cleanedVillage || '-'}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-slate-600">
+                            {r._cleanedPhone || '-'}
+                          </td>
+                          <td className="p-3 font-mono font-bold text-slate-900">
+                            ₹{(r._receiptAmount || r._openingAmt || r._totalAmount || 0).toLocaleString()}
+                          </td>
+                          <td className="p-3 text-slate-500">
+                            {detectedType === 'receipts' ? (
+                              r._invoiceRef ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[11px] font-bold">
+                                  #{r._invoiceRef} जमा
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-[11px]">थेट खात्यावर</span>
+                              )
+                            ) : (
+                              r._sheetNo ? `Sheet ${r._sheetNo}` : r.DATE || r.Date || '-'
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB 2: MANUAL CATEGORY WISE IMPORT                        */}
+      {/* ========================================================= */}
+      {activeMainTab === 'manual' && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              {
+                type: 'bills' as ManualImportType,
+                label: '1. Old Sales Bills',
+                sub: 'पुराने ग्राहक बिल CSV',
+                icon: Receipt,
+              },
+              {
+                type: 'receipts' as ManualImportType,
+                label: '2. Weekly Receipts',
+                sub: 'किस्त रसीदें व रिफंड CSV',
+                icon: FileSpreadsheet,
+              },
+              {
+                type: 'cards' as ManualImportType,
+                label: '3. Scheme Cards',
+                sub: 'कार्ड धारक डेटा CSV',
+                icon: CreditCard,
+              },
+              {
+                type: 'purchases' as ManualImportType,
+                label: '4. Dealer Purchases',
+                sub: 'डीलर खरीद (Manisha Ent.)',
+                icon: Building2,
+              },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeManualType === tab.type;
+              return (
+                <button
+                  key={tab.type}
+                  onClick={() => {
+                    setActiveManualType(tab.type);
+                    setCsvText('');
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                    isActive
+                      ? 'border-2 border-blue-600 bg-blue-50/40 shadow-sm'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                    {isActive && <span className="w-2 h-2 rounded-full bg-blue-600" />}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-xs">{tab.label}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{tab.sub}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Upload CSV File for {manualTemplates[activeManualType].desc}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Select a .csv file from your computer or download the sample template below.
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleDownloadSample(activeManualType)}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                Download Sample {manualTemplates[activeManualType].filename}
+              </button>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+              <input
+                type="file"
+                accept=".csv,.txt"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const text = event.target?.result as string;
+                      processAndCleanCSV(text, file.name, activeManualType);
+                      setActiveMainTab('universal');
+                    };
+                    reader.readAsText(file);
+                  }
+                }}
+                className="text-xs text-slate-600"
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Settle / Receive Payment Modal */}
-      {settleModalCust && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
+      {/* ========================================================= */}
+      {/* TAB 3: SEARCH ALL UPLOADED DATA (Screenshot 2)            */}
+      {/* ========================================================= */}
+      {activeMainTab === 'search' && (
+        <div className="space-y-5 animate-in fade-in">
+          
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
-                  Receive Payment (उधारी जमा पावती)
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  अपलोड झालेल्या सर्व डेटाची थेट शोध मोहीम
                 </h3>
-                <p className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                  {settleModalCust.name}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  कार्ड नंबर, ग्राहक नाव, गाव किंवा मोबाईल नंबर टाकून तात्काळ शोध घ्या.
                 </p>
               </div>
+
+              {/* Filter Chips */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                {(['all', 'cards', 'bills', 'receipts'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSearchFilterCategory(cat)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      searchFilterCategory === cat
+                        ? 'bg-white text-blue-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {cat === 'all'
+                      ? 'सर्व'
+                      : cat === 'cards'
+                      ? `Cards (${existingCardMembers.length})`
+                      : cat === 'bills'
+                      ? `Bills (${existingBills.length})`
+                      : `Receipts (${existingReceipts.length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="कार्ड नंबर (उदा. 1001, 3191, 4107), नाव किंवा गाव (उदा. Kelzar, Hingni)..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Results List */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 flex items-center justify-between">
+              <span>एकूण {searchResults.length} नोंदी सापडल्या</span>
+              <span className="text-[11px] text-slate-400 font-normal">Real-time across all schemes</span>
+            </div>
+
+            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              {searchResults.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-medium">
+                  कोणतीही नोंद सापडली नाही. कृपया वेगळा नंबर किंवा नाव टाकून शोधा.
+                </div>
+              ) : (
+                searchResults.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3.5 hover:bg-slate-50/80 flex items-center justify-between gap-3 text-xs transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                        item.category === 'card'
+                          ? 'bg-blue-100 text-blue-700'
+                          : item.category === 'bill'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        {item.category === 'card' ? <CreditCard className="w-4 h-4" /> : item.category === 'bill' ? <Receipt className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-900 block text-xs sm:text-sm">
+                          {item.title}
+                        </span>
+                        <div className="flex items-center gap-2 text-slate-400 text-[11px] mt-0.5">
+                          <span>{item.subtitle}</span>
+                          {item.village && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-600 font-semibold">{item.village}</span>
+                            </>
+                          )}
+                          {item.phone && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono">{item.phone}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      {item.amount !== undefined && (
+                        <span className="block font-bold text-slate-900 font-mono">
+                          ₹{item.amount.toLocaleString()}
+                        </span>
+                      )}
+                      {item.due !== undefined && item.due > 0 && (
+                        <span className="text-[10px] font-bold text-rose-600 block">
+                          बाकी: ₹{item.due.toLocaleString()}
+                        </span>
+                      )}
+                      {item.extra && (
+                        <span className="text-[10px] text-slate-400 block">{item.extra}</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 4. CLEAN DATA RESET MODAL (Start Clean)                   */}
+      {/* ========================================================= */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-lg">
+                    डेटा रीसेट व दुरुस्ती टूल (Start Clean)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    डेटा व्यवस्थित करण्यासाठी खालील योग्य पर्याय निवडा:
+                  </p>
+                </div>
+              </div>
+
               <button
-                onClick={() => setSettleModalCust(null)}
-                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-center justify-between">
-              <span className="text-amber-800 dark:text-amber-300 font-bold">Current Balance Due:</span>
-              <span className="font-black text-amber-700 dark:text-amber-400 text-base font-mono-num">
-                ₹{(Number(settleModalCust.balanceDue) || 0).toLocaleString()}
+            {/* Current counts indicator */}
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-wrap gap-2 text-xs text-slate-700">
+              <span className="font-semibold text-slate-500">सध्या सिस्टीममध्ये:</span>
+              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
+                {existingCustomers.length} ग्राहक
+              </span>
+              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
+                {existingBills.length} बिले
+              </span>
+              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
+                {existingCardMembers.length} कार्ड मेंबर्स
+              </span>
+              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
+                {existingReceipts.length} पावत्या
               </span>
             </div>
 
-            <form onSubmit={submitSettlePayment} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Amount Received (₹) * <span className="text-[10px] text-[var(--tactile-text-dim)]">(जमा रक्कम)</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  value={settleAmount}
-                  onChange={(e) => setSettleAmount(e.target.value)}
-                  placeholder={String(settleModalCust.balanceDue || '')}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-black text-base placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-inner font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Payment Mode <span className="text-[10px] text-[var(--tactile-text-dim)]">(पेमेंट प्रकार)</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSettleMode('Cash')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                      settleMode === 'Cash'
-                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
-                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
-                    }`}
-                  >
-                    Cash (रोख)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSettleMode('Online')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                      settleMode === 'Online'
-                        ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
-                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
-                    }`}
-                  >
-                    Online / UPI (गुगल पे)
-                  </button>
+            {/* Options */}
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onResetData) onResetData('zero-bills');
+                  setShowResetModal(false);
+                  setSuccessMessage('सर्व ₹0 असलेले चुकीचे बिल यशस्वीरीत्या दुरुस्त केले गेले आहेत!');
+                }}
+                className="w-full p-4 rounded-2xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 text-left transition cursor-pointer space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-900 text-xs sm:text-sm">
+                    १. फक्त ₹0 असलेले चुकीचे बिल दुरुस्त करा (Safe Fix)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold">
+                    Safe Fix
+                  </span>
                 </div>
-              </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  काही जुन्या बिलांमध्ये एकूण रक्कम ₹0 दाखवत असल्यास, जमा रक्कम व बाकी जुळवून अचूक बिल रक्कम तयार केली जाईल. कोणताही डेटा डिलीट होणार नाही.
+                </p>
+              </button>
 
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Notes / Reference <span className="text-[10px] text-[var(--tactile-text-dim)]">(नोंद / पावती संदर्भ)</span>
-                </label>
-                <input
-                  type="text"
-                  value={settleNotes}
-                  onChange={(e) => setSettleNotes(e.target.value)}
-                  placeholder="e.g. Cleared pending invoice, GPay Txn ID"
-                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onResetData) onResetData('all');
+                  setShowResetModal(false);
+                  setSuccessMessage('सर्व डेटा यशस्वीरित्या रिसेट (साफ़) करण्यात आला आहे! सर्व रेकॉर्ड्स आता 0 आहेत.');
+                }}
+                className="w-full p-4 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 text-left transition cursor-pointer space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-rose-900 text-xs sm:text-sm">
+                    २. संपूर्ण डेटा गायब / रिसेट करा (Complete Full Reset)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 text-[10px] font-bold">
+                    0 Records
+                  </span>
+                </div>
+                <p className="text-[11px] text-rose-800 leading-relaxed">
+                  विद्यमान सर्व {existingCustomers.length} ग्राहक, {existingBills.length} बिले, {existingCardMembers.length} कार्ड मेंबर्स, हप्ते व खरेदी पूर्णपणे डिलीट होऊन सिस्टीम ₹0 सह ताजी व स्वच्छ होईल.
+                </p>
+              </button>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
-                <button
-                  type="button"
-                  onClick={() => setSettleModalCust(null)}
-                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md cursor-pointer"
-                >
-                  Record Payment (पावती नोंदवा)
-                </button>
-              </div>
-            </form>
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                रद्द करा
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Quick Customer Hisab Calculator Modal */}
-      {showQuickHisabModal && (
-        <QuickCustomerHisabModal
-          initialCustomer={quickHisabCustomer}
-          customers={customers}
-          settings={settings}
-          onClose={() => {
-            setShowQuickHisabModal(false);
-            setQuickHisabCustomer(null);
-          }}
-          onSaveQuickHisab={(data) => {
-            if (data.customerId && data.receiptPaid > 0) {
-              onSettlePayment(
-                data.customerId,
-                data.receiptPaid,
-                'Cash',
-                `${data.itemDetails} - जमा पावती हिशोब. ${data.notes || ''}`
-              );
-            }
-          }}
-        />
-      )}
-
-      {/* Duplicate Customer Accounts Merge Modal */}
-      <DuplicateCustomerMergeModal
-        isOpen={showDuplicateMergeModal}
-        customers={customers}
-        transactions={transactions}
-        duplicatePairs={duplicatePairs}
-        initialSelectedPairId={selectedDuplicatePairId}
-        onClose={() => {
-          setShowDuplicateMergeModal(false);
-          setSelectedDuplicatePairId(undefined);
-        }}
-        onDismissPair={(pairId) => {
-          setDismissedPairIds((prev) => new Set(prev).add(pairId));
-        }}
-        onMerge={(primaryId, duplicateId, mergedData) => {
-          if (onMergeCustomers) {
-            onMergeCustomers(primaryId, duplicateId, mergedData);
-          }
-          setShowDuplicateMergeModal(false);
-          setSelectedDuplicatePairId(undefined);
-        }}
-      />
     </div>
   );
 };

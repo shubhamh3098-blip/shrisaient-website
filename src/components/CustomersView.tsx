@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useDeferredValue, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -8,176 +8,188 @@ import {
   IndianRupee,
   Share2,
   CheckCircle,
+  CheckCircle2,
   AlertCircle,
-  BookOpen,
+  FileText,
+  Printer,
   Receipt,
-  RotateCw,
-  X,
+  RefreshCw,
+  BookOpen,
+  Database,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  ArrowUpDown,
+  ChevronsLeft,
+  ChevronsRight,
+  Merge,
   Sparkles,
-  LayoutGrid,
-  Table as TableIcon,
-  Download,
-  Calculator,
-  GitMerge,
+  X
 } from 'lucide-react';
 import { BusinessSettings, Customer, TransactionEntry, CardTransaction } from '../types';
 import { CustomerLedgerModal } from './CustomerLedgerModal';
-import { QuickCustomerHisabModal } from './QuickCustomerHisabModal';
-import { exportCustomersToCsv } from '../utils/csvExporter';
-import { detectDuplicateCustomers } from '../utils/duplicateDetector';
-import { DuplicateCustomerMergeModal } from './DuplicateCustomerMergeModal';
+import { MergeCustomerModal } from './MergeCustomerModal';
+import { detectDuplicateCustomers } from '../utils/customerDeduplication';
 
 interface CustomersViewProps {
   customers: Customer[];
   transactions?: TransactionEntry[];
   cardTransactions?: CardTransaction[];
   onAddCustomer: (customer: Omit<Customer, 'id'>) => void;
-  onSettlePayment: (
-    customerId: string,
-    amount: number,
-    mode: 'Cash' | 'Online',
-    notes: string,
-    customReceiptNo?: string,
-    refBillNo?: string,
-    customDate?: string
-  ) => void;
-  onRecalculateLedgers?: () => void;
-  onOpenQuickPavti?: (customer?: Customer | null, billNo?: string, amount?: number) => void;
-  onMergeCustomers?: (
-    primaryId: string,
-    duplicateId: string,
-    mergedData: {
-      name: string;
-      phone: string;
-      village?: string;
-      address?: string;
-    }
-  ) => void;
+  onSettlePayment: (customerId: string, amount: number, mode: 'Cash' | 'Online', notes: string) => void;
+  onRecheckLedgers?: () => void;
+  onNavigateUploadedData?: () => void;
+  onMergeCustomers?: (primaryId: string, secondaryId: string, overrides?: any) => void;
   settings: BusinessSettings;
+  mergedRecords?: any[];
 }
 
-const PAGE_SIZE = 24;
-
 export const CustomersView: React.FC<CustomersViewProps> = ({
-  customers = [],
+  customers,
   transactions = [],
   cardTransactions = [],
   onAddCustomer,
   onSettlePayment,
-  onRecalculateLedgers,
-  onOpenQuickPavti,
+  onRecheckLedgers,
+  onNavigateUploadedData,
   onMergeCustomers,
   settings,
+  mergedRecords,
 }) => {
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'due' | 'high-due' | 'cleared'>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'due-desc' | 'due-asc'>('due-desc');
+  const deferredSearch = useDeferredValue(search);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'due' | 'cleared'>('all');
+  const [selectedVillage, setSelectedVillage] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'due_desc' | 'name_asc' | 'purchased_desc'>('due_desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAll, setShowAll] = useState(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const PAGE_SIZE = 24; // 24 cards per page ensures instant render without mobile freezing
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [settleModalCust, setSettleModalCust] = useState<Customer | null>(null);
-  const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState<Customer | null>(null);
-  const [quickHisabCustomer, setQuickHisabCustomer] = useState<Customer | null>(null);
-  const [showQuickHisabModal, setShowQuickHisabModal] = useState(false);
+  const [selectedLedgerCust, setSelectedLedgerCust] = useState<Customer | null>(null);
+  const [recheckMessage, setRecheckMessage] = useState<string>('');
 
-  // Duplicate accounts detection state
-  const [showDuplicateMergeModal, setShowDuplicateMergeModal] = useState(false);
-  const [selectedDuplicatePairId, setSelectedDuplicatePairId] = useState<string | undefined>(undefined);
-  const [dismissedPairIds, setDismissedPairIds] = useState<Set<string>>(new Set());
+  // Customer Account Merge states
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergePrimaryCust, setMergePrimaryCust] = useState<Customer | null>(null);
+  const [mergeSecondaryCust, setMergeSecondaryCust] = useState<Customer | null>(null);
+  const [mergeSuccessBanner, setMergeSuccessBanner] = useState<string | null>(null);
 
-const duplicatePairs = useMemo(() => {
-  return detectDuplicateCustomers(customers || [], dismissedPairIds);
-}, [customers, dismissedPairIds]);
+  // Detect likely duplicate accounts (e.g. Shesh Bhagat vs Sheshrav Bhagat)
+  const duplicateCandidates = useMemo(() => detectDuplicateCustomers(customers, mergedRecords), [customers, mergedRecords]);
 
   // Add customer form states
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
-  const [newVillage, setNewVillage] = useState('');
 
   // Settle form states
   const [settleAmount, setSettleAmount] = useState('');
   const [settleMode, setSettleMode] = useState<'Cash' | 'Online'>('Cash');
   const [settleNotes, setSettleNotes] = useState('');
 
-  // Defensive calculations for overall totals
-  const { totalCustomers, totalUdhar, customersWithDueCount } = useMemo(() => {
-    let sumUdhar = 0;
-    let dueCount = 0;
-    (customers || []).forEach((c) => {
-      if (!c) return;
-      const due = Number(c.balanceDue) || 0;
-      if (due > 0) {
-        sumUdhar += due;
-        dueCount++;
+  // Extract unique villages/areas
+  const uniqueVillages = useMemo(() => {
+    const set = new Set<string>();
+    customers.forEach((c) => {
+      if (c.village) set.add(c.village.trim());
+      else if (c.address) {
+        const parts = c.address.split(',').map((p) => p.trim()).filter(Boolean);
+        parts.forEach((p) => {
+          if (p.length > 2 && !p.toLowerCase().includes('shop') && !p.toLowerCase().includes('plot')) {
+            set.add(p);
+          }
+        });
       }
     });
-    return {
-      totalCustomers: (customers || []).length,
-      totalUdhar: sumUdhar,
-      customersWithDueCount: dueCount,
-    };
+    return Array.from(set).slice(0, 20);
   }, [customers]);
 
-  // Robust, crash-proof filtering & sorting
+  const dueCount = useMemo(() => customers.filter((c) => (c.balanceDue || 0) > 0).length, [customers]);
+  const clearedCount = useMemo(() => customers.filter((c) => (c.balanceDue || 0) <= 0).length, [customers]);
+
+  // Reset page to 1 whenever search query, status or village filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deferredSearch, statusFilter, selectedVillage, sortBy]);
+
   const filtered = useMemo(() => {
-    const q = (search || '').toLowerCase().trim();
-
-    return (customers || [])
+    const q = deferredSearch.trim().toLowerCase();
+    return customers
       .filter((c) => {
-        if (!c) return false;
-
-        const nameStr = String(c.name || '').toLowerCase();
-        const phoneStr = String(c.phone || '');
-        const addrStr = String(c.address || '').toLowerCase();
-        const villStr = String(c.village || '').toLowerCase();
-
         const matchesSearch =
           !q ||
-          nameStr.includes(q) ||
-          phoneStr.includes(q) ||
-          addrStr.includes(q) ||
-          villStr.includes(q);
+          c.name.toLowerCase().includes(q) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.address && c.address.toLowerCase().includes(q)) ||
+          (c.village && c.village.toLowerCase().includes(q));
 
-        if (!matchesSearch) return false;
+        let matchesStatus = true;
+        if (statusFilter === 'due') matchesStatus = (c.balanceDue || 0) > 0;
+        if (statusFilter === 'cleared') matchesStatus = (c.balanceDue || 0) <= 0;
 
-        const due = Number(c.balanceDue) || 0;
-        if (filterType === 'due') return due > 0;
-        if (filterType === 'high-due') return due >= 5000;
-        if (filterType === 'cleared') return due <= 0;
-        return true;
+        let matchesVillage = true;
+        if (selectedVillage !== 'all') {
+          matchesVillage =
+            (c.village && c.village.toLowerCase() === selectedVillage.toLowerCase()) ||
+            (c.address && c.address.toLowerCase().includes(selectedVillage.toLowerCase()));
+        }
+
+        return matchesSearch && matchesStatus && matchesVillage;
       })
       .sort((a, b) => {
-        const dueA = Number(a?.balanceDue) || 0;
-        const dueB = Number(b?.balanceDue) || 0;
-
-        if (sortBy === 'due-desc') return dueB - dueA;
-        if (sortBy === 'due-asc') return dueA - dueB;
-        return String(a?.name || '').localeCompare(String(b?.name || ''));
+        if (sortBy === 'due_desc') return (b.balanceDue || 0) - (a.balanceDue || 0);
+        if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+        if (sortBy === 'purchased_desc') {
+          const purA = Math.max(a.totalPurchased || 0, (a.totalPaid || 0) + (a.balanceDue || 0));
+          const purB = Math.max(b.totalPurchased || 0, (b.totalPaid || 0) + (b.balanceDue || 0));
+          return purB - purA;
+        }
+        return 0;
       });
-  }, [customers, search, filterType, sortBy]);
+  }, [customers, deferredSearch, statusFilter, selectedVillage, sortBy]);
 
-  // Pagination chunking to eliminate mobile/laptop freezing
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const displayedCustomers = useMemo(() => {
-    if (showAll) return filtered;
-    const start = (currentPage - 1) * PAGE_SIZE;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  // Paginated subset of customers to render only 24 items at a time
+  const paginatedCustomers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage, showAll]);
+  }, [filtered, safeCurrentPage]);
+
+  const totalUdhar = customers.reduce((acc, c) => acc + (c.balanceDue || 0), 0);
+
+  const handleRunRecheck = () => {
+    if (onRecheckLedgers) {
+      onRecheckLedgers();
+      setRecheckMessage('खातेवही तपासणी पूर्ण! सर्व ग्राहकांचे जुने बिल, जमा पावत्या व बाकी अचूक जुळवले गेले आहेत.');
+      setTimeout(() => setRecheckMessage(''), 5000);
+    }
+  };
 
   const handleSendReminder = (c: Customer) => {
-    if (!c) return;
-    const due = Number(c.balanceDue) || 0;
+    const effectivePurchased = Math.max(c.totalPurchased || 0, (c.totalPaid || 0) + (c.balanceDue || 0));
     const text = encodeURIComponent(
-      `Namaste ${c.name || 'Customer'},\nThis is a gentle reminder from *${settings.businessName || 'Shri Sai Enterprises'}* regarding your outstanding balance of *₹${due.toLocaleString()}*.\nKindly clear the payment at your earliest convenience via Cash or UPI.\nContact: ${settings.phone || '8766486915'}\nWebsite: ${settings.domainName || 'shrisaient.in'}`
+      `*${settings.businessName}*\n` +
+      `*श्री साई इंटरप्राइजेस, वर्धा*\n` +
+      `*ग्राहक खाते विवरण / Ledger Statement*\n` +
+      `------------------------------------------\n` +
+      `👤 *ग्राहक:* ${c.name}\n` +
+      `📞 *मोबाईल:* ${c.phone || 'N/A'}\n` +
+      (c.village ? `📍 *गाव:* ${c.village}\n` : '') +
+      `📅 *दिनांक:* ${new Date().toLocaleDateString('en-IN')}\n` +
+      `------------------------------------------\n` +
+      `📦 एकूण खरेदी (Total Purchases): *₹${effectivePurchased.toLocaleString()}*\n` +
+      `✅ एकूण जमा (Total Paid): *₹${(c.totalPaid || 0).toLocaleString()}*\n` +
+      `⚠️ *शिल्लक बाकी (Balance Due): ₹${(c.balanceDue || 0).toLocaleString()}*\n` +
+      `------------------------------------------\n` +
+      (c.balanceDue > 0
+        ? `🙏 नम्र विनंती: कृपया बाकी रक्कम ₹${(c.balanceDue || 0).toLocaleString()} लवकरात लवकर जमा करावी.\n` +
+          `💳 UPI / PhonePe / GPay: *8766486915@upi*\n`
+        : `🎉 आपले सर्व खाते क्लिअर आहे! धन्यवाद!\n`) +
+      `📞 संपर्क: ${settings.phone} / 8600122798\n` +
+      `📍 पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा`
     );
-    const phone = String(c.phone || '').replace(/[^0-9]/g, '');
+    const phone = c.phone.replace(/[^0-9]/g, '');
     const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
   };
@@ -190,7 +202,6 @@ const duplicatePairs = useMemo(() => {
       name: newName.trim(),
       phone: newPhone.trim(),
       address: newAddress.trim() || undefined,
-      village: newVillage.trim() || undefined,
       totalPurchased: 0,
       totalPaid: 0,
       balanceDue: 0,
@@ -200,7 +211,6 @@ const duplicatePairs = useMemo(() => {
     setNewName('');
     setNewPhone('');
     setNewAddress('');
-    setNewVillage('');
     setShowAddModal(false);
   };
 
@@ -216,737 +226,546 @@ const duplicatePairs = useMemo(() => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-5 space-y-5">
-      {/* Header with English Primary & Small Marathi Subtext */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-7xl mx-auto px-2.5 sm:px-6 py-3.5 sm:py-6 space-y-3.5 sm:space-y-6 pb-28">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[var(--tactile-text-heading)] tracking-tight">
-              Customer Directory & Khata
-            </h1>
-            <span className="text-xs px-2 py-0.5 rounded-md bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-[var(--tactile-text-muted)] font-medium">
-              ग्राहक खातेवही
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-[var(--tactile-text-muted)] mt-0.5">
-            Manage customer accounts, outstanding balances (Udhar), and instant ledger statements.
-            <span className="ml-1 text-[11px] text-[var(--tactile-text-dim)]">(उधारी बाकी हिशोब व व्हॉट्सॲप स्मरणपत्र)</span>
+          <h1 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            Customers & Khata Book
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            ग्राहक नोंदवही, जुने हिशोब, बाकी उधारी आणि WhatsApp स्टेटमेंट
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Quick Hisab & Print Calculator Button */}
+        {/* Action buttons toolbar - Clean and responsive */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 self-start sm:self-auto w-full sm:w-auto">
           <button
-            onClick={() => {
-              setQuickHisabCustomer(null);
-              setShowQuickHisabModal(true);
-            }}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-500/25 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="मोबाईल हिशोब कॅल्क्युलेटर (उदा. दिवाण 7000, 3000 दिले, 1500 पावती)"
+            onClick={() => setShowAddModal(true)}
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
           >
-            <Calculator className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>Quick Hisab & Print</span>
-              <span className="text-[9px] text-amber-700 dark:text-amber-300 font-normal">हिशोब कॅल्क्युलेटर</span>
-            </div>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ नवीन ग्राहक</span>
           </button>
 
-          {/* Duplicate Khata Merge Button */}
-          <button
-            onClick={() => {
-              if (duplicatePairs.length > 0) {
-                setSelectedDuplicatePairId(duplicatePairs[0].id);
-              }
-              setShowDuplicateMergeModal(true);
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ${
-              duplicatePairs.length > 0
-                ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-400 animate-pulse'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-            }`}
-            title="दोन सारखी ग्राहक खाती शोधून त्यांचा हिशोब एकत्र करा"
-          >
-            <GitMerge className="w-4 h-4" />
-            <div className="flex flex-col text-left leading-tight">
-              <span className="flex items-center gap-1">
-                Merge Khata
-                {duplicatePairs.length > 0 && (
-                  <span className="bg-slate-950 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                    {duplicatePairs.length}
-                  </span>
-                )}
-              </span>
-              <span className="text-[9px] opacity-80 font-normal">खाती विलीनीकरण</span>
-            </div>
-          </button>
-
-          {/* Download CSV button */}
-          <button
-            onClick={() => exportCustomersToCsv(filtered, 'ShriSai_Customers_Khata')}
-            className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Download Customers Khata CSV"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>Download CSV</span>
-              <span className="text-[9px] text-emerald-700/80 font-normal">ग्राहक खाती एक्सपोर्ट</span>
-            </div>
-          </button>
-
-          {onRecalculateLedgers && (
+          {onNavigateUploadedData && (
             <button
-              onClick={() => {
-                onRecalculateLedgers();
-                alert('सर्व ग्राहकांचे जुने बिल आणि जमा पावत्या ताडून हिशोब बरोबर केला गेला आहे!');
-              }}
-              title="Recalculate customer balances against all sales bills & receipts"
-              className="px-3 py-2 rounded-xl tactile-btn-secondary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              type="button"
+              onClick={onNavigateUploadedData}
+              title="अपलोड झालेला सर्व २,५०२+ डेटा व मास्टर रजिस्टर पहा"
+              className="px-2.5 sm:px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200 border border-blue-200 dark:border-blue-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
             >
-              <RotateCw className="w-3.5 h-3.5 text-blue-600" />
-              <div className="flex flex-col text-left leading-tight">
-                <span>Recheck Balances</span>
-                <span className="text-[9px] text-[var(--tactile-text-dim)]">खातेवही ताडून पहा</span>
-              </div>
+              <Database className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="hidden sm:inline">सर्व डेटा रजिस्टर</span>
+              <span className="sm:hidden">डेटा</span>
+            </button>
+          )}
+
+          {onMergeCustomers && (
+            <button
+              type="button"
+              onClick={() => {
+                setMergePrimaryCust(null);
+                setMergeSecondaryCust(null);
+                setShowMergeModal(true);
+              }}
+              title="दोन खाती एकाच व्यक्तीची असल्यास एकत्र करा (Merge Accounts)"
+              className="px-2.5 sm:px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-indigo-200 shadow-2xs"
+            >
+              <Merge className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="hidden sm:inline">खाते एकत्र करा</span>
+              <span className="sm:hidden">Merge</span>
             </button>
           )}
 
           <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-xl tactile-btn-primary text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+            type="button"
+            onClick={handleRunRecheck}
+            title="सर्व जुने बिल व पावत्या तपासून खातेवही अचूक जुळवा"
+            className="px-2.5 sm:px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-slate-200 dark:border-slate-700 shadow-2xs"
           >
-            <Plus className="w-4 h-4" />
-            <div className="flex flex-col text-left leading-tight">
-              <span>+ Add Customer</span>
-              <span className="text-[9px] text-white/80 font-normal">नवीन ग्राहक नोंदवा</span>
-            </div>
+            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">खातेवही ताडून पहा</span>
+            <span className="sm:hidden">Recheck</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Overview Cards with High Contrast & Clear Marathi hints */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="tactile-card p-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Total Customers</p>
-              <span className="text-[10px] text-[var(--tactile-text-dim)]">एकूण ग्राहक</span>
-            </div>
-            <p className="text-2xl font-black text-[var(--tactile-text-heading)] mt-1 font-mono-num">
-              {totalCustomers}
-            </p>
-            <p className="text-[11px] text-[var(--tactile-text-muted)] mt-0.5">
-              {customersWithDueCount} with pending dues
-            </p>
+      {/* Recheck Toast Banner */}
+      {recheckMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{recheckMessage}</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-600">
-            <Users className="w-5 h-5" />
-          </div>
+          <button
+            onClick={() => setRecheckMessage('')}
+            className="text-xs text-emerald-700 font-bold hover:underline cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
+      )}
 
-        <div className="tactile-card p-4 border-amber-500/40 bg-amber-500/5 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-amber-800 dark:text-amber-300 font-bold">Total Market Udhar</p>
-              <span className="text-[10px] text-amber-700/80 dark:text-amber-400">एकूण बाजार उधारी बाकी</span>
-            </div>
-            <p className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1 font-mono-num">
-              ₹{totalUdhar.toLocaleString()}
-            </p>
-            <p className="text-[11px] text-amber-700/80 dark:text-amber-400 mt-0.5">
-              Across {customersWithDueCount} balance accounts
-            </p>
+      {/* Merge Success Banner */}
+      {mergeSuccessBanner && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>{mergeSuccessBanner}</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
-            <IndianRupee className="w-5 h-5" />
-          </div>
+          <button
+            onClick={() => setMergeSuccessBanner(null)}
+            className="text-xs text-emerald-700 dark:text-emerald-300 font-bold hover:underline cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
+      )}
 
-        <div className="tactile-card p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs text-[var(--tactile-text-muted)] font-bold">Fast Filter</p>
-              <span className="text-[10px] text-[var(--tactile-text-dim)]">जलद फिल्टर</span>
-            </div>
-            <span className="text-xs font-mono font-bold text-[var(--tactile-primary)]">
-              {filtered.length} Results
+      {/* KPI & Filters Bar - Mobile friendly grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-750 p-3 sm:p-4 shadow-xs">
+          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">एकूण ग्राहक (Clients)</p>
+          <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">{customers.length.toLocaleString()}</p>
+        </div>
+        <div className="bg-amber-50/70 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800 p-3 sm:p-4 shadow-xs">
+          <p className="text-[11px] sm:text-xs text-amber-900 dark:text-amber-300 font-bold">मार्केट उधारी (Pending)</p>
+          <p className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-400 mt-1">₹{totalUdhar.toLocaleString()}</p>
+        </div>
+        <div className="col-span-2 md:col-span-1 bg-white dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-750 p-2.5 sm:p-4 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-1 sm:mb-0">
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">उधारी फिल्टर (Filter)</p>
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
+              {filtered.length} / {customers.length}
             </span>
           </div>
-
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
+          <div className="flex items-center gap-1 sm:gap-1.5 mt-1 sm:mt-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
             <button
-              onClick={() => {
-                setFilterType(filterType === 'due' ? 'all' : 'due');
-                setCurrentPage(1);
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
-                filterType === 'due'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+              onClick={() => setStatusFilter('all')}
+              className={`flex-1 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition cursor-pointer ${
+                statusFilter === 'all' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              <span>Dues Only (बाकी)</span>
+              All ({customers.length})
             </button>
             <button
-              onClick={() => {
-                setFilterType(filterType === 'cleared' ? 'all' : 'cleared');
-                setCurrentPage(1);
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
-                filterType === 'cleared'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+              onClick={() => setStatusFilter('due')}
+              className={`flex-1 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition cursor-pointer ${
+                statusFilter === 'due' ? 'bg-[#0D9488] text-white shadow-xs' : 'text-amber-800 dark:text-amber-300 hover:text-amber-900'
               }`}
             >
-              <span>Cleared (शून्य बाकी)</span>
+              Due ({dueCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter('cleared')}
+              className={`flex-1 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition cursor-pointer ${
+                statusFilter === 'cleared' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-800 dark:text-emerald-400 hover:text-emerald-900'
+              }`}
+            >
+              Cleared ({clearedCount})
             </button>
           </div>
         </div>
       </div>
 
-      {/* Potential Duplicate Accounts Detected Banner (संभाव्य डुप्लिकेट खाती आढळली) */}
-      {duplicatePairs.length > 0 && (
-        <div className="rounded-2xl p-4 sm:p-5 bg-amber-500/10 border-2 border-amber-500/40 text-slate-900 dark:text-white shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0 mt-0.5">
-              <GitMerge className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-sm sm:text-base text-amber-950 dark:text-amber-200">
-                  संभाव्य डुप्लिकेट खाती आढळली ({duplicatePairs.length})
-                </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-700">
-                  अकाउंटिंग दुरुस्ती
-                </span>
+      {/* Auto-detected Duplicate Accounts Alert Banner */}
+      {duplicateCandidates.length > 0 && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 border border-amber-300 dark:border-amber-800 shadow-xs space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5 text-amber-700 dark:text-amber-300" />
               </div>
-              <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
-                {duplicatePairs[0].custA.name} ({duplicatePairs[0].custA.phone || duplicatePairs[0].custA.village || 'खाते १'}) आणि {duplicatePairs[0].custB.name} ({duplicatePairs[0].custB.phone || duplicatePairs[0].custB.village || 'खाते २'}) हे एकाच व्यक्तीचे २ खाते असू शकतात.
-              </p>
-              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 font-medium">
-                कारण: {duplicatePairs[0].reason}
-              </p>
+              <div>
+                <h4 className="text-xs sm:text-sm font-black text-amber-950 dark:text-amber-100 flex items-center gap-2">
+                  <span>संभाव्य डुप्लिकेट खाती आढळली ({duplicateCandidates.length})</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200 dark:bg-amber-800 rounded-full text-amber-950 dark:text-amber-100">
+                    अकाउंटिंग दुरुस्ती
+                  </span>
+                </h4>
+                <p className="text-xs text-amber-900 dark:text-amber-200 mt-1">
+                  <strong>{duplicateCandidates[0].primary.name}</strong> ({duplicateCandidates[0].primary.phone || 'मोबाईल नाही'}) आणि <strong>{duplicateCandidates[0].secondary.name}</strong> ({duplicateCandidates[0].secondary.village || duplicateCandidates[0].secondary.address || 'पत्ता उपलब्ध नाही'}) हे एकाच व्यक्तीचे २ खाते असू शकतात.
+                </p>
+                <div className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5 font-medium">
+                  कारण: {duplicateCandidates[0].reason}
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
             <button
+              type="button"
               onClick={() => {
-                setSelectedDuplicatePairId(duplicatePairs[0].id);
-                setShowDuplicateMergeModal(true);
+                setMergePrimaryCust(duplicateCandidates[0].primary);
+                setMergeSecondaryCust(duplicateCandidates[0].secondary);
+                setShowMergeModal(true);
               }}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black text-xs flex items-center gap-2 shadow-md shadow-amber-600/30 transition cursor-pointer self-start sm:self-auto shrink-0 active:scale-95"
             >
-              <GitMerge className="w-4 h-4" />
-              <span>हिशोब तपासा व एकत्र करा (Review Hisab & Merge)</span>
-            </button>
-            <button
-              onClick={() => {
-                setDismissedPairIds((prev) => new Set(prev).add(duplicatePairs[0].id));
-              }}
-              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg text-xs font-bold cursor-pointer"
-              title="ही २ वेगळी खाती ठेवा (Dismiss)"
-            >
-              ✕
+              <Merge className="w-4 h-4" />
+              <span>आताच १-क्लिक एकत्र करा (Merge Both)</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* SEARCH BAR - 100% VISIBLE TEXT WITH HIGH CONTRAST & CLEAR BUTTON */}
-      <div className="tactile-card p-3 sm:p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {/* Main Search Input - High Contrast & Mobile Proof (text-base on mobile <640px) */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by customer name, phone number, village or address..."
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-base sm:text-sm placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-[#0D5C4D] shadow-xs"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCurrentPage(1);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-                title="Clear Search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Sort Selector & View Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-sm sm:text-xs text-[var(--tactile-text-main)] flex-1 sm:flex-none">
-              <ArrowUpDown className="w-3.5 h-3.5 text-[var(--tactile-text-muted)] shrink-0" />
-              <span className="text-xs sm:text-[11px] font-medium text-[var(--tactile-text-muted)] hidden sm:inline">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent text-sm sm:text-xs font-bold text-[var(--tactile-text-main)] focus:outline-none cursor-pointer w-full"
-              >
-                <option value="due-desc">Highest Udhar First (जास्त उधारी)</option>
-                <option value="due-asc">Lowest Udhar First (कमी उधारी)</option>
-                <option value="name">Customer Name A-Z (नावाप्रमाणे)</option>
-              </select>
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] rounded-xl p-0.5">
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                  viewMode === 'cards'
-                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
-                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-                title="कार्ड व्ह्यू"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cards</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-white dark:bg-slate-800 text-[var(--tactile-text-main)] shadow-2xs'
-                    : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-                title="टेबल व्ह्यू"
-              >
-                <TableIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Table</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Filter Chips */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs sm:text-[11px] font-bold text-[var(--tactile-text-muted)] mr-1">Quick:</span>
-            {[
-              { id: 'all', label: 'All Clients', mr: 'सर्व' },
-              { id: 'due', label: 'With Balance Due', mr: 'उधारी बाकी' },
-              { id: 'high-due', label: 'High Dues (₹5,000+)', mr: 'मोठी उधारी' },
-              { id: 'cleared', label: 'Zero Balance', mr: 'पूर्ण जमा' },
-            ].map((chip) => (
-              <button
-                key={chip.id}
-                onClick={() => {
-                  setFilterType(chip.id as any);
-                  setCurrentPage(1);
-                }}
-                className={`px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-sm sm:text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                  filterType === chip.id
-                    ? 'tactile-btn-primary text-white font-bold'
-                    : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
-                }`}
-              >
-                <span>{chip.label}</span>
-                <span className="text-xs sm:text-[9px] opacity-75 font-normal">({chip.mr})</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="text-xs sm:text-[11px] text-[var(--tactile-text-dim)] font-mono">
-            Showing {displayedCustomers.length} of {filtered.length} customers
-          </div>
-        </div>
-      </div>
-
-      {/* Customer List: Cards or Table */}
-      {displayedCustomers.length === 0 ? (
-        <div className="tactile-card p-12 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-[var(--tactile-surface-inset)] flex items-center justify-center text-[var(--tactile-text-muted)]">
-            <Users className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-[var(--tactile-text-heading)]">
-            No Customers Found
-          </h3>
-          <p className="text-sm sm:text-xs text-[var(--tactile-text-muted)] max-w-sm mx-auto">
-            {search
-              ? `No customer matching "${search}". Check spelling or clear search.`
-              : 'No customers recorded yet in this category.'}
-          </p>
+      {/* Search & Village Filters Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            id="search-customers-input"
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ग्राहकाचे नाव, फोन नंबर किंवा गाव शोधा... (Search customer)"
+            className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00523f]/20 focus:border-[#00523f] shadow-2xs transition"
+          />
           {search && (
             <button
-              onClick={() => {
-                setSearch('');
-                setFilterType('all');
-              }}
-              className="px-4 py-2.5 rounded-xl tactile-btn-secondary text-sm sm:text-xs font-bold cursor-pointer"
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center text-xs font-bold cursor-pointer transition"
+              title="सर्च साफ करा (Clear)"
             >
-              Reset Search & Filters
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-      ) : viewMode === 'table' ? (
-        /* Customer List Table with Increased Base Font Size (<640px) */
-        <div className="tactile-card overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm sm:text-xs">
-              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b border-[var(--tactile-border)]">
-                <tr>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs">ग्राहक (Customer Name)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs whitespace-nowrap">मोबाईल / गाव</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">एकूण खरेदी (Total)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">जमा (Paid)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-right whitespace-nowrap">उधारी बाकी (Due)</th>
-                  <th className="py-3.5 px-3 sm:px-4 text-sm sm:text-xs text-center whitespace-nowrap">कृती (Actions)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--tactile-border-subtle)]">
-                {displayedCustomers.map((c) => {
-                  const due = Number(c?.balanceDue) || 0;
-                  const totalPurchased = Number(c?.totalPurchased) || 0;
-                  const totalPaid = Number(c?.totalPaid) || 0;
 
-                  return (
-                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                      <td className="py-3.5 px-3 sm:px-4">
-                        <div className="font-bold text-base sm:text-sm text-[var(--tactile-text-heading)]">
-                          {c.name || 'Unnamed Customer'}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 text-sm sm:text-xs font-mono text-[var(--tactile-text-main)]">
-                          <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
-                          <span>{c.phone || '-'}</span>
-                        </div>
-                        {(c.address || c.village) && (
-                          <div className="flex items-center gap-1 text-xs sm:text-[11px] text-[var(--tactile-text-dim)] mt-0.5">
-                            <MapPin className="w-3 h-3 shrink-0" />
-                            <span className="truncate max-w-[140px]">
-                              {[c.address, c.village].filter(Boolean).join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
-                          ₹{totalPurchased.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
-                          ₹{totalPaid.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
-                        {due > 0 ? (
-                          <span className="font-black text-base sm:text-sm text-amber-700 dark:text-amber-400 font-mono-num bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
-                            ₹{due.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                            Cleared • जमा
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => setSelectedLedgerCustomer(c)}
-                            className="py-1.5 px-2.5 rounded-lg tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                            title="खातेवही उघडा"
-                          >
-                            <BookOpen className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Statement</span>
-                          </button>
-                          <button
-                            onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                            className="py-1.5 px-2.5 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                            title="रक्कम जमा करा / पावती फाडा"
-                          >
-                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>+ Pay</span>
-                          </button>
-                          <button
-                            title="हिशोब कॅल्क्युलेटर (उदा. बिल, अ‍ॅडव्हान्स, पावती)"
-                            onClick={() => {
-                              setQuickHisabCustomer(c);
-                              setShowQuickHisabModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
-                          >
-                            <Calculator className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge with another account)"
-                            onClick={() => {
-                              const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
-                              if (matchingPair) {
-                                setSelectedDuplicatePairId(matchingPair.id);
-                              } else {
-                                setSelectedDuplicatePairId(undefined);
-                              }
-                              setShowDuplicateMergeModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
-                          >
-                            <GitMerge className="w-3.5 h-3.5" />
-                          </button>
-                          {due > 0 && (
-                            <button
-                              title="Send WhatsApp Due Reminder"
-                              onClick={() => handleSendReminder(c)}
-                              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
-                            >
-                              <Share2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        {uniqueVillages.length > 0 && (
+          <select
+            value={selectedVillage}
+            onChange={(e) => setSelectedVillage(e.target.value)}
+            className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#00523f]/20 shadow-2xs cursor-pointer"
+          >
+            <option value="all">📍 सर्व गावे / All Villages ({uniqueVillages.length})</option>
+            {uniqueVillages.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+          className="px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#00523f]/20 shadow-2xs cursor-pointer"
+        >
+          <option value="due_desc">💰 बाकी जास्त ते कमी (Highest Due)</option>
+          <option value="name_asc">🔤 नाव A ते Z (Name A-Z)</option>
+          <option value="purchased_desc">🛍️ एकूण खरेदी जास्त (Top Purchases)</option>
+        </select>
+      </div>
+
+      {/* Pagination Status & Quick Jump Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-850 p-3 rounded-2xl border border-slate-200 dark:border-slate-750 shadow-2xs text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-slate-900 dark:text-white">
+            दाखवत आहे: {filtered.length > 0 ? (safeCurrentPage - 1) * PAGE_SIZE + 1 : 0} -{' '}
+            {Math.min(safeCurrentPage * PAGE_SIZE, filtered.length)}
+          </span>
+          <span className="text-slate-400">•</span>
+          <span className="text-slate-500 dark:text-slate-400">
+            एकूण <strong>{filtered.length.toLocaleString()}</strong> ग्राहक (पृष्ठ <strong>{safeCurrentPage}</strong> / {totalPages})
+          </span>
+          {search && (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#00523f] dark:text-emerald-400 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800">
+              "{search}" चे निकाल
+            </span>
+          )}
         </div>
-      ) : (
-        /* Customer Cards Grid with Increased Base Font Size (<640px) */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {displayedCustomers.map((c) => {
-            const due = Number(c?.balanceDue) || 0;
-            const totalPurchased = Number(c?.totalPurchased) || 0;
-            const totalPaid = Number(c?.totalPaid) || 0;
+
+        {/* Compact Page Controls */}
+        <div className="flex items-center gap-1 self-end sm:self-auto">
+          <button
+            type="button"
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage(1)}
+            title="पहिले पृष्ठ (First)"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            disabled={safeCurrentPage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            title="मागील पृष्ठ (Previous)"
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">मागील</span>
+          </button>
+
+          <span className="px-2 font-mono font-bold text-slate-800 dark:text-slate-200">
+            {safeCurrentPage} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            title="पुढील पृष्ठ (Next)"
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+          >
+            <span className="hidden sm:inline">पुढील</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            disabled={safeCurrentPage >= totalPages}
+            onClick={() => setCurrentPage(totalPages)}
+            title="शेवटचे पृष्ठ (Last)"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+          >
+            <ChevronsRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Customers List Cards - Only 24 items mapped for ultra-fast performance */}
+      {paginatedCustomers.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {paginatedCustomers.map((c) => {
+            const effectivePurchased = Math.max(c.totalPurchased || 0, (c.totalPaid || 0) + (c.balanceDue || 0));
 
             return (
               <div
                 key={c.id}
-                className="tactile-card p-4 flex flex-col justify-between space-y-3 tactile-card-hover"
+                className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-3.5 sm:p-5 shadow-xs flex flex-col justify-between space-y-3 sm:space-y-4 hover:border-teal-500/50 transition"
               >
                 <div>
-                  {/* Customer Name & Status Badge - text-base on mobile (<640px) */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-base sm:text-sm font-extrabold text-[var(--tactile-text-heading)] truncate">
-                        {c.name || 'Unnamed Customer'}
-                      </h3>
-                      <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-muted)] mt-1">
-                        <Phone className="w-3.5 h-3.5 text-[var(--tactile-text-dim)] shrink-0" />
-                        <span className="font-mono">{c.phone || 'No Phone'}</span>
-                      </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">{c.name}</h3>
+                      {c.phone && c.phone !== '0' ? (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                          <a href={`tel:${c.phone}`} className="font-mono hover:text-blue-600 hover:underline">
+                            {c.phone}
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          <Phone className="w-3 h-3 text-slate-300 shrink-0" />
+                          <span className="italic text-[11px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">मोबाईल नाही</span>
+                        </div>
+                      )}
                     </div>
-
-                    {due > 0 ? (
-                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-sm sm:text-xs font-black bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0 font-mono-num">
-                        Due: ₹{due.toLocaleString()}
+                    {c.balanceDue > 0 ? (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-100/90 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shadow-2xs shrink-0 font-mono">
+                        बाकी: ₹{c.balanceDue.toLocaleString()}
                       </span>
                     ) : (
-                      <span className="px-2.5 py-1 sm:py-0.5 rounded-full text-xs sm:text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
-                        Cleared • जमा
+                      <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shrink-0">
+                        Cleared
                       </span>
                     )}
                   </div>
 
-                  {(c.address || c.village) && (
-                    <div className="flex items-center gap-1.5 text-sm sm:text-xs text-[var(--tactile-text-dim)] mt-2">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">
-                        {[c.address, c.village].filter(Boolean).join(', ')}
-                      </span>
+                  {c.address && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="truncate">{c.address}</span>
                     </div>
                   )}
 
-                  {/* Financial Metrics with English Primary & Marathi hint */}
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-[var(--tactile-border-subtle)] text-sm sm:text-xs">
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
                     <div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Billed</span>
-                        <span className="text-[11px] sm:text-[9px] text-[var(--tactile-text-dim)]">एकूण खरेदी</span>
-                      </div>
-                      <span className="font-bold text-base sm:text-xs text-[var(--tactile-text-heading)] font-mono-num">
-                        ₹{totalPurchased.toLocaleString()}
+                      <span className="text-slate-400 dark:text-slate-500 block text-[11px] font-medium">एकूण खरेदी (Total)</span>
+                      <span className="font-bold text-slate-900 dark:text-white font-mono text-xs sm:text-sm">
+                        ₹{effectivePurchased.toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs sm:text-[10px] text-[var(--tactile-text-muted)] font-bold">Total Paid</span>
-                        <span className="text-[11px] sm:text-[9px] text-emerald-600 font-medium">एकूण जमा</span>
-                      </div>
-                      <span className="font-bold text-base sm:text-xs text-emerald-600 dark:text-emerald-400 font-mono-num">
-                        ₹{totalPaid.toLocaleString()}
+                      <span className="text-slate-400 dark:text-slate-500 block text-[11px] font-medium">एकूण जमा (Paid)</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono text-xs sm:text-sm">
+                        ₹{(c.totalPaid || 0).toLocaleString()}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Card Action Buttons - Increased Font Size for Small Screens */}
-                <div className="space-y-1.5 pt-2 border-t border-[var(--tactile-border-subtle)]">
-                  {/* Full Ledger & Bills Statement Button */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {/* Full Statement Button */}
                   <button
-                    onClick={() => setSelectedLedgerCustomer(c)}
-                    className="w-full py-2.5 sm:py-2 px-3 rounded-xl tactile-btn-primary text-sm sm:text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                    onClick={() => setSelectedLedgerCust(c)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-[#00523f] text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
                   >
-                    <BookOpen className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" />
-                    <span>Statement & Bills (खातेवही)</span>
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                    <span>खातेवही हिशोब (Bills + Payments)</span>
                   </button>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                      className="flex-1 py-2 sm:py-1.5 px-3 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer text-center flex items-center justify-center gap-1"
+                      onClick={() => setSettleModalCust(c)}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-[#00523f] dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-bold transition cursor-pointer text-center"
                     >
-                      <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>+ Receive Payment</span>
+                      + Receive Payment
                     </button>
-
-                    <button
-                      title="हिशोब कॅल्क्युलेटर व पावती प्रिंट (Quick Hisab)"
-                      onClick={() => {
-                        setQuickHisabCustomer(c);
-                        setShowQuickHisabModal(true);
-                      }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
-                    >
-                      <Calculator className="w-4 h-4" />
-                    </button>
-
-                    <button
-                      title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge Accounts)"
-                      onClick={() => {
-                        const matchingPair = duplicatePairs.find((p) => p.custA.id === c.id || p.custB.id === c.id);
-                        if (matchingPair) {
-                          setSelectedDuplicatePairId(matchingPair.id);
-                        } else {
-                          setSelectedDuplicatePairId(undefined);
-                        }
-                        setShowDuplicateMergeModal(true);
-                      }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
-                    >
-                      <GitMerge className="w-4 h-4" />
-                    </button>
-
-                    {due > 0 && (
+                    {onMergeCustomers && (
                       <button
-                        title="Send WhatsApp Due Reminder (व्हॉट्सॲप स्मरणपत्र)"
-                        onClick={() => handleSendReminder(c)}
-                        className="p-2 sm:p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
+                        title="हे खाते दुसऱ्या खात्यात एकत्र / विलीन करा (Merge Accounts)"
+                        onClick={() => {
+                          setMergePrimaryCust(c);
+                          setMergeSecondaryCust(null);
+                          setShowMergeModal(true);
+                        }}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300 transition cursor-pointer"
                       >
-                        <Share2 className="w-4 h-4" />
+                        <Merge className="w-4 h-4" />
                       </button>
                     )}
+                    <button
+                      title="WhatsApp Statement / Due Reminder"
+                      onClick={() => handleSendReminder(c)}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95 shrink-0"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </button>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-750 p-8 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            कोणताही ग्राहक सापडला नाही (No Customers Found)
+          </h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            तुम्ही शोधत असलेले नाव किंवा फिल्टर उपलब्ध नाही. कृपया सर्च बदलून पहा किंवा फिल्टर क्लिअर करा.
+          </p>
+          {(search || statusFilter !== 'all' || selectedVillage !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('all');
+                setSelectedVillage('all');
+              }}
+              className="px-4 py-2 rounded-full bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
+            >
+              फिल्टर साफ करा (Clear Filters)
+            </button>
+          )}
+        </div>
       )}
 
-      {/* Pagination Controls - Keeps mobile & laptop super fast */}
-      {filtered.length > PAGE_SIZE && (
-        <div className="tactile-card p-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-[var(--tactile-text-muted)] font-medium">
-            Page <strong className="text-[var(--tactile-text-heading)]">{currentPage}</strong> of{' '}
-            <strong className="text-[var(--tactile-text-heading)]">{totalPages}</strong> (
-            {filtered.length} customers)
-          </div>
+      {/* Bottom Pagination Bar */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            पृष्ठ <strong>{safeCurrentPage}</strong> पैकी <strong>{totalPages}</strong> (एकूण {filtered.length.toLocaleString()} ग्राहक)
+          </p>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
             <button
-              onClick={() => setShowAll(!showAll)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)] hover:bg-[var(--tactile-surface)] transition cursor-pointer"
+              type="button"
+              disabled={safeCurrentPage <= 1}
+              onClick={() => {
+                setCurrentPage(1);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
             >
-              {showAll ? 'Show Pages (24 per page)' : 'View All'}
+              ⏮ प्रथम (First)
+            </button>
+            <button
+              type="button"
+              disabled={safeCurrentPage <= 1}
+              onClick={() => {
+                setCurrentPage((p) => Math.max(1, p - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              मागील (Prev)
             </button>
 
-            {!showAll && (
-              <>
-                <button
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Prev</span>
-                </button>
-                <button
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-2.5 py-1.5 rounded-lg border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--tactile-surface-inset)] transition cursor-pointer flex items-center gap-1"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
+            {/* Quick jump to page */}
+            <div className="flex items-center gap-1 px-2 text-xs">
+              <span className="text-slate-500">पृष्ठ:</span>
+              <select
+                value={safeCurrentPage}
+                onChange={(e) => {
+                  setCurrentPage(Number(e.target.value));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 dark:text-white"
+              >
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              disabled={safeCurrentPage >= totalPages}
+              onClick={() => {
+                setCurrentPage((p) => Math.min(totalPages, p + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-3.5 py-1.5 rounded-full bg-[#00523f] text-xs font-bold text-white hover:bg-[#004232] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 shadow-xs"
+            >
+              पुढील (Next)
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              disabled={safeCurrentPage >= totalPages}
+              onClick={() => {
+                setCurrentPage(totalPages);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            >
+              अंतिम (Last) ⏭
+            </button>
           </div>
         </div>
       )}
 
-      {/* Customer Ledger Statement Modal */}
-      {selectedLedgerCustomer && (
-        <CustomerLedgerModal
-          customer={selectedLedgerCustomer}
-          transactions={transactions}
-          cardTransactions={cardTransactions}
-          settings={settings}
-          onClose={() => setSelectedLedgerCustomer(null)}
-          onReceivePayment={(c, billNo, dueAmount) => {
-            if (onOpenQuickPavti) {
-              onOpenQuickPavti(c, billNo, dueAmount);
-            } else {
-              setSettleModalCust(c);
-              if (dueAmount) setSettleAmount(String(dueAmount));
-            }
-          }}
-        />
-      )}
-
       {/* Add Customer Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
-              <div>
-                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
-                  Add New Customer
-                </h3>
-                <p className="text-[11px] text-[var(--tactile-text-muted)]">
-                  नवीन ग्राहक खाते नोंदणी
-                </p>
-              </div>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-slate-900 text-base">Add New Customer</h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 font-bold"
               >
-                <X className="w-4 h-4" />
+                ✕
               </button>
             </div>
-
-            <form onSubmit={submitAddCustomer} className="space-y-3.5">
+            <form onSubmit={submitAddCustomer} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Customer / Business Name * <span className="text-[10px] text-[var(--tactile-text-dim)]">(ग्राहकाचे नाव)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Customer / Business Name *
                 </label>
                 <input
                   type="text"
                   required
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. Ramesh Sharma or Patil Electricals"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
+                  placeholder="e.g. Ramesh Hardware or Amit Patil"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Phone / WhatsApp Number * <span className="text-[10px] text-[var(--tactile-text-dim)]">(मोबाईल नंबर)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone / WhatsApp Number *
                 </label>
                 <input
                   type="tel"
@@ -954,49 +773,34 @@ const duplicatePairs = useMemo(() => {
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
                   placeholder="e.g. 9822112233"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-semibold text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner font-mono"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Village / City <span className="text-[10px] text-[var(--tactile-text-dim)]">(गाव / शहर)</span>
-                </label>
-                <input
-                  type="text"
-                  value={newVillage}
-                  onChange={(e) => setNewVillage(e.target.value)}
-                  placeholder="e.g. Wardha, Arvi, Hinganghat, Seloo"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Address Details <span className="text-[10px] text-[var(--tactile-text-dim)]">(पत्ता)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Shop Address / Location
                 </label>
                 <textarea
                   rows={2}
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
-                  placeholder="Shop number, landmark, area..."
-                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-sm placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner resize-none"
+                  placeholder="Shop number, street, town..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none"
                 />
               </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl tactile-btn-primary text-xs font-bold shadow-md cursor-pointer"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs"
                 >
-                  Save Customer (जतन करा)
+                  Save Customer
                 </button>
               </div>
             </form>
@@ -1004,106 +808,102 @@ const duplicatePairs = useMemo(() => {
         </div>
       )}
 
-      {/* Settle / Receive Payment Modal */}
+      {/* Settle Balance Modal */}
       {settleModalCust && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="tactile-card-modal max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--tactile-border-subtle)] pb-3">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="font-black text-[var(--tactile-text-heading)] text-base">
-                  Receive Payment (उधारी जमा पावती)
-                </h3>
-                <p className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                  {settleModalCust.name}
-                </p>
+                <h3 className="font-bold text-slate-900 text-base">Receive Payment / Udhar Settle</h3>
+                <p className="text-xs text-slate-500">{settleModalCust.name}</p>
               </div>
               <button
                 onClick={() => setSettleModalCust(null)}
-                className="w-8 h-8 rounded-full bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] flex items-center justify-center text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 font-bold"
               >
-                <X className="w-4 h-4" />
+                ✕
               </button>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-center justify-between">
-              <span className="text-amber-800 dark:text-amber-300 font-bold">Current Balance Due:</span>
-              <span className="font-black text-amber-700 dark:text-amber-400 text-base font-mono-num">
-                ₹{(Number(settleModalCust.balanceDue) || 0).toLocaleString()}
+            <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs flex items-center justify-between">
+              <span className="text-amber-800 font-medium">Current Balance Due:</span>
+              <span className="font-bold text-amber-900 text-sm">
+                ₹{settleModalCust.balanceDue.toLocaleString()}
               </span>
             </div>
 
-            <form onSubmit={submitSettlePayment} className="space-y-3.5">
+            <form onSubmit={submitSettlePayment} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Amount Received (₹) * <span className="text-[10px] text-[var(--tactile-text-dim)]">(जमा रक्कम)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Amount Received (₹) *
                 </label>
                 <input
                   type="number"
-                  step="any"
+                  step="0.01"
                   required
                   value={settleAmount}
                   onChange={(e) => setSettleAmount(e.target.value)}
-                  placeholder={String(settleModalCust.balanceDue || '')}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] font-black text-base placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-inner font-mono"
+                  placeholder={settleModalCust.balanceDue.toString()}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Payment Mode <span className="text-[10px] text-[var(--tactile-text-dim)]">(पेमेंट प्रकार)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Payment Mode
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSettleMode('Cash')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    className={`py-2 text-xs font-semibold rounded-lg border ${
                       settleMode === 'Cash'
-                        ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
-                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        : 'border-slate-200 text-slate-600'
                     }`}
                   >
-                    Cash (रोख)
+                    Cash
                   </button>
                   <button
                     type="button"
                     onClick={() => setSettleMode('Online')}
-                    className={`py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    className={`py-2 text-xs font-semibold rounded-lg border ${
                       settleMode === 'Online'
-                        ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
-                        : 'border-[var(--tactile-border)] bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-main)]'
+                        ? 'border-blue-600 bg-blue-50 text-blue-800'
+                        : 'border-slate-200 text-slate-600'
                     }`}
                   >
-                    Online / UPI (गुगल पे)
+                    Online (UPI)
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[var(--tactile-text-main)] mb-1">
-                  Notes / Reference <span className="text-[10px] text-[var(--tactile-text-dim)]">(नोंद / पावती संदर्भ)</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Note / Reference
                 </label>
                 <input
                   type="text"
                   value={settleNotes}
                   onChange={(e) => setSettleNotes(e.target.value)}
-                  placeholder="e.g. Cleared pending invoice, GPay Txn ID"
-                  className="w-full px-3.5 py-2 rounded-xl border border-[var(--tactile-border)] bg-[var(--tactile-surface-raised)] text-[var(--tactile-text-main)] text-xs placeholder:text-[var(--tactile-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--tactile-border-focus)] shadow-inner"
+                  placeholder="e.g. Cleared pending bill, GPay Txn ID"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--tactile-border-subtle)]">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setSettleModalCust(null)}
-                  className="px-4 py-2 rounded-xl border border-[var(--tactile-border)] text-xs font-semibold text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md cursor-pointer"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs"
                 >
-                  Record Payment (पावती नोंदवा)
+                  Record Payment
                 </button>
               </div>
             </form>
@@ -1111,51 +911,43 @@ const duplicatePairs = useMemo(() => {
         </div>
       )}
 
-      {/* Quick Customer Hisab Calculator Modal */}
-      {showQuickHisabModal && (
-        <QuickCustomerHisabModal
-          initialCustomer={quickHisabCustomer}
-          customers={customers}
+      {/* Customer Ledger & Print Modal */}
+      {selectedLedgerCust && (
+        <CustomerLedgerModal
+          customer={selectedLedgerCust}
+          transactions={transactions}
+          cardTransactions={cardTransactions}
           settings={settings}
-          onClose={() => {
-            setShowQuickHisabModal(false);
-            setQuickHisabCustomer(null);
-          }}
-          onSaveQuickHisab={(data) => {
-            if (data.customerId && data.receiptPaid > 0) {
-              onSettlePayment(
-                data.customerId,
-                data.receiptPaid,
-                'Cash',
-                `${data.itemDetails} - जमा पावती हिशोब. ${data.notes || ''}`
-              );
-            }
+          onClose={() => setSelectedLedgerCust(null)}
+          onReceivePayment={(customerId, amount, mode, notes) => {
+            onSettlePayment(customerId, amount, mode, notes);
+            // Refresh customer balance locally in modal if needed
+            setSelectedLedgerCust((prev) =>
+              prev ? { ...prev, totalPaid: prev.totalPaid + amount, balanceDue: Math.max(0, prev.balanceDue - amount) } : null
+            );
           }}
         />
       )}
-
-      {/* Duplicate Customer Accounts Merge Modal */}
-      <DuplicateCustomerMergeModal
-        isOpen={showDuplicateMergeModal}
-        customers={customers}
-        transactions={transactions}
-        duplicatePairs={duplicatePairs}
-        initialSelectedPairId={selectedDuplicatePairId}
-        onClose={() => {
-          setShowDuplicateMergeModal(false);
-          setSelectedDuplicatePairId(undefined);
-        }}
-        onDismissPair={(pairId) => {
-          setDismissedPairIds((prev) => new Set(prev).add(pairId));
-        }}
-        onMerge={(primaryId, duplicateId, mergedData) => {
-          if (onMergeCustomers) {
-            onMergeCustomers(primaryId, duplicateId, mergedData);
-          }
-          setShowDuplicateMergeModal(false);
-          setSelectedDuplicatePairId(undefined);
-        }}
-      />
+      {/* Customer Deduplication & Merge Modal */}
+      {showMergeModal && onMergeCustomers && (
+        <MergeCustomerModal
+          isOpen={true}
+          customers={customers}
+          initialPrimaryCustomer={mergePrimaryCust}
+          initialSecondaryCustomer={mergeSecondaryCust}
+          onClose={() => {
+            setShowMergeModal(false);
+            setMergePrimaryCust(null);
+            setMergeSecondaryCust(null);
+          }}
+          onConfirmMerge={(pId, sId, overrides) => {
+            onMergeCustomers(pId, sId, overrides);
+            setMergeSuccessBanner(
+              '✓ यशस्वीपणे दोन्ही खाती एकत्र (Merge) झाली! सर्व जुनी बिले, पावत्या व बाकी रक्कम एकत्र जोडली गेली आहे.'
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
