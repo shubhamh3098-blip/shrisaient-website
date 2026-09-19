@@ -225,19 +225,110 @@ export function cleanDate(rawDate?: string): string {
   return s || new Date().toISOString().split('T')[0];
 }
 
-// Determine scheme from card number or name
+// Determine scheme from card number, text hints (Marathi/English/code), or explicit target
 export function getSchemeForCard(cardNum: number, schemeHint = ''): { schemeId: CardSchemeId; schemeName: string } {
-  const hint = (schemeHint || '').toLowerCase();
-  if (hint.includes('scheme 3') || hint.includes('scheme3')) {
+  const hint = (schemeHint || '').toLowerCase().trim();
+  const cleanHint = hint.replace(/[\s_\-\.\/\(\)\[\]#:,]/g, '');
+
+  // 1. Direct or partial hint matches (Scheme 3 / योजना ३ / SCH-3 / 3)
+  if (
+    hint === 'scheme3' ||
+    hint === 'scheme 3' ||
+    hint === '3' ||
+    hint === '३' ||
+    cleanHint.includes('scheme3') ||
+    cleanHint.includes('sch3') ||
+    cleanHint.includes('योजना3') ||
+    cleanHint.includes('योजना३') ||
+    cleanHint.includes('स्कीम3') ||
+    cleanHint.includes('स्कीम३') ||
+    cleanHint.includes('schemeiii') ||
+    cleanHint.includes('schiii') ||
+    hint.includes('sch-3') ||
+    hint.includes('sch 3') ||
+    hint.includes('s-3') ||
+    hint.includes('s 3') ||
+    hint.includes('योजना ३') ||
+    hint.includes('योजना 3') ||
+    hint.includes('स्कीम ३') ||
+    hint.includes('स्कीम 3')
+  ) {
     return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
   }
-  if (hint.includes('scheme 2') || hint.includes('scheme2')) {
+
+  // 2. Direct or partial hint matches (Scheme 2 / योजना २ / SCH-2 / 2)
+  if (
+    hint === 'scheme2' ||
+    hint === 'scheme 2' ||
+    hint === '2' ||
+    hint === '२' ||
+    cleanHint.includes('scheme2') ||
+    cleanHint.includes('sch2') ||
+    cleanHint.includes('योजना2') ||
+    cleanHint.includes('योजना२') ||
+    cleanHint.includes('स्कीम2') ||
+    cleanHint.includes('स्कीम२') ||
+    cleanHint.includes('schemeii') ||
+    cleanHint.includes('schii') ||
+    hint.includes('sch-2') ||
+    hint.includes('sch 2') ||
+    hint.includes('s-2') ||
+    hint.includes('s 2') ||
+    hint.includes('योजना २') ||
+    hint.includes('योजना 2') ||
+    hint.includes('स्कीम २') ||
+    hint.includes('स्कीम 2')
+  ) {
     return { schemeId: 'scheme2', schemeName: 'Scheme 2 (योजना 2)' };
   }
-  if (hint.includes('scheme 1') || hint.includes('scheme1')) {
+
+  // 3. Direct or partial hint matches (Scheme 1 / योजना १ / SCH-1 / 1)
+  if (
+    hint === 'scheme1' ||
+    hint === 'scheme 1' ||
+    hint === '1' ||
+    hint === '१' ||
+    cleanHint.includes('scheme1') ||
+    cleanHint.includes('sch1') ||
+    cleanHint.includes('योजना1') ||
+    cleanHint.includes('योजना१') ||
+    cleanHint.includes('स्कीम1') ||
+    cleanHint.includes('स्कीम१') ||
+    cleanHint.includes('schemei') ||
+    cleanHint.includes('schi') ||
+    hint.includes('sch-1') ||
+    hint.includes('sch 1') ||
+    hint.includes('s-1') ||
+    hint.includes('s 1') ||
+    hint.includes('योजना १') ||
+    hint.includes('योजना 1') ||
+    hint.includes('स्कीम १') ||
+    hint.includes('स्कीम 1')
+  ) {
     return { schemeId: 'scheme1', schemeName: 'Scheme 1 (योजना 1)' };
   }
 
+  // 4. Higher schemes (4, 5, 6)
+  if (cleanHint.includes('scheme4') || cleanHint.includes('sch4') || cleanHint.includes('योजना4') || cleanHint.includes('योजना४') || hint === '4' || hint === '४') {
+    return { schemeId: 'scheme4', schemeName: 'Scheme 4 (योजना 4)' };
+  }
+  if (cleanHint.includes('scheme5') || cleanHint.includes('sch5') || cleanHint.includes('योजना5') || cleanHint.includes('योजना५') || hint === '5' || hint === '५') {
+    return { schemeId: 'scheme5', schemeName: 'Scheme 5 (योजना 5)' };
+  }
+  if (cleanHint.includes('scheme6') || cleanHint.includes('sch6') || cleanHint.includes('योजना6') || cleanHint.includes('योजना६') || hint === '6' || hint === '६') {
+    return { schemeId: 'scheme6', schemeName: 'Scheme 6 (योजना 6)' };
+  }
+
+  // 5. Fallback based on card number ranges
+  if (cardNum >= 10001 && cardNum <= 12000) {
+    return { schemeId: 'scheme6', schemeName: 'Scheme 6 (योजना 6)' };
+  }
+  if (cardNum >= 8001 && cardNum <= 9999) {
+    return { schemeId: 'scheme5', schemeName: 'Scheme 5 (योजना 5)' };
+  }
+  if (cardNum >= 6001 && cardNum <= 7999) {
+    return { schemeId: 'scheme4', schemeName: 'Scheme 4 (योजना 4)' };
+  }
   if (cardNum >= 4000) {
     return { schemeId: 'scheme3', schemeName: 'Scheme 3 (योजना 3)' };
   }

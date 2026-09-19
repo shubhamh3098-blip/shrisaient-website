@@ -121,7 +121,7 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-fade-in text-slate-100">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 animate-fade-in text-slate-100">
       
       {/* Top Page Header */}
       <div className="tactile-card rounded-2xl p-6 border border-slate-800 bg-[#0f172a] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">

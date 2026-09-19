@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   FileSpreadsheet,
   Upload,
@@ -11,19 +11,20 @@ import {
   Receipt,
   ArrowRight,
   Database,
-  RefreshCw,
-  Search,
-  Check,
-  X,
+  Layers,
   Sparkles,
-  ShieldCheck,
   Trash2,
-  Filter,
+  RefreshCw,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Users,
+  ShoppingCart,
   Eye,
-  Phone,
-  MapPin,
-  HelpCircle,
-  Layers
+  Package,
+  Tag,
+  Truck
 } from 'lucide-react';
 import {
   CardMember,
@@ -32,2069 +33,1619 @@ import {
   Customer,
   Dealer,
   PurchaseEntry,
+  PurchaseLineItem,
+  StockItem,
   TransactionEntry
 } from '../types';
+import { SCHEMES_CONFIG } from '../utils/storage';
+import { processUniversalCsv, UniversalImportResult, cleanModelNo, parseSerialNumbersList } from '../utils/universalImporter';
+import { getSchemeForCard } from '../utils/dataCleaner';
 
 interface CsvImportViewProps {
   onImportBills: (bills: TransactionEntry[]) => void;
   onImportReceipts: (receipts: CardTransaction[]) => void;
-  onImportCardMembers: (members: CardMember[]) => void;
+  onImportCardMembers: (members: CardMember[], autoReceipts?: CardTransaction[]) => void;
   onImportPurchases: (purchases: PurchaseEntry[], dealers: Dealer[]) => void;
-  onImportCustomers?: (customers: Customer[]) => void;
+  onUniversalImport?: (data: {
+    bills: TransactionEntry[];
+    salesReceipts?: TransactionEntry[];
+    cardMembers: CardMember[];
+    cardTransactions: CardTransaction[];
+    customers: Customer[];
+    stockItems?: StockItem[];
+    purchases?: PurchaseEntry[];
+    dealers?: Dealer[];
+  }) => void;
+  onClearZeroBills?: () => void;
+  onFullResetData?: () => void;
+  onClearCardsData?: () => void;
+  onClearBillsData?: () => void;
   existingCardMembers?: CardMember[];
   existingDealers?: Dealer[];
-  existingCustomers?: Customer[];
   existingBills?: TransactionEntry[];
   existingReceipts?: CardTransaction[];
-  onResetData?: (mode: 'all' | 'zero-bills') => void;
+  existingCustomers?: Customer[];
+  existingPurchases?: PurchaseEntry[];
+  existingStock?: StockItem[];
   onSwitchTab?: (tab: any) => void;
 }
 
-type MainTab = 'universal' | 'manual' | 'search';
-type ManualImportType = 'bills' | 'receipts' | 'cards' | 'purchases';
+type ImportTab = 'universal' | 'manual';
+type ImportType = 'cards' | 'bills' | 'receipts' | 'purchases';
 
-// Comprehensive Village & Spelling Correction Dictionary (Wardha / Vidarbha area)
-const SPELLING_MAP: Record<string, string> = {
-  KELHZAR: 'Kelzar',
-  KELZAR: 'Kelzar',
-  KELJHAR: 'Kelzar',
-  VAYFAD: 'Waifad',
-  WAYFAD: 'Waifad',
-  VAIFAD: 'Waifad',
-  NILIMA: 'Nilima',
-  BORI: 'Bori',
-  BORIKAMPTEE: 'Bori',
-  'BORI KAMPTEE': 'Bori',
-  HINGNI: 'Hingni',
-  HINGANI: 'Hingni',
-  HINGANGHAT: 'Hinganghat',
-  ANTERGAON: 'Antergaon',
-  ANTARGAON: 'Antergaon',
-  'SINDI MEGHE': 'Sindi Meghe',
-  SINDI: 'Sindi Meghe',
-  SELU: 'Seloo',
-  SELOO: 'Seloo',
-  DEOLI: 'Deoli',
-  ARVI: 'Arvi',
-  PIPRI: 'Pipri',
-  'PIPRI MEGHE': 'Pipri',
-  SATODA: 'Satoda',
-  SHIVNAGAR: 'Shivnagar',
-  DEVNAGAR: 'Devnagar',
-  'KANHOLI BARA': 'Kanholi Bara',
-  KANHOLI: 'Kanholi Bara',
-  WARDHA: 'Wardha',
-  'ANAND NAGAR': 'Anand Nagar',
-  'PUNJAB COLONY': 'Punjab Colony',
+const normKey = (k: any): string => {
+  if (!k) return '';
+  return String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
-// Clean spelling helper
-function normalizeVillage(raw: string): { cleaned: string; wasCorrected: boolean } {
-  if (!raw) return { cleaned: '', wasCorrected: false };
-  const upper = raw.trim().toUpperCase().replace(/[\.,]/g, '');
-  if (SPELLING_MAP[upper]) {
-    const isDifferent = SPELLING_MAP[upper].toUpperCase() !== raw.trim().toUpperCase();
-    return { cleaned: SPELLING_MAP[upper], wasCorrected: isDifferent };
-  }
-  // Title case fallback
-  const titleCase = raw
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-  return { cleaned: titleCase, wasCorrected: false };
-}
-
-// Clean names and extract village if in brackets: "ARUN SAYRE (ANTERGAON)"
-function parseNameAndVillage(rawName: string, existingVillage?: string): {
-  cleanName: string;
-  extractedVillage: string;
-  wasExtracted: boolean;
-} {
-  let cleanName = rawName ? rawName.trim() : '';
-  let extractedVillage = existingVillage ? existingVillage.trim() : '';
-  let wasExtracted = false;
-
-  const bracketMatch = cleanName.match(/\(([^)]+)\)|\[([^\]]+)\]/);
-  if (bracketMatch) {
-    const villageCandidate = (bracketMatch[1] || bracketMatch[2] || '').trim();
-    cleanName = cleanName.replace(/\(([^)]+)\)|\[([^\]]+)\]/, '').trim();
-    if (!extractedVillage && villageCandidate) {
-      extractedVillage = normalizeVillage(villageCandidate).cleaned;
-      wasExtracted = true;
+const getField = (row: Record<string, any>, candidates: string[], defaultValue = ''): string => {
+  const normMap: Record<string, string> = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      normMap[normKey(k)] = String(v).trim();
     }
   }
-
-  // Capitalize name properly
-  cleanName = cleanName.replace(/\s+/g, ' ');
-
-  return { cleanName, extractedVillage, wasExtracted };
-}
-
-// Clean phone numbers
-function cleanPhoneNumber(rawPhone: string): { phone: string; wasFormatted: boolean } {
-  if (!rawPhone) return { phone: '', wasFormatted: false };
-  const str = rawPhone.toString().trim().toLowerCase();
-  // If phone is 0, 00, -, NA, etc., it means the customer has NO phone number
-  if (
-    str === '0' ||
-    str === '00' ||
-    str === 'na' ||
-    str === 'n/a' ||
-    str === 'none' ||
-    str === 'null' ||
-    str === 'nil' ||
-    str === '-' ||
-    str === '#value!'
-  ) {
-    return { phone: '', wasFormatted: false };
-  }
-  const digits = rawPhone.toString().replace(/\D/g, '');
-  // Ignore single zeros, short numbers, and repetitive dummy sequences (e.g. 0000000000)
-  if (!digits || digits.length < 10) return { phone: '', wasFormatted: false };
-  if (/^(\d)\1{9,}$/.test(digits) || digits === '1234567890') {
-    return { phone: '', wasFormatted: false };
-  }
-  if (digits.length === 10) {
-    return { phone: digits, wasFormatted: rawPhone.trim() !== digits };
-  }
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return { phone: digits.slice(2), wasFormatted: true };
-  }
-  if (digits.length === 11 && digits.startsWith('0')) {
-    return { phone: digits.slice(1), wasFormatted: true };
-  }
-  return { phone: digits.slice(-10), wasFormatted: false };
-}
-
-// Clean and normalize dates to standard YYYY-MM-DD
-function normalizeDateStr(rawDate?: string): string {
-  if (!rawDate) return new Date().toISOString().split('T')[0];
-  const str = rawDate.trim();
-  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-  if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, '0');
-    const month = dmyMatch[2].padStart(2, '0');
-    const year = dmyMatch[3];
-    return `${year}-${month}-${day}`;
-  }
-  const ymdMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if (ymdMatch) {
-    const year = ymdMatch[1];
-    const month = ymdMatch[2].padStart(2, '0');
-    const day = ymdMatch[3].padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-  return str;
-}
-
-// Flexible case/punctuation-insensitive field retriever
-function getRowField(row: Record<string, string>, aliases: string[]): string {
-  const keys = Object.keys(row);
-  for (const alias of aliases) {
-    const cleanAlias = alias.toLowerCase().replace(/[\s._-]/g, '');
-    const matchedKey = keys.find(
-      (k) => k.toLowerCase().replace(/[\s._-]/g, '') === cleanAlias
-    );
-    if (matchedKey && row[matchedKey] !== undefined && row[matchedKey].toString().trim() !== '') {
-      return row[matchedKey].toString().trim();
+  for (const cand of candidates) {
+    const nk = normKey(cand);
+    if (normMap[nk] !== undefined && normMap[nk] !== '') {
+      return normMap[nk];
     }
   }
-  return '';
-}
+  return defaultValue;
+};
 
-function getRowNumberField(row: Record<string, string>, aliases: string[]): number {
-  const val = getRowField(row, aliases);
-  if (!val) return 0;
-  const cleaned = val.replace(/[^0-9.-]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
-}
+const parseNum = (val: any, defaultVal = 0): number => {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? defaultVal : n;
+};
+
+const normalizeDate = (dStr: string): string => {
+  if (!dStr) return new Date().toISOString().split('T')[0];
+  const clean = dStr.trim().replace(/\//g, '-');
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const p1 = parts[0].trim();
+    const p2 = parts[1].trim();
+    const p3 = parts[2].trim();
+    if (p1.length <= 2 && p3.length === 4) {
+      return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    }
+    if (p1.length <= 2 && p3.length === 2) {
+      return `20${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    }
+    if (p1.length === 4) {
+      return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+    }
+  }
+  return clean || new Date().toISOString().split('T')[0];
+};
 
 export const CsvImportView: React.FC<CsvImportViewProps> = ({
   onImportBills,
   onImportReceipts,
   onImportCardMembers,
   onImportPurchases,
+  onUniversalImport,
+  onClearZeroBills,
+  onFullResetData,
+  onClearCardsData,
+  onClearBillsData,
   existingCardMembers = [],
   existingDealers = [],
-  existingCustomers = [],
   existingBills = [],
   existingReceipts = [],
-  onResetData,
+  existingCustomers = [],
+  existingPurchases = [],
+  existingStock = [],
   onSwitchTab,
 }) => {
-  // Main Navigation Tabs (matching Screenshot 2)
-  const [activeMainTab, setActiveMainTab] = useState<MainTab>('universal');
-  const [activeManualType, setActiveManualType] = useState<ManualImportType>('bills');
+  const [importMode, setImportMode] = useState<ImportTab>('universal');
+  const [activeImportType, setActiveImportType] = useState<ImportType>('cards');
+  const [targetSchemeId, setTargetSchemeId] = useState<string>('auto');
+  const [csvText, setCsvText] = useState('');
+  const [parsedRows, setParsedRows] = useState<any[]>([]);
+  const [universalResult, setUniversalResult] = useState<UniversalImportResult | null>(null);
+  const [universalActiveTab, setUniversalActiveTab] = useState<'products' | 'bills' | 'receipts' | 'cards' | 'customers'>('products');
+  const [parseError, setParseError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditFilter, setAuditFilter] = useState<string>('all');
+  const [pendingCleanAction, setPendingCleanAction] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const [lastImportedSummary, setLastImportedSummary] = useState<{
+    date: string;
+    billsCount: number;
+    receiptsCount: number;
+    cardMembersCount: number;
+    customersCount: number;
+    purchasesCount: number;
+    productsCount?: number;
+    sampleRows: Array<{ type: string; title: string; ref?: string; amount?: number }>;
+  } | null>(null);
 
-  // Input States
-  const [csvText, setCsvText] = useState<string>('');
-  const [fileName, setFileName] = useState<string>('');
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [showPasteArea, setShowPasteArea] = useState<boolean>(false);
-
-  // Parsed & Cleaned universal records
-  const [detectedType, setDetectedType] = useState<
-    'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases' | 'unknown'
-  >('unknown');
-  const [detectedRecords, setDetectedRecords] = useState<any[]>([]);
-  const [cleanStats, setCleanStats] = useState<{
-    spellingFixed: number;
-    villagesExtracted: number;
-    phonesFormatted: number;
-    zeroBillsFixed: number;
-    totalRows: number;
-    totalSales: number;
-    totalPaid: number;
-    totalDue: number;
-  }>({
-    spellingFixed: 0,
-    villagesExtracted: 0,
-    phonesFormatted: 0,
-    zeroBillsFixed: 0,
-    totalRows: 0,
-    totalSales: 0,
-    totalPaid: 0,
-    totalDue: 0,
-  });
-
-  // Reset Modal
-  const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  const [successMessage, setSuccessMessage] = useState<string>('');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isImporting, setIsImporting] = useState<boolean>(false);
-
-  // Search tab state
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchFilterCategory, setSearchFilterCategory] = useState<'all' | 'cards' | 'bills' | 'receipts'>('all');
-
-  // Sample CSV Templates for Manual Mode
-  const manualTemplates: Record<ManualImportType, { filename: string; content: string; desc: string }> = {
-    bills: {
-      filename: 'sample_old_bills.csv',
-      desc: 'Old Sales Invoices & Customer Bills',
-      content: `InvoiceNo,Date,CustomerName,CustomerPhone,CardNumber,Village,ItemDetails,TotalAmount,PaidAmount,DueAmount,PaymentMode
-INV-2025-0101,2025-11-12,Ramesh Patil (Wardha),9822012345,1001,Wardha,Copper Wire 2.5mm 10 coils,15000,10000,5000,Cash
-INV-2025-0102,2025-11-15,Mahesh Kulkarni,9823098765,,Kelzar,Modular switches 20 pcs,4800,4800,0,Online
-INV-2025-0103,2025-12-01,Sunita More (Waifad),9765412980,1002,Waifad,LED Battens 20W (15 pcs),3750,3750,0,Cash
-INV-2025-0104,2026-01-10,Vikas Jadhav,9421876543,1045,Antergaon,Distribution Box 8 Way + MCBs,6200,4000,2200,Cash`,
-    },
-    receipts: {
-      filename: 'sample_weekly_receipts.csv',
-      desc: 'Weekly Card Payment & Refund Receipts (साप्ताहिक जमा व परतावा)',
-      content: `ReceiptNo,CardNo,SchemeId,CustomerName,Date,WeekNo,Amount,Type,PaymentMode,Remarks
-REC-SCH1-101,1030,scheme1,SANGITA UTTAM PATIL,2025-06-08,1,450,WeeklyPayment,Cash,Week 1 payment
-REC-SCH2-102,3191,scheme2,SUNIL DANDAGE,2024-11-15,2,1000,WeeklyPayment,Cash,Week 2 payment
-REC-SCH3-103,4107,scheme3,RANJANA SHAMBHARKAR,2025-07-12,1,600,WeeklyPayment,Cash,Week 1 deposit
-REF-SCH1-104,1001,scheme1,Prakash Shinde,2026-09-04,,5000,Refund,Cash,Customer return refund`,
-    },
-    cards: {
-      filename: 'sample_card_members.csv',
-      desc: 'Card Scheme Members (NAME, CARD.NO, VILLEGE, MOBILE.NO, OPENING AMT, DATE, SHEET NO)',
-      content: `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
-RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793
-VAISHALI BAVNE,4304,HINGNI,,100,18-10-2025,5104
-SANGITA,4181,DEVNAGAR,,200,01-10-2025,5110
-SUNIL DANDAGE,3191,PIPRI,8855881081,3000,01-11-2024,
-PRASHANT BHALE,3201,SATODA,,100,01-11-2024,
-SANGITA UTTAM PATIL,1030,HINGNI,7972811639,450,01-06-2025,
-YAMUNA PRABHAKAR KAIKADI,1029,HINGNI,8698041323,200,01-06-2025,`,
-    },
-    purchases: {
-      filename: 'sample_dealer_purchases.csv',
-      desc: 'Dealer / Supplier Old Purchases (e.g. Manisha Enterprises)',
-      content: `BillNo,Date,DealerName,Items,TotalAmount,PaidAmount,PaymentMode
-PUR-7701,2026-08-10,Manisha Enterprises,Wires and modular accessories,95000,75000,Online
-PUR-7702,2026-08-25,Manisha Enterprises,PVC pipes & conduits lot,50000,40000,Online
-PUR-7703,2026-08-15,Polycab Distributors Ltd.,Submersible cables 4mm,72500,72500,Online
-PUR-7704,2026-09-01,Anchor Switchgear Pvt Ltd,Panel boards & isolators,28400,20000,Online`,
-    },
-  };
-
-  // Download sample helper
-  const handleDownloadSample = (type: ManualImportType) => {
-    const item = manualTemplates[type];
-    const blob = new Blob([item.content], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', item.filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Universal Smart CSV Parser & Error Cleaner
-  const processAndCleanCSV = (
-    content: string,
-    customFileName = '',
-    preferredType?: 'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases'
-  ) => {
-    setErrorMessage('');
+  const handleProcessCsvString = (text: string, overrideSchemeId?: string) => {
+    setParseError('');
     setSuccessMessage('');
-
-    if (!content.trim()) {
-      setDetectedRecords([]);
-      setDetectedType('unknown');
+    if (!text.trim()) {
+      setParsedRows([]);
+      setUniversalResult(null);
       return;
     }
 
     try {
-      // Split content into lines handling \r\n, \r, or \n
-      const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
-      if (lines.length < 2) {
-        setErrorMessage('CSV फाईलमध्ये हेडर आणि किमान १ डेटा ओळ असणे आवश्यक आहे.');
-        setDetectedRecords([]);
-        return;
-      }
+      const schemeToUse = overrideSchemeId !== undefined ? overrideSchemeId : targetSchemeId;
+      // 1. Run Universal Smart Importer & Cleaner
+      const uniRes = processUniversalCsv(text, undefined, schemeToUse);
+      setUniversalResult(uniRes);
 
-      // Detect delimiter: tab (pasted from Excel), semicolon, or comma
-      const firstLine = lines[0];
-      const tabMatches = (firstLine.match(/\t/g) || []).length;
-      const semiMatches = (firstLine.match(/;/g) || []).length;
-      const commaMatches = (firstLine.match(/,/g) || []).length;
-      let delimiter = ',';
-      if (tabMatches > commaMatches && tabMatches >= semiMatches) {
-        delimiter = '\t';
-      } else if (semiMatches > commaMatches && semiMatches > tabMatches) {
-        delimiter = ';';
-      }
-
-      const splitLine = (l: string): string[] => {
-        if (delimiter === '\t') {
-          return l.split('\t').map((v) => v.trim().replace(/^["']|["']$/g, ''));
-        }
-        if (delimiter === ';') {
-          return l.split(';').map((v) => v.trim().replace(/^["']|["']$/g, ''));
-        }
-        return l.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((v) =>
-          v.trim().replace(/^["']|["']$/g, '')
-        );
-      };
-
-      // Parse headers
-      const rawHeaders = splitLine(lines[0]);
-      const upperHeaders = rawHeaders.map((h) => h.toUpperCase());
-
-      // Detect Data Type Automatically
-      let detected: 'scheme1' | 'scheme2' | 'scheme3' | 'bills' | 'receipts' | 'customers' | 'purchases' | 'unknown' = 'unknown';
-
-      const hasCardNo = upperHeaders.some((h) => h.includes('CARD') || h.includes('CARD.NO') || h.includes('CARDNO'));
-      const hasVillage = upperHeaders.some((h) => h.includes('VILLEGE') || h.includes('VILLAGE') || h.includes('CITY'));
-      const hasOpeningAmt = upperHeaders.some((h) => h.includes('OPENING') || h.includes('DEPOSIT') || h.includes('AMT'));
-      const hasInvoiceNo = upperHeaders.some((h) => h.includes('INVOICE') || h.includes('BILLNO') || h.includes('BILL NO') || h.includes('BILL.NO') || h.includes('BILL_NO') || h.includes('BILL'));
-      const hasReceiptNo = upperHeaders.some((h) => h.includes('RECEIPT') || h.includes('WEEK') || h.includes('REC-') || h.includes('RECIVED BY') || h.includes('RECEIVED BY') || h.includes('पावती') || h.includes('REC NO') || h.includes('REC. NO') || h.includes('PAWATI'));
-      const hasDealerName = upperHeaders.some((h) => h.includes('DEALER') || h.includes('SUPPLIER'));
-      const hasSalesColumns = upperHeaders.some((h) => h.includes('PRODUCT') || h.includes('ADVANCE') || h.includes('BALANCE') || h.includes('ITEM') || h.includes('विक्री') || h.includes('खरेदी'));
-
-      let spellingFixedCount = 0;
-      let villagesExtractedCount = 0;
-      let phonesFormattedCount = 0;
-      let zeroBillsFixedCount = 0;
-
-      const parsedRows: any[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line.trim()) continue;
-        const values = splitLine(line);
-        // Only skip if the line is completely blank
-        if (!values.some((v) => v.trim().length > 0)) continue;
-
-        const row: Record<string, string> = {};
-        rawHeaders.forEach((header, idx) => {
-          row[header] = values[idx] || '';
-        });
-        // Also keep indexed values for positional fallbacks
-        (row as any)._rawValues = values;
-        parsedRows.push(row);
-      }
-
-      if (parsedRows.length === 0) {
-        setErrorMessage('कोणतीही वैध डेटा ओळ सापडली नाही.');
-        return;
-      }
-
-      // Inspect first 20 rows to determine Card Scheme vs Bills
-      const sampleCardNumbers: number[] = [];
-      parsedRows.slice(0, 20).forEach((r) => {
-        const val = parseInt(r['CARD.NO'] || r['CARD NO'] || r.CardNo || r.cardNumber || r.CardNumber || '0');
-        if (val > 0) sampleCardNumbers.push(val);
-      });
-
-      const fileLower = customFileName.toLowerCase();
-
-      if (preferredType) {
-        detected = preferredType;
-      } else if (hasDealerName || fileLower.includes('purchase') || fileLower.includes('dealer')) {
-        detected = 'purchases';
-      } else if (hasReceiptNo || upperHeaders.includes('WEEKNO') || upperHeaders.includes('WEEK') || upperHeaders.includes('RECIVED BY') || upperHeaders.includes('RECEIVED BY') || fileLower.includes('receipt') || fileLower.includes('पावती')) {
-        detected = 'receipts';
-      } else if (
-        hasInvoiceNo ||
-        hasSalesColumns ||
-        upperHeaders.includes('ITEMDETAILS') ||
-        upperHeaders.includes('ITEMS') ||
-        fileLower.includes('bill') ||
-        fileLower.includes('sale') ||
-        fileLower.includes('विक्री')
-      ) {
-        detected = 'bills';
-      } else if (hasCardNo && (hasVillage || hasOpeningAmt || sampleCardNumbers.length > 0)) {
-        // Scheme Cards! Determine which scheme (1, 2, or 3)
-        const avgCard = sampleCardNumbers.length > 0
-          ? sampleCardNumbers.reduce((a, b) => a + b, 0) / sampleCardNumbers.length
-          : 0;
-
-        if (avgCard >= 4001 || fileLower.includes('scheme 3') || fileLower.includes('scheme3')) {
-          detected = 'scheme3';
-        } else if (avgCard >= 3001 || fileLower.includes('scheme 2') || fileLower.includes('scheme2')) {
-          detected = 'scheme2';
-        } else {
-          detected = 'scheme1';
-        }
-      } else {
-        detected = 'customers';
-      }
-
-      // Pre-compute fast lookup Maps for existing bills to eliminate O(N^2) lag
-      const billByCardMap = new Map<number, string>();
-      const billByPhoneMap = new Map<string, string>();
-      const billByNameMap = new Map<string, string>();
-      if (existingBills && existingBills.length > 0) {
-        for (let b = 0; b < existingBills.length; b++) {
-          const eb = existingBills[b];
-          if (eb.dueAmount > 0 && eb.invoiceNo) {
-            if (eb.cardNumber) billByCardMap.set(eb.cardNumber, eb.invoiceNo);
-            const digits = (eb.customerPhone || '').replace(/\D/g, '');
-            if (digits.length >= 10) billByPhoneMap.set(digits, eb.invoiceNo);
-            if (eb.customerName) billByNameMap.set(eb.customerName.toLowerCase().trim(), eb.invoiceNo);
-          }
-        }
-      }
-
-      // Clean rows with Spelling Normalizer & Bracket Village Extractor
-      const cleanedRows = parsedRows.map((r, index) => {
-        const rawBillNo = getRowField(r, [
-          'BILL NO',
-          'BILL_NO',
-          'BILL NUMBER',
-          'BILLNO',
-          'BillNo',
-          'billNo',
-          'INVOICE NO',
-          'INVOICE_NO',
-          'INVOICENO',
-          'INVOICE',
-          'InvoiceNo',
-          'VOUCHER NO',
-          'VCH NO',
-          'BILL',
-          'INV NO',
-          'INV_NO',
-          'INVNO',
-          'SR NO',
-          'SR. NO',
-          'SL NO',
-          'NO',
-          'BILL #',
-          'INV #',
-          'SALE NO',
-          'SALES NO',
-          'बिल नंबर',
-          'बिल क्र.',
-          'बिल नं',
-        ]);
-
-        const rawDate = getRowField(r, [
-          'DATE',
-          'BILL DATE',
-          'INVOICE DATE',
-          'BILL_DATE',
-          'INVOICE_DATE',
-          'BILLDATE',
-          'INVOICEDATE',
-          'DOC DATE',
-          'TRANSACTION DATE',
-          'ENTRY DATE',
-          'तारीख',
-          'दिनांक',
-        ]);
-
-        const rawVillage = getRowField(r, [
-          'VILLEGE',
-          'VILLAGE',
-          'CITY',
-          'TOWN',
-          'ADDRESS',
-          'LOCATION',
-          'AREA',
-          'गाव',
-          'पत्ता',
-        ]);
-
-        const explicitName = getRowField(r, [
-          'NAME',
-          'CUSTOMER NAME',
-          'CUSTOMER',
-          'PARTY NAME',
-          'PARTY',
-          'CLIENT',
-          'ACCOUNT NAME',
-          'ACCOUNT',
-          'A/C NAME',
-          'M/S',
-          'NAME OF PARTY',
-          'NAME OF CUSTOMER',
-          'ग्राहकाचे नाव',
-          'नाव',
-        ]);
-
-        const rawName =
-          explicitName ||
-          (rawBillNo ? `ग्राहक (बिल #${rawBillNo}${rawVillage ? ` - ${rawVillage}` : ''})` : `ग्राहक #${index + 1}`);
-
-        const rawPhone = getRowField(r, [
-          'MOBILE.NO',
-          'MOBILE NO',
-          'MOBILE NUMBER',
-          'MOBILE',
-          'PHONE',
-          'PHONE NUMBER',
-          'CONTACT',
-          'CONTACT NO',
-          'TEL',
-          'CELL',
-          'WHATSAPP',
-          'मोबाईल',
-        ]);
-
-        // 1. Extract village from name brackets: "ARUN SAYRE (ANTERGAON)"
-        const nameParsed = parseNameAndVillage(rawName, rawVillage);
-        if (nameParsed.wasExtracted) villagesExtractedCount++;
-
-        // 2. Clean village spelling
-        const villageNorm = normalizeVillage(nameParsed.extractedVillage);
-        if (villageNorm.wasCorrected) spellingFixedCount++;
-
-        // 3. Clean Phone
-        const phoneClean = cleanPhoneNumber(rawPhone);
-        if (phoneClean.wasFormatted) phonesFormattedCount++;
-
-        // 4. Clean ₹0 bills / calculate advance and balance if it's bill
-        const rawTotal = getRowNumberField(r, [
-          'TOTAL',
-          'TOTAL AMOUNT',
-          'TOTAL AMT',
-          'BILL AMOUNT',
-          'BILL AMT',
-          'NET AMOUNT',
-          'NET AMT',
-          'AMOUNT',
-          'AMT',
-          'DEBIT',
-          'DEBIT AMOUNT',
-          'GRAND TOTAL',
-          'SALES',
-          'PRICE',
-          'VALUE',
-          'खरेदी',
-          'रक्कम',
-        ]);
-
-        const rawPaid = getRowNumberField(r, [
-          'ADVANCE',
-          'PAID AMOUNT',
-          'PAID AMT',
-          'PAID',
-          'RECEIVED',
-          'REC AMOUNT',
-          'REC AMT',
-          'CREDIT',
-          'CREDIT AMOUNT',
-          'DEPOSIT',
-          'CASH',
-          'जमा',
-        ]);
-
-        const rawDue = getRowNumberField(r, [
-          'BALANCE',
-          'BAL',
-          'DUE',
-          'DUE AMOUNT',
-          'DUE AMT',
-          'PENDING',
-          'BALANCE DUE',
-          'OUTSTANDING',
-          'बाकी',
-          'शिल्लक',
-        ]);
-
-        let finalTotal = rawTotal;
-        let finalPaid = rawPaid;
-        let finalDue = rawDue;
-
-        if (finalTotal === 0 && (finalPaid > 0 || finalDue > 0)) {
-          finalTotal = finalPaid + finalDue;
-          zeroBillsFixedCount++;
-        } else if (finalTotal > 0) {
-          if (finalDue === 0 && finalPaid > 0 && finalPaid < finalTotal) {
-            finalDue = Math.max(0, finalTotal - finalPaid);
-          } else if (finalPaid === 0 && finalDue > 0 && finalDue < finalTotal) {
-            finalPaid = Math.max(0, finalTotal - finalDue);
-          } else if (finalPaid === 0 && finalDue === 0) {
-            finalDue = finalTotal;
-          }
-        }
-
-        const cardNum =
-          getRowNumberField(r, [
-            'CARD.NO',
-            'CARD NO',
-            'CARD NUMBER',
-            'CARDNO',
-            'CARD',
-          ]) || undefined;
-
-        const openingAmt = getRowNumberField(r, [
-          'OPENING AMT',
-          'OPENING AMOUNT',
-          'OPENING BALANCE',
-          'OPENING',
-          'DEPOSIT',
-          'ठेव',
-        ]);
-
-        const sheetNo = getRowField(r, [
-          'SHEET NO',
-          'SHEET_NO',
-          'SHEETNO',
-          'SHEET',
-          'PAGE NO',
-        ]);
-
-        // Extract receipt specific fields with comprehensive aliases
-        let receiptNo = getRowField(r, [
-          'RECEIPT NO',
-          'RECEIPT_NO',
-          'RECEIPTNO',
-          'RECEIPT',
-          'RECEIPT #',
-          'RECEIPT NUMBER',
-          'REC NO',
-          'REC_NO',
-          'REC. NO',
-          'REC.NO',
-          'REC NO.',
-          'REC #',
-          'PAWATI NO',
-          'PAWATI_NO',
-          'PAWATI NO.',
-          'PAWATINO',
-          'PAWATI',
-          'PAWATI NUMBER',
-          'VOUCHER NO',
-          'VOUCHER_NO',
-          'VCH NO',
-          'VCH_NO',
-          'पावती नं',
-          'पावती नंबर',
-          'पावती क्र.',
-          'पावती क्रमांक',
-          'पावती क्र',
-          'अनुक्रमांक',
-          'क्रमांक',
-          'क्र.',
-          'SR NO',
-          'SR. NO',
-          'SR.NO',
-          'SR NO.',
-          'SRNO',
-          'SL NO',
-          'SL. NO',
-          'SL.NO',
-          'S.NO',
-          'S.NO.',
-          'NO',
-          'NO.',
-          'NUMBER',
-          '#',
-          'ID',
-          'CODE',
-        ]);
-
-        if (!receiptNo && detected === 'receipts') {
-          receiptNo = rawBillNo;
-        }
-
-        const rawValues: string[] = (r as any)._rawValues || Object.values(r).map((v) => String(v).trim());
-
-        // Positional fallback for receipts if receiptNo is still empty but Col 0 is a number (e.g. 1072, 1073...)
-        if (!receiptNo && detected === 'receipts' && rawValues.length >= 1 && /^\d+$/.test(rawValues[0])) {
-          receiptNo = rawValues[0];
-        }
-
-        // Positional fallback for customer name if explicit name was missing
-        let effectiveName = nameParsed.cleanName;
-        if ((!explicitName || effectiveName.startsWith('ग्राहक #')) && detected === 'receipts' && rawValues.length >= 3 && rawValues[2] && !/^\d+$/.test(rawValues[2])) {
-          const parsedPosName = parseNameAndVillage(rawValues[2], rawVillage);
-          effectiveName = parsedPosName.cleanName;
-        }
-
-        // Positional fallback for village if missing
-        let effectiveVillage = villageNorm.cleaned;
-        if (!rawVillage && detected === 'receipts' && rawValues.length >= 4 && rawValues[3] && !/^\d+$/.test(rawValues[3])) {
-          effectiveVillage = normalizeVillage(rawValues[3]).cleaned;
-        }
-
-        const invoiceRef = getRowField(r, [
-          'BILL NO',
-          'BILL_NO',
-          'BILLNO',
-          'INVOICE NO',
-          'INVOICE_NO',
-          'INVOICENO',
-          'INV NO',
-          'INV_NO',
-          'BILL',
-          'INV',
-          'बिल नं',
-        ]);
-
-        let rawReceiptAmt = getRowNumberField(r, [
-          'AMOUNT',
-          'AMT',
-          'RECEIPT AMOUNT',
-          'REC AMOUNT',
-          'DEPOSIT',
-          'PAID',
-          'PAID AMOUNT',
-          'रक्कम',
-          'जमा रक्कम',
-          'जमा',
-        ]);
-
-        // Positional fallback for amount if rawReceiptAmt is 0 and col 4 is a number
-        if (rawReceiptAmt === 0 && detected === 'receipts' && rawValues.length >= 5) {
-          const numCandidate = parseFloat(String(rawValues[4] || '').replace(/[^\d.-]/g, ''));
-          if (!isNaN(numCandidate) && numCandidate > 0) {
-            rawReceiptAmt = numCandidate;
-          }
-        }
-
-        const receiptAmt =
-          rawReceiptAmt > 0 ? rawReceiptAmt : rawPaid > 0 ? rawPaid : finalTotal;
-
-        let receivedBy = getRowField(r, [
-          'RECIVED BY',
-          'RECEIVED BY',
-          'REC. BY',
-          'REC BY',
-          'COLLECTOR',
-          'AGENT',
-          'AGENT NAME',
-          'FIELD STAFF',
-          'BY',
-          'COLLECTED BY',
-          'STAFF',
-          'जमा घेणारा',
-          'एजंट',
-          'कर्मचारी',
-        ]);
-
-        // Positional fallback for collector / received by (e.g. BHUSHAN, SHUBHAM)
-        if (!receivedBy && detected === 'receipts' && rawValues.length >= 6 && rawValues[5]) {
-          receivedBy = rawValues[5];
-        }
-
-        const remarks = getRowField(r, [
-          'REMARKS',
-          'NOTES',
-          'PARTICULARS',
-          'DESCRIPTION',
-          'तपशील',
-        ]) || (receivedBy ? `जमा घेणारा: ${receivedBy}` : '');
-
-        const rawType = getRowField(r, ['TYPE', 'NATURE', 'CATEGORY']);
-        const receiptType = rawType.toLowerCase().includes('refund')
-          ? 'Refund'
-          : 'WeeklyPayment';
-
-        const productDetails =
-          getRowField(r, [
-            'PRODUCT',
-            'ITEM',
-            'ITEM DETAILS',
-            'ITEMDETAILS',
-            'PARTICULARS',
-            'DESCRIPTION',
-            'ITEMS',
-            'GOODS',
-            'माल/तपशील',
-          ]) || 'इलेक्ट्रॉनिक्स व गृहोपयोगी वस्तू';
-
-        // Check if there is an existing matching bill for this receipt (O(1) Map lookup)
-        let matchedBillInvoice = invoiceRef;
-        if (!matchedBillInvoice && existingBills.length > 0) {
-          const normName = effectiveName.toLowerCase();
-          const cleanP = phoneClean.phone;
-          matchedBillInvoice =
-            (cardNum ? billByCardMap.get(cardNum) : undefined) ||
-            (cleanP ? billByPhoneMap.get(cleanP) : undefined) ||
-            billByNameMap.get(normName);
-        }
-
-        return {
-          ...r,
-          _rawBillNo: rawBillNo,
-          _rawDate: rawDate,
-          _cleanedName: effectiveName,
-          _cleanedVillage: effectiveVillage,
-          _cleanedPhone: phoneClean.phone,
-          _cardNumber: cardNum,
-          _openingAmt: openingAmt,
-          _sheetNo: sheetNo,
-          _totalAmount: finalTotal,
-          _paidAmount: finalPaid,
-          _dueAmount: finalDue,
-          _receiptNo: receiptNo,
-          _invoiceRef: matchedBillInvoice,
-          _receiptAmount: receiptAmt,
-          _receivedBy: receivedBy,
-          _receiptRemarks: remarks,
-          _receiptType: receiptType,
-          _productDetails: productDetails,
-          _wasSpellingFixed: villageNorm.wasCorrected,
-          _wasVillageExtracted: nameParsed.wasExtracted,
-        };
-      });
-
-      const totalSales = cleanedRows.reduce((sum, r) => sum + (Number(r._totalAmount) || 0), 0);
-      const totalPaid = cleanedRows.reduce((sum, r) => sum + (Number(r._paidAmount) || 0), 0);
-      const totalDue = cleanedRows.reduce((sum, r) => sum + (Number(r._dueAmount) || 0), 0);
-
-      setDetectedType(detected);
-      setDetectedRecords(cleanedRows);
-      setCleanStats({
-        spellingFixed: spellingFixedCount,
-        villagesExtracted: villagesExtractedCount,
-        phonesFormatted: phonesFormattedCount,
-        zeroBillsFixed: zeroBillsFixedCount,
-        totalRows: cleanedRows.length,
-        totalSales,
-        totalPaid,
-        totalDue,
-      });
+      // 2. Also populate standard row previews
+      parseCSVContent(text);
     } catch (err: any) {
-      setErrorMessage(`CSV वाचताना त्रुटी आली: ${err.message}`);
-      setDetectedRecords([]);
+      setParseError(`CSV प्रक्रिया करताना त्रुटी आली: ${err.message}`);
     }
   };
 
-  // Handle Drag & Drop
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        setCsvText(text);
-        processAndCleanCSV(text, file.name);
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Handle File Input Selection
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        setCsvText(text);
-        processAndCleanCSV(text, file.name);
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Fast Sample File Loader (matching screenshot buttons: Scheme 2, Scheme 3)
-  const handleLoadSampleScheme = (schemeNo: 1 | 2 | 3) => {
-    let sampleContent = '';
-    let name = '';
-
-    if (schemeNo === 2) {
-      name = 'Scheme 2 (Cards 3001-3999).csv';
-      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
-SUNIL DANDAGE (PIPRI),3191,PIPRI,8855881081,3000,01-11-2024,
-PRASHANT BHALE,3201,SATODA,,100,01-11-2024,
-MAHADEO BHURLE (KELHZAR),3212,KELHZAR,9657788990,500,01-11-2024,
-SARIKA SANDIP BHANDEKAR,3234,KANHOLI BARA,9096037244,100,01-11-2024,
-SUNIL GHONGADE (SATODA),3027,SATODA,9673448626,500,01-11-2024,
-DILIP RAMRAO THAKRE,3105,SHIVNAGAR,,1000,01-11-2024,
-VANDANA PATIL (VAYFAD),3250,VAYFAD,9822334455,200,01-11-2024,`;
-    } else if (schemeNo === 3) {
-      name = 'Scheme 3 (Cards 4001-6000).csv';
-      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
-RANJANA SHAMBHARKAR,4107,BORI,,600,05-07-2025,2793
-VAISHALI BAVNE (HINGNI),4304,HINGNI,,100,18-10-2025,5104
-SANGITA (DEVNAGAR),4181,DEVNAGAR,,200,01-10-2025,5110
-NILIMA SURESH RAUT,4220,NILIMA,9175534365,500,15-08-2025,3312
-PRAKASH BUDHBAWARE (ANTERGAON),4150,ANTERGAON,8262988399,800,01-09-2025,4102
-SURAJ GAIKWAD (SINDI MEGHE),4190,SINDI MEGHE,9876543210,1200,10-09-2025,5501`;
-    } else {
-      name = 'Scheme 1 (Cards 1001-2999).csv';
-      sampleContent = `NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO
-SANGITA UTTAM PATIL (HINGNI),1030,HINGNI,7972811639,450,01-06-2025,101
-YAMUNA PRABHAKAR KAIKADI,1029,HINGNI,8698041323,200,01-06-2025,102
-ARUN SAYRE (ANTERGAON),1001,ANTERGAON,9822001122,1300,01-05-2025,103
-KAPIL KHOBRAGADE (ANAND NAGAR),1002,ANAND NAGAR,8877665544,1400,15-05-2025,104
-SANJAY SHANKAR KURADKAR,1005,PUNJAB COLONY,9988776655,560,20-05-2025,105`;
-    }
-
-    setFileName(name);
-    setCsvText(sampleContent);
-    processAndCleanCSV(sampleContent, name);
-  };
-
-  // Commit and Save Cleaned Data into Database (Asynchronous to prevent browser freezing)
-  const handleCommitUniversalImport = () => {
-    if (detectedRecords.length === 0 || isImporting) return;
-
-    setIsImporting(true);
-    setErrorMessage('');
-
-    setTimeout(() => {
-      try {
-        if (detectedType === 'scheme1' || detectedType === 'scheme2' || detectedType === 'scheme3') {
-          const targetSchemeId: CardSchemeId = detectedType;
-          const schemeName =
-            detectedType === 'scheme3'
-              ? 'Scheme 3 (योजना 3)'
-              : detectedType === 'scheme2'
-              ? 'Scheme 2 (योजना 2)'
-              : 'Scheme 1 (योजना 1)';
-
-          const newCards: CardMember[] = detectedRecords.map((r, idx) => {
-            const cardNum = r._cardNumber || (detectedType === 'scheme3' ? 4001 + idx : detectedType === 'scheme2' ? 3001 + idx : 1001 + idx);
-            const opening = r._openingAmt || 0;
-            return {
-              id: `cm-csv-${cardNum}-${Date.now()}-${idx}`,
-              cardNumber: cardNum,
-              schemeId: targetSchemeId,
-              schemeName,
-              customerName: r._cleanedName,
-              phone: r._cleanedPhone,
-              village: r._cleanedVillage || undefined,
-              sheetNo: r._sheetNo || undefined,
-              openingAmt: opening > 0 ? opening : undefined,
-              address: r._cleanedVillage ? `${r._cleanedVillage}, Wardha` : 'Wardha',
-              joiningDate: normalizeDateStr(r.DATE || r.Date),
-              registrationFee: 50,
-              registrationFeePaid: true,
-              totalDeposited: opening,
-              totalRefunded: 0,
-              netBalance: opening,
-              status: 'Active',
-              notes: `Auto-imported & cleaned on ${new Date().toISOString().split('T')[0]}${r._sheetNo ? ` • Sheet #${r._sheetNo}` : ''}`,
-            };
-          });
-
-          onImportCardMembers(newCards);
-          setSuccessMessage(`यशस्वी! ${newCards.length} कार्ड मेंबर्स (${schemeName}) स्पेलिंग व गावांच्या दुरुस्तीसह लेजरमध्ये सेव्ह केले गेले!`);
-        } else if (detectedType === 'bills') {
-          const validRecords = detectedRecords.filter(
-            (r) =>
-              r._totalAmount > 0 ||
-              r._paidAmount > 0 ||
-              r._dueAmount > 0 ||
-              Boolean(r._rawBillNo) ||
-              (r.BillNo && r.BillNo.toString().trim()) ||
-              (r['BILL NO'] && r['BILL NO'].toString().trim()) ||
-              (r.InvoiceNo && r.InvoiceNo.toString().trim()) ||
-              (r._cleanedName && r._cleanedName.trim().length > 0)
-          );
-
-          const newBills: TransactionEntry[] = validRecords.map((r, idx) => {
-            const billNum =
-              r._rawBillNo ||
-              r['BILL NO'] ||
-              r['BILL_NO'] ||
-              r.BillNo ||
-              r.billNo ||
-              r.InvoiceNo ||
-              `INV-${Date.now().toString().slice(-4)}-${idx + 1}`;
-            const billDate = normalizeDateStr(r._rawDate || r.Date || r.DATE);
-
-            return {
-              id: `inv-imp-${Date.now()}-${idx}`,
-              invoiceNo: billNum,
-              date: billDate,
-              customerName: r._cleanedName,
-              customerPhone: r._cleanedPhone,
-              cardNumber: r._cardNumber,
-              village: r._cleanedVillage,
-              itemDetails: r._productDetails || r.PRODUCT || r.Product || r.ItemDetails || 'इलेक्ट्रॉनिक्स व गृहोपयोगी वस्तू',
-              totalAmount: r._totalAmount,
-              payingNow: r._paidAmount,
-              dueAmount: r._dueAmount,
-              paymentMode: (r.PaymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online',
-              notes: `Imported Sales Record • Village: ${r._cleanedVillage || 'Wardha'}${billNum ? ` • Bill #${billNum}` : ''}`,
-              createdAt: new Date().toISOString(),
-            };
-          });
-
-          onImportBills(newBills);
-          setSuccessMessage(`यशस्वी! ${newBills.length} विक्री बिले दुरुस्त करून ऑल एन्ट्रीज व ग्राहकांच्या खात्यावर सेव्ह केली.`);
-        } else if (detectedType === 'receipts') {
-          let creditedBillsCount = 0;
-          const newReceipts: CardTransaction[] = detectedRecords.map((r, idx) => {
-            const cardNum = r._cardNumber || undefined;
-            const amt = r._receiptAmount || r._paidAmount || r._totalAmount || 500;
-            const receiptCode = r._receiptNo ? String(r._receiptNo).trim() : (cardNum ? `REC-${cardNum}-${idx + 1}` : `REC-${idx + 1}`);
-            const date = normalizeDateStr(r._rawDate || r.Date || r.DATE || r.date || r['BILL DATE'] || r['RECEIPT DATE'] || r['तारीख'] || r['दिनांक']);
-            const mode = (r.PaymentMode === 'Online' || r.paymentMode === 'Online' ? 'Online' : 'Cash') as 'Cash' | 'Online';
-            const invoice = r._invoiceRef;
-            if (invoice) creditedBillsCount++;
-
-            const remark = r._receiptRemarks
-              ? `${r._receiptRemarks}${invoice ? ` • बिलामध्ये जमा (Against Bill #${invoice})` : ''}`
-              : invoice
-                ? `बिलामध्ये जमा (Credit Against Bill #${invoice}) • ${r._cleanedVillage || 'Wardha'}`
-                : `साप्ताहिक जमा पावती • ${r._cleanedVillage || 'Wardha'}`;
-
-            return {
-              id: `rec-imp-${Date.now()}-${idx}`,
-              cardId: cardNum ? `cm-${cardNum}` : `gen-${Date.now()}-${idx}`,
-              cardNumber: cardNum || 0,
-              schemeId: cardNum ? (cardNum >= 4001 ? 'scheme3' : cardNum >= 3001 ? 'scheme2' : 'scheme1') : 'scheme1',
-              customerName: r._cleanedName,
-              customerPhone: r._cleanedPhone,
-              receiptNo: receiptCode,
-              date: date,
-              type: r._receiptType || 'WeeklyPayment',
-              amount: amt,
-              paymentMode: mode,
-              remarks: remark,
-              balanceAfter: amt,
-              createdAt: new Date().toISOString(),
-              invoiceNo: invoice, // Attached for bill-credit resolution
-              village: r._cleanedVillage,
-              customerVillage: r._cleanedVillage,
-              collectedBy: r._receivedBy || undefined,
-              agentName: r._receivedBy || undefined,
-            } as CardTransaction;
-          });
-
-          onImportReceipts(newReceipts);
-          const creditMsg = creditedBillsCount > 0 ? ` (${creditedBillsCount} बिलांच्या खात्यावर रक्कम थेट वजा / क्रेडिट झाली)` : '';
-          setSuccessMessage(`यशस्वी! ${newReceipts.length} जमा पावत्या सिस्टीममध्ये नोंदवल्या गेल्या${creditMsg}.`);
-        } else {
-          // Generic customers
-          setSuccessMessage(`यशस्वी! ${detectedRecords.length} रेकॉर्ड्स सिस्टीममध्ये समाविष्ट केले.`);
-        }
-
-        setDetectedRecords([]);
-        setCsvText('');
-        setFileName('');
-      } catch (err: any) {
-        setErrorMessage(`डेटा सेव्ह करताना त्रुटी: ${err.message}`);
-      } finally {
-        setIsImporting(false);
+  const parseCSVContent = (content: string) => {
+    try {
+      const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        setParseError('CSV फाईलमध्ये किमान १ हेडर आणि १ डेटा ओळ असणे आवश्यक आहे.');
+        setParsedRows([]);
+        return;
       }
-    }, 40);
+
+      const rawHeaders = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((h) =>
+        h.trim().replace(/^["']|["']$/g, '')
+      );
+
+      const rows: any[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const currentLine = lines[i];
+        const values = currentLine.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((val) =>
+          val.trim().replace(/^["']|["']$/g, '')
+        );
+
+        if (!values.some((v) => v && v.length > 0)) continue;
+
+        const rowObj: Record<string, string> = {};
+        rawHeaders.forEach((header, index) => {
+          if (header) {
+            rowObj[header] = values[index] !== undefined ? values[index] : '';
+          }
+        });
+        rows.push(rowObj);
+      }
+      setParsedRows(rows);
+    } catch (err: any) {
+      setParseError(`CSV Parsing Error: ${err.message}`);
+    }
   };
 
-  // Search filter matching
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const items: Array<{
-      id: string;
-      category: 'card' | 'bill' | 'receipt';
-      title: string;
-      subtitle: string;
-      village?: string;
-      phone?: string;
-      amount?: number;
-      due?: number;
-      extra?: string;
-    }> = [];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvText(text);
+      handleProcessCsvString(text);
+    };
+    reader.readAsText(file);
+  };
 
-    // Scheme cards
-    if (searchFilterCategory === 'all' || searchFilterCategory === 'cards') {
-      existingCardMembers.forEach((m) => {
-        const str = `${m.cardNumber} ${m.customerName} ${m.village || ''} ${m.phone || ''} ${m.sheetNo || ''}`.toLowerCase();
-        if (!q || str.includes(q)) {
-          items.push({
-            id: m.id,
-            category: 'card',
-            title: `#${m.cardNumber} - ${m.customerName}`,
-            subtitle: m.schemeName,
-            village: m.village,
-            phone: m.phone,
-            amount: m.netBalance || m.totalDeposited,
-            extra: m.sheetNo ? `Sheet #${m.sheetNo}` : undefined,
-          });
-        }
-      });
+  const resolveCardScheme = (cardNum: number, rawSchemeText: string): { schemeId: CardSchemeId; schemeName: string } => {
+    if (targetSchemeId !== 'auto') {
+      const found = SCHEMES_CONFIG.find((s) => s.id === targetSchemeId);
+      if (found) return { schemeId: found.id as CardSchemeId, schemeName: found.name };
     }
 
-    // Bills
-    if (searchFilterCategory === 'all' || searchFilterCategory === 'bills') {
-      existingBills.forEach((b) => {
-        const str = `${b.invoiceNo} ${b.customerName} ${b.village || ''} ${b.customerPhone || ''} ${b.itemDetails}`.toLowerCase();
-        if (!q || str.includes(q)) {
-          items.push({
-            id: b.id,
-            category: 'bill',
-            title: `${b.invoiceNo} - ${b.customerName}`,
-            subtitle: b.itemDetails,
-            village: b.village,
-            phone: b.customerPhone,
-            amount: b.totalAmount,
-            due: b.dueAmount,
-            extra: b.date,
-          });
-        }
-      });
+    return getSchemeForCard(cardNum, rawSchemeText);
+  };
+
+  const handleCommitUniversal = () => {
+    if (!universalResult) return;
+
+    const totalReceiptsCount = (universalResult.salesReceipts?.length || 0) + universalResult.cardTransactions.length;
+
+    // Collect sample rows for verification
+    const sampleRows: Array<{ type: string; title: string; ref?: string; amount?: number }> = [];
+    universalResult.bills.slice(0, 8).forEach(b => sampleRows.push({ type: 'विक्री बिल', title: `${b.customerName}${b.stockItemName ? ` (${b.stockItemName})` : ''}`, ref: b.invoiceNo, amount: b.totalAmount }));
+    if (universalResult.stockItems && universalResult.stockItems.length > 0) {
+      universalResult.stockItems.slice(0, 6).forEach(s => sampleRows.push({ type: 'प्रॉडक्ट / वस्तू', title: s.name, ref: s.code, amount: s.sellingPrice }));
+    }
+    universalResult.cardTransactions.slice(0, 8).forEach(c => sampleRows.push({ type: 'योजना पावती', title: `कार्ड #${c.cardNumber} (${c.customerName})`, ref: c.receiptNo, amount: c.amount }));
+    if (universalResult.salesReceipts) {
+      universalResult.salesReceipts.slice(0, 8).forEach(r => sampleRows.push({ type: 'उधारी जमा', title: r.customerName, ref: r.invoiceNo, amount: r.payingNow }));
+    }
+    universalResult.cardMembers.slice(0, 8).forEach(m => sampleRows.push({ type: 'कार्ड मेंबर', title: `${m.customerName} (#${m.cardNumber})`, ref: m.schemeName, amount: m.totalDeposited }));
+    universalResult.customers.slice(0, 8).forEach(cust => sampleRows.push({ type: 'ग्राहक खाते', title: cust.name, ref: cust.phone, amount: cust.balanceDue }));
+    if (universalResult.purchases && universalResult.purchases.length > 0) {
+      universalResult.purchases.slice(0, 8).forEach(p => sampleRows.push({ type: 'खरेदी बिल', title: `${p.supplierName} (${p.items || 'वस्तू'})`, ref: p.billNo, amount: p.totalAmount }));
+    }
+    if (universalResult.dealers && universalResult.dealers.length > 0) {
+      universalResult.dealers.slice(0, 6).forEach(d => sampleRows.push({ type: 'डीलर / सप्लायर', title: d.name, ref: d.phone, amount: d.balanceDue }));
     }
 
-    // Receipts
-    if (searchFilterCategory === 'all' || searchFilterCategory === 'receipts') {
-      existingReceipts.forEach((r) => {
-        const str = `${r.receiptNo} ${r.customerName} ${r.cardNumber}`.toLowerCase();
-        if (!q || str.includes(q)) {
-          items.push({
-            id: r.id,
-            category: 'receipt',
-            title: `${r.receiptNo} - Card #${r.cardNumber}`,
-            subtitle: r.customerName,
-            amount: r.amount,
-            extra: r.date,
-          });
-        }
+    if (onUniversalImport) {
+      onUniversalImport({
+        bills: universalResult.bills,
+        salesReceipts: universalResult.salesReceipts || [],
+        cardMembers: universalResult.cardMembers,
+        cardTransactions: universalResult.cardTransactions,
+        customers: universalResult.customers,
+        stockItems: universalResult.stockItems || [],
+        purchases: universalResult.purchases || [],
+        dealers: universalResult.dealers || [],
       });
+    } else {
+      if (universalResult.bills.length > 0) onImportBills(universalResult.bills);
+      if (universalResult.salesReceipts && universalResult.salesReceipts.length > 0) onImportBills(universalResult.salesReceipts);
+      if (universalResult.cardMembers.length > 0) onImportCardMembers(universalResult.cardMembers, universalResult.cardTransactions);
+      else if (universalResult.cardTransactions.length > 0) onImportReceipts(universalResult.cardTransactions);
+      if (universalResult.purchases && universalResult.purchases.length > 0) {
+        onImportPurchases(universalResult.purchases, universalResult.dealers || []);
+      }
     }
 
-    return items;
-  }, [searchQuery, searchFilterCategory, existingCardMembers, existingBills, existingReceipts]);
+    const prodCount = universalResult.stockItems?.length || 0;
+    const purCount = universalResult.purchases?.length || 0;
+    const dlrCount = universalResult.dealers?.length || 0;
+
+    setLastImportedSummary({
+      date: new Date().toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      billsCount: universalResult.bills.length,
+      receiptsCount: totalReceiptsCount,
+      cardMembersCount: universalResult.cardMembers.length,
+      customersCount: universalResult.customers.length,
+      purchasesCount: purCount,
+      productsCount: prodCount,
+      sampleRows,
+    });
+
+    setSuccessMessage(
+      `सफलतापूर्वक सेव्ह झाले! ${universalResult.bills.length} विक्री बिले, ${purCount > 0 ? `${purCount} खरेदी बिले (${dlrCount} डीलर्स), ` : ''}${prodCount} प्रॉडक्ट्स/वस्तू, ${totalReceiptsCount} जमा पावत्या, ${universalResult.cardMembers.length} कार्ड मेंबर्स आणि ${universalResult.customers.length} ग्राहक खाती सिस्टीममध्ये सुरक्षित सेव्ह झाली आहेत!`
+    );
+    setUniversalResult(null);
+    setCsvText('');
+    setParsedRows([]);
+  };
+
+  const handleCommitManual = () => {
+    if (parsedRows.length === 0) return;
+    try {
+      if (activeImportType === 'cards') {
+        const newCards: CardMember[] = [];
+        const autoReceipts: CardTransaction[] = [];
+
+        parsedRows.forEach((r, idx) => {
+          const cardNum = parseNum(getField(r, ['CARD.NO', 'Card No', 'CardNumber', 'CardNo']), 1001);
+          const customerName = getField(r, ['NAME', 'Customer Name', 'CustomerName', 'Name'], `Member #${cardNum}`);
+          const village = getField(r, ['VILLEGE', 'Village', 'City', 'Address']);
+          const phone = getField(r, ['MOBILE.NO', 'Mobile', 'Phone', 'CustomerPhone']);
+          const sheetNo = getField(r, ['SHEET NO', 'SheetNo']);
+          const dateRaw = getField(r, ['DATE', 'Date']);
+          const joiningDate = normalizeDate(dateRaw);
+          const openingAmt = parseNum(getField(r, ['OPENING AMT', 'Saving Balance', 'OpeningAmt', 'Balance']), 0);
+
+          const { schemeId, schemeName } = resolveCardScheme(cardNum, getField(r, ['Scheme', 'SchemeId']));
+          const cardId = `cm-${schemeId}-${cardNum}`;
+
+          newCards.push({
+            id: cardId,
+            cardNumber: cardNum,
+            schemeId,
+            schemeName,
+            customerName,
+            phone: phone || '',
+            village: village || undefined,
+            sheetNo: sheetNo || undefined,
+            openingAmt: openingAmt > 0 ? openingAmt : undefined,
+            address: village ? `${village}, Wardha` : '',
+            joiningDate,
+            registrationFee: 50,
+            registrationFeePaid: true,
+            totalDeposited: openingAmt,
+            totalRefunded: 0,
+            netBalance: openingAmt,
+            status: 'Active',
+            notes: `Imported via CSV record${sheetNo ? ` • Sheet #${sheetNo}` : ''}`,
+          });
+
+          if (openingAmt > 0) {
+            autoReceipts.push({
+              id: `rcpt-opn-${schemeId}-${cardNum}-${idx}`,
+              cardId,
+              cardNumber: cardNum,
+              schemeId,
+              customerName,
+              customerPhone: phone || undefined,
+              receiptNo: `REC-OPN-${cardNum}`,
+              date: joiningDate,
+              type: 'WeeklyPayment',
+              weekNumber: 1,
+              amount: openingAmt,
+              paymentMode: 'Cash',
+              remarks: `Initial/Opening Deposit of ₹${openingAmt}`,
+              balanceAfter: openingAmt,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        });
+
+        onImportCardMembers(newCards, autoReceipts);
+        setSuccessMessage(`सफलता: ${newCards.length} कार्ड मेंबर्स लोड झाले आणि ₹ जमा पासबुकमध्ये क्रेडिट झाले!`);
+      } else if (activeImportType === 'bills') {
+        const newBills: TransactionEntry[] = parsedRows.map((r, idx) => {
+          const invoiceNo = getField(r, ['Bill No', 'InvoiceNo', 'BillNo', 'Bill_No', 'Bill', 'INV NO'], `INV-${Date.now().toString().slice(-4)}-${idx + 1}`);
+          const date = normalizeDate(getField(r, ['Date', 'BillDate', 'Bill Date', 'DATE']));
+          const customerName = getField(r, ['Customer Name', 'NAME', 'Name', 'CustomerName', 'Customer'], 'Customer');
+          const mobile = getField(r, ['Mobile', 'MOBILE.NO', 'Mobile No', 'Phone', 'Contact']);
+          const village = getField(r, ['Village', 'VILLEGE', 'Town', 'City', 'Address']);
+
+          let totalAmount = parseNum(getField(r, ['Grand Total', 'TotalAmount', 'Total', 'SubTotal', 'Sub Total', 'Bill Amount', 'GRAND TOTAL']), 0);
+          const payingNow = parseNum(getField(r, ['Amount Paid', 'PaidAmount', 'Paid', 'Cash Paid', 'AMOUNT PAID']), 0);
+          const dueAmount = parseNum(getField(r, ['Balance Due', 'DueAmount', 'Due', 'BALANCE DUE', 'Balance']), 0);
+
+          if (totalAmount === 0 && (payingNow > 0 || dueAmount > 0)) {
+            totalAmount = payingNow + dueAmount;
+          }
+
+          const rawProduct = getField(r, ['Product', 'Product Name', 'ProductName', 'Item', 'Item Name', 'ItemName', 'Particulars', 'Description', 'Goods', 'Vastu', 'Sahitya']);
+          const rawQty = parseNum(getField(r, ['Quantity', 'Qty', 'Pieces', 'Nos', 'Count', 'Nag']), 1);
+          const rawRate = parseNum(getField(r, ['Rate', 'Price', 'UnitPrice', 'Unit Price', 'MRP', 'Bhav', 'Dar']), 0);
+          const rawCat = getField(r, ['Category', 'Type', 'Group', 'Class', 'Vibhag']);
+
+          const itemsSummary = rawProduct || getField(r, ['Items Summary', 'ItemDetails', 'Items', 'Particulars'], 'Sales Invoice');
+          const remarks = getField(r, ['Remarks', 'Agent', 'Notes']);
+
+          return {
+            id: `inv-imp-${Date.now()}-${idx}`,
+            invoiceNo,
+            date,
+            customerName,
+            customerPhone: mobile,
+            village: village || undefined,
+            stockItemName: rawProduct || undefined,
+            quantity: rawQty > 0 ? rawQty : 1,
+            unitPrice: rawRate > 0 ? rawRate : (totalAmount > 0 && rawQty > 0 ? Math.round(totalAmount / rawQty) : undefined),
+            category: rawCat || undefined,
+            itemDetails: itemsSummary + (rawQty > 1 ? ` (${rawQty} नग)` : '') + (village ? ` (${village})` : ''),
+            totalAmount,
+            payingNow,
+            dueAmount: dueAmount > 0 ? dueAmount : Math.max(0, totalAmount - payingNow),
+            paymentMode: (getField(r, ['Payment Mode', 'PaymentMode', 'Mode'], 'Cash').toLowerCase().includes('online') ? 'Online' : 'Cash') as 'Cash' | 'Online',
+            notes: remarks ? `Remarks: ${remarks}` : `Bill: Total ₹${totalAmount}, Paid ₹${payingNow}, Due ₹${dueAmount}${rawProduct ? ` | वस्तू: ${rawProduct}` : ''}`,
+            createdAt: new Date().toISOString(),
+          };
+        });
+
+        onImportBills(newBills);
+        setSuccessMessage(`सफलता: ${newBills.length} विक्री बिल लोड झाले आणि All Entries अपडेट झाली!`);
+      } else if (activeImportType === 'receipts') {
+        const schemeReceipts: CardTransaction[] = [];
+        const customerReceiptEntries: TransactionEntry[] = [];
+
+        parsedRows.forEach((r, idx) => {
+          // Check for CANCEL in any field
+          const rowVals = Object.values(r).map((v) => String(v || '').toUpperCase());
+          if (rowVals.some((v) => v.includes('CANCEL') || v.includes('CANCE;L'))) {
+            return;
+          }
+
+          const rawRcptVal = getField(r, ['Receipt No', 'ReceiptNo', 'VoucherNo', 'Sr', 'No', 'SlNo', '']);
+          const receiptNo = rawRcptVal ? (/^\d+$/.test(rawRcptVal) ? `REC-${rawRcptVal}` : rawRcptVal) : `REC-${Date.now().toString().slice(-4)}-${idx + 1}`;
+          const date = normalizeDate(getField(r, ['Date', 'Receipt Date', 'DATE', 'Bill Date', 'Tarikh']));
+          const customerName = getField(r, ['Customer Name', 'NAME', 'Name', 'Customer', 'Grahak'], 'Customer');
+          const village = getField(r, ['Village', 'VILLAGE', 'VILLEGE', 'City', 'Town', 'Address']);
+          const rawCardNo = getField(r, ['Card No', 'CARD.NO', 'CardNumber']);
+          const cardNum = parseNum(rawCardNo, 0);
+          const amount = parseNum(getField(r, ['Amount Received', 'Amount', 'AMOUNT RECEIVED', 'AMOUNT', 'Total Received', 'Rakkam', 'Jama']), 0);
+          const againstBill = getField(r, ['Against Bill No', 'Ref Bill No', 'Bill No', 'AgainstBillNo']);
+          const receivedBy = getField(r, ['Received By', 'RECIVED BY', 'ReceivedBy', 'RecivedBy', 'Collector', 'Agent', 'Staff']);
+          const remarks = getField(r, ['Remarks', 'Notes', 'REMARKS']) || (receivedBy ? `जमा घेणारा: ${receivedBy}` : '');
+          const rawMode = getField(r, ['Payment Mode', 'Mode', 'PAYMENT MODE'], 'Cash');
+          const paymentMode: 'Cash' | 'Online' =
+            rawMode.toLowerCase().includes('online') ||
+            rawMode.toLowerCase().includes('upi') ||
+            receivedBy.toLowerCase().includes('online')
+              ? 'Online'
+              : 'Cash';
+
+          if (!customerName || (customerName === 'Customer' && amount === 0)) {
+            return;
+          }
+
+          // If card number is provided AND not against a sales bill
+          if (cardNum > 0 && !againstBill) {
+            const { schemeId } = resolveCardScheme(cardNum, remarks);
+            schemeReceipts.push({
+              id: `rec-imp-${Date.now()}-${idx}`,
+              cardId: `cm-${schemeId}-${cardNum}`,
+              cardNumber: cardNum,
+              schemeId,
+              customerName,
+              receiptNo,
+              date,
+              type: 'WeeklyPayment',
+              amount,
+              paymentMode,
+              remarks: remarks || `Scheme Payment Receipt: ${receiptNo}`,
+              balanceAfter: amount,
+              createdAt: new Date().toISOString(),
+            });
+          } else {
+            // Customer credit recovery / udhari settlement receipt against bill
+            customerReceiptEntries.push({
+              id: `rcpt-entry-${Date.now()}-${idx}`,
+              invoiceNo: receiptNo,
+              date,
+              customerName,
+              village: village || undefined,
+              itemDetails: againstBill
+                ? `उधारी जमा (पावती #${receiptNo} - बिल #${againstBill})${receivedBy ? ` [जमा: ${receivedBy}]` : ''}`
+                : `उधारी जमा पावती #${receiptNo}${receivedBy ? ` [जमा: ${receivedBy}]` : ''}${village ? ` (${village})` : ''}`,
+              totalAmount: 0,
+              payingNow: amount,
+              dueAmount: 0,
+              paymentMode,
+              refBillNo: againstBill || undefined,
+              againstBillNo: againstBill || undefined,
+              entryType: 'Receipt',
+              notes: remarks
+                ? `पावती: ${receiptNo} | संदर्भ बिल: ${againstBill || 'Direct'} | ${remarks}`
+                : `पावती: ${receiptNo} | संदर्भ बिल: ${againstBill || 'Direct'}${receivedBy ? ` | जमा: ${receivedBy}` : ''}`,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        });
+
+        if (schemeReceipts.length > 0) {
+          onImportReceipts(schemeReceipts);
+        }
+        if (customerReceiptEntries.length > 0) {
+          onImportBills(customerReceiptEntries);
+        }
+
+        setSuccessMessage(
+          `सफलता: ${customerReceiptEntries.length} ग्राहक उधारी जमा पावत्या (Sales Receipts) आणि ${schemeReceipts.length} कार्ड योजना पावत्या योग्य खात्यात जोडल्या गेल्या!`
+        );
+      } else if (activeImportType === 'purchases') {
+        const purchaseMap = new Map<string, PurchaseEntry>();
+        const dealerMap = new Map<string, Dealer>();
+
+        parsedRows.forEach((r, idx) => {
+          const rawSupplier = getField(r, ['DEALER', 'Dealer', 'SUPPLIER', 'Supplier', 'VENDOR', 'Vendor', 'PARTY', 'Party', 'सप्लायर', 'डीलर', 'नाव']);
+          const rawBillNo = getField(r, ['BILL.NO', 'BillNo', 'BILL NO', 'INVOICE NO', 'InvoiceNo', 'Bill', 'बिलक्र', 'बिलनंबर', 'बिल']);
+          if (!rawSupplier && !rawBillNo) return;
+          const supplierName = rawSupplier || 'MANISHA ENTERPRISES';
+          const billNo = rawBillNo || `PB-${Date.now().toString().slice(-4)}-${idx + 1}`;
+          const dateRaw = getField(r, ['DATE', 'Date', 'दिनांक', 'तारीख']);
+          const date = normalizeDate(dateRaw);
+          const phone = getField(r, ['PHONE', 'Phone', 'MOBILE', 'Mobile', 'मोबाईल']);
+          const address = getField(r, ['ADDRESS', 'Address', 'CITY', 'City', 'पत्ता']);
+          const gstin = getField(r, ['GSTIN', 'GST', 'GST NO', 'gstin']).toUpperCase();
+          const itemName = getField(r, ['PRODUCT', 'Product', 'ITEM', 'Item', 'PARTICULARS', 'Particulars', 'DESCRIPTION', 'वस्तू', 'साहित्य'], 'Goods');
+          const modelNo = cleanModelNo(getField(r, ['MODEL', 'Model', 'MODEL NO', 'ItemCode', 'Code']));
+          const hsn = getField(r, ['HSN', 'HSN CODE'], '84182100');
+          const qty = parseNum(getField(r, ['QTY', 'Qty', 'QUANTITY', 'Quantity', 'नग']), 1);
+          const rate = parseNum(getField(r, ['RATE', 'Rate', 'PURCHASE PRICE', 'Price', 'दर']), 0);
+          const totalAmount = parseNum(getField(r, ['TOTAL', 'Total', 'GRAND TOTAL', 'GrandTotal', 'एकूण']), qty * rate);
+          const paidAmount = parseNum(getField(r, ['PAID', 'Paid', 'PAID AMOUNT', 'Deposit', 'जमा']), 0);
+          const paymentMode = (getField(r, ['MODE', 'PaymentMode', 'पेमेंटमोड']).toLowerCase().includes('cheque') ? 'Cheque' : getField(r, ['MODE', 'PaymentMode']).toLowerCase().includes('cash') ? 'Cash' : 'Online') as 'Cash' | 'Online' | 'Cheque';
+          const serialsRaw = getField(r, ['SERIAL NO', 'SerialNo', 'SERIALS', 'Serials', 'सीरियलनंबर']);
+          const serials = parseSerialNumbersList(serialsRaw);
+
+          const lineItem: PurchaseLineItem = {
+            id: `p-item-${idx + 1}`,
+            description: itemName,
+            modelNo: modelNo || undefined,
+            hsn,
+            quantity: qty,
+            rate: rate > 0 ? rate : Math.round(totalAmount / qty),
+            discount: 0,
+            taxableAmount: totalAmount,
+            cgstRate: 9,
+            cgstAmount: Math.round(totalAmount * 0.09),
+            sgstRate: 9,
+            sgstAmount: Math.round(totalAmount * 0.09),
+            totalAmount,
+            serialNumbers: serials,
+          };
+
+          const key = `${supplierName.toLowerCase()}-${billNo.toLowerCase()}`;
+          const existing = purchaseMap.get(key);
+          if (existing) {
+            existing.lineItems = [...(existing.lineItems || []), lineItem];
+            existing.totalAmount += totalAmount;
+            existing.items = (existing.lineItems || []).map((it) => `${it.description} (${it.quantity} नग)`).join(', ');
+          } else {
+            const entry: PurchaseEntry = {
+              id: `pur-${Date.now()}-${idx}`,
+              billNo,
+              date,
+              supplierName,
+              supplierPhone: phone || undefined,
+              supplierAddress: address || undefined,
+              supplierGstin: gstin || undefined,
+              items: `${itemName}${modelNo ? ` [${modelNo}]` : ''} (${qty} नग)`,
+              lineItems: [lineItem],
+              taxableAmount: totalAmount,
+              cgstAmount: Math.round(totalAmount * 0.09),
+              sgstAmount: Math.round(totalAmount * 0.09),
+              totalAmount,
+              paidAmount,
+              status: paidAmount >= totalAmount ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending',
+              paymentMode,
+            };
+            purchaseMap.set(key, entry);
+          }
+
+          // Register dealer
+          const dKey = supplierName.toLowerCase().trim();
+          let dealer = dealerMap.get(dKey);
+          if (!dealer) {
+            dealer = {
+              id: `dlr-${dKey.replace(/[^a-z0-9]/g, '-')}`,
+              name: supplierName,
+              phone: phone || '',
+              address: address || undefined,
+              gstin: gstin || undefined,
+              totalPurchases: 0,
+              totalPaid: 0,
+              balanceDue: 0,
+              lastTransactionDate: date,
+            };
+            dealerMap.set(dKey, dealer);
+          }
+          dealer.totalPurchases += totalAmount;
+          dealer.totalPaid += paidAmount;
+          dealer.balanceDue = Math.max(0, dealer.totalPurchases - dealer.totalPaid);
+        });
+
+        const purchasesList = Array.from(purchaseMap.values());
+        const dealersList = Array.from(dealerMap.values());
+        if (purchasesList.length > 0) {
+          onImportPurchases(purchasesList, dealersList);
+          setSuccessMessage(
+            `सफलता: ${purchasesList.length} खरेदी बिले (Purchases) आणि ${dealersList.length} डीलर्स सिस्टीममध्ये यशस्वीरित्या सेव्ह झाले!`
+          );
+        }
+      }
+      setCsvText('');
+      setParsedRows([]);
+    } catch (err: any) {
+      setParseError(`Error importing: ${err.message}`);
+    }
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      
-      {/* ========================================================= */}
-      {/* 1. TOP HEADER (Matching Screenshot 2)                     */}
-      {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Header & Emergency Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              CSV Data Import & Cleanup Tool
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] uppercase tracking-wider">
-              Smart 5-in-1
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
-            पुरानी फाइलें अपलोड करें या 1 क्लिक में गलत ₹0 वाले बिल साफ़ करके फिर से ताज़ा डेटा लोड करें।
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Database className="w-6 h-6 text-indigo-600" />
+            <span>CSV डेटा इम्पोर्ट & व्यवस्थापन</span>
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            फायली थेट अपलोड करा, डेटाची शुद्धता तपासा आणि सिस्टीममधील सर्व रेकॉर्ड्स मास्टर सर्चमध्ये पाहा.
           </p>
         </div>
 
-        {/* Top Right Red Button from Screenshot 2 */}
-        <button
-          type="button"
-          onClick={() => setShowResetModal(true)}
-          className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-600/20 active:scale-95 transition cursor-pointer self-start sm:self-auto shrink-0"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span>पूरा डेटा रीसेट करे (Start Clean)</span>
-        </button>
+        {/* Emergency Cleanup & Reset Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onClearCardsData && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCleanAction({
+                  title: 'कार्ड डेटा क्लिअर करायचा आहे का?',
+                  description: 'सर्व कार्ड्स व साप्ताहिक हप्ते (Card Scheme Data) 100% पूर्णपणे क्लिअर केले जातील.',
+                  onConfirm: () => {
+                    onClearCardsData();
+                    setSuccessMessage('सर्व कार्ड्स व साप्ताहिक हप्ते यशस्वीपणे क्लिअर झाले आहेत!');
+                    setLastImportedSummary(null);
+                    setPendingCleanAction(null);
+                  },
+                });
+              }}
+              className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-purple-600" />
+              <span>कार्ड डेटा क्लिअर करा</span>
+            </button>
+          )}
+
+          {onClearBillsData && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCleanAction({
+                  title: 'सेल्स बिले व ग्राहक क्लिअर करायचे का?',
+                  description: 'सर्व जुनी विक्री बिले व ग्राहक यादी (Sales Bills Data) 100% पूर्णपणे क्लिअर केली जाईल.',
+                  onConfirm: () => {
+                    onClearBillsData();
+                    setSuccessMessage('सर्व विक्री बिले व ग्राहक यादी यशस्वीपणे क्लिअर झाली आहे!');
+                    setLastImportedSummary(null);
+                    setPendingCleanAction(null);
+                  },
+                });
+              }}
+              className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>सेल्स बिले क्लिअर करा</span>
+            </button>
+          )}
+
+          {onClearZeroBills && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCleanAction({
+                  title: '₹0 चे चुकीचे बिल साफ़ करायचे का?',
+                  description: 'सर्व ₹0 वाले चुकीचे इम्पोर्ट झालेले बिल काढून टाकले जातील.',
+                  onConfirm: () => {
+                    onClearZeroBills();
+                    setSuccessMessage('सर्व ₹0 चे चुकीचे बिल यशस्वीपणे काढून टाकले आहेत!');
+                    setPendingCleanAction(null);
+                  },
+                });
+              }}
+              className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-amber-600" />
+              <span>₹0 चे बिल साफ़ करा</span>
+            </button>
+          )}
+
+          {onFullResetData && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCleanAction({
+                  title: 'सर्व जुना डेटा 100% क्लिअर करायचा का?',
+                  description: 'सावधान: सर्व जुना डेटा (बिले, कार्ड्स, ग्राहक, पावत्या) 100% पूर्णपणे क्लिअर करून स्वच्छ केला जाईल.',
+                  onConfirm: () => {
+                    onFullResetData();
+                    setSuccessMessage('सर्व जुना डेटा यशस्वीपणे पूर्ण क्लिअर झाला आहे!');
+                    setLastImportedSummary(null);
+                    setPendingCleanAction(null);
+                  },
+                });
+              }}
+              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>सर्व जुना डेटा 100% क्लिअर करा</span>
+            </button>
+          )}
+        </div>
+
+        {/* Clean confirmation in-app dialog for CsvImportView */}
+        {pendingCleanAction && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {pendingCleanAction.title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {pendingCleanAction.description}
+                </p>
+              </div>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingCleanAction(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  रद्द करा
+                </button>
+                <button
+                  type="button"
+                  onClick={pendingCleanAction.onConfirm}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition cursor-pointer"
+                >
+                  होय, आता करा
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Success / Error Alerts */}
-      {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+      {/* Live System Imported Database Status Banner */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 text-white border border-indigo-700/40 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+              <FileSpreadsheet className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>सिस्टीममध्ये उपलब्ध असलेला सध्याचा डेटा</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono font-bold border border-emerald-500/30">
+                  {existingBills.length + existingReceipts.length + existingCardMembers.length + existingCustomers.length + existingPurchases.length} एकूण नोंदी
+                </span>
+              </h2>
+              <p className="text-xs text-indigo-200/80 mt-0.5">
+                खालील सर्व डेटाबेस सिस्टीममध्ये सुरक्षित साठवलेला असून मास्टर सर्चमध्ये शोधण्यासाठी सज्ज आहे.
+              </p>
+            </div>
+          </div>
+
+          {onSwitchTab && (
+            <button
+              type="button"
+              onClick={() => onSwitchTab('uploaded-data')}
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-sm self-start sm:self-auto shrink-0"
+            >
+              <Database className="w-4 h-4" />
+              <span>🔍 मास्टर सर्च उघडा (सर्व डेटा शोधा) ➜</span>
+            </button>
+          )}
+        </div>
+
+        {/* 5 Data Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 pt-1">
+          <div
+            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
+          >
+            <div className="flex items-center justify-between text-xs text-indigo-200 font-semibold">
+              <span>विक्री बिले</span>
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            <div className="text-xl font-black text-white mt-1 font-mono">
+              {existingBills.length.toLocaleString()}
+            </div>
+            <span className="text-[10px] text-indigo-300">Invoices</span>
+          </div>
+
+          <div
+            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
+          >
+            <div className="flex items-center justify-between text-xs text-purple-200 font-semibold">
+              <span>जमा पावत्या</span>
+              <Receipt className="w-3.5 h-3.5 text-purple-400" />
+            </div>
+            <div className="text-xl font-black text-white mt-1 font-mono">
+              {existingReceipts.length.toLocaleString()}
+            </div>
+            <span className="text-[10px] text-purple-300">Receipts</span>
+          </div>
+
+          <div
+            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
+          >
+            <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
+              <span>कार्ड सभासद</span>
+              <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <div className="text-xl font-black text-white mt-1 font-mono">
+              {existingCardMembers.length.toLocaleString()}
+            </div>
+            <span className="text-[10px] text-amber-300">Scheme Cards</span>
+          </div>
+
+          <div
+            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer"
+          >
+            <div className="flex items-center justify-between text-xs text-teal-200 font-semibold">
+              <span>ग्राहक खाती</span>
+              <Users className="w-3.5 h-3.5 text-teal-400" />
+            </div>
+            <div className="text-xl font-black text-white mt-1 font-mono">
+              {existingCustomers.length.toLocaleString()}
+            </div>
+            <span className="text-[10px] text-teal-300">Customers</span>
+          </div>
+
+          <div
+            onClick={() => onSwitchTab && onSwitchTab('uploaded-data')}
+            className="p-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 transition cursor-pointer col-span-2 sm:col-span-1"
+          >
+            <div className="flex items-center justify-between text-xs text-rose-200 font-semibold">
+              <span>खरेदी आवक</span>
+              <ShoppingCart className="w-3.5 h-3.5 text-rose-400" />
+            </div>
+            <div className="text-xl font-black text-white mt-1 font-mono">
+              {existingPurchases.length.toLocaleString()}
+            </div>
+            <span className="text-[10px] text-rose-300">Purchases</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Recently Imported Inspection Panel (If import just occurred) */}
+      {lastImportedSummary && (
+        <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-400 dark:border-emerald-600 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200 dark:border-emerald-800 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <h3 className="text-sm font-black text-emerald-950 dark:text-emerald-200">
+                  🎉 नुकताच इम्पोर्ट झालेला डेटा (वेळ: {lastImportedSummary.date})
+                </h3>
+                <p className="text-xs text-emerald-800 dark:text-emerald-400 mt-0.5">
+                  खालील नोंदी सिस्टीममध्ये यशस्वीरित्या जमा करण्यात आल्या आहेत:
+                </p>
+              </div>
+            </div>
+            {onSwitchTab && (
+              <button
+                type="button"
+                onClick={() => onSwitchTab('uploaded-data')}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>मास्टर सर्चमध्ये हा डेटा पाहा</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+            <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-300 border border-blue-200">
+              🛒 {lastImportedSummary.billsCount} विक्री बिले
+            </span>
+            <span className="px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-900 dark:text-purple-300 border border-purple-200">
+              🧾 {lastImportedSummary.receiptsCount} जमा पावत्या
+            </span>
+            <span className="px-3 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-300 border border-amber-200">
+              💳 {lastImportedSummary.cardMembersCount} कार्ड सभासद
+            </span>
+            <span className="px-3 py-1 rounded-lg bg-teal-100 dark:bg-teal-900/40 text-teal-900 dark:text-teal-300 border border-teal-200">
+              👥 {lastImportedSummary.customersCount} ग्राहक खाती
+            </span>
+          </div>
+
+          {lastImportedSummary.sampleRows.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-emerald-100/50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-300 font-bold border-b border-emerald-200 dark:border-emerald-800">
+                  <tr>
+                    <th className="px-3 py-2">प्रकार</th>
+                    <th className="px-3 py-2">नाव / तपशील</th>
+                    <th className="px-3 py-2">संदर्भ / पावती / बिल क्र.</th>
+                    <th className="px-3 py-2 text-right">रक्कम</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {lastImportedSummary.sampleRows.map((r, i) => (
+                    <tr key={i} className="hover:bg-emerald-50/50 dark:hover:bg-slate-800/50">
+                      <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-300">
+                        {r.type}
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-slate-900 dark:text-white">
+                        {r.title}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">
+                        {r.ref || '-'}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        ₹{(r.amount || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Success Notification Banner */}
+      {successMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 text-sm font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <span>{successMessage}</span>
           </div>
-          <button
-            onClick={() => setSuccessMessage('')}
-            className="text-xs text-emerald-700 hover:underline font-bold cursor-pointer"
-          >
-            बंद करा
-          </button>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <span>{errorMessage}</span>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {onSwitchTab && (
+              <button
+                type="button"
+                onClick={() => onSwitchTab('uploaded-data')}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>मास्टर सर्चमध्ये तपासा</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSuccessMessage('')}
+              className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer ml-1"
+            >
+              ✕ बंद करा
+            </button>
           </div>
-          <button
-            onClick={() => setErrorMessage('')}
-            className="text-xs text-rose-700 hover:underline font-bold cursor-pointer"
-          >
-            बंद करा
-          </button>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. THREE SEGMENTED TABS (From Screenshot 2)               */}
-      {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-2xl">
+      {/* Top Navigation Mode Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => setActiveMainTab('universal')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
-              activeMainTab === 'universal'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            onClick={() => setImportMode('universal')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+              importMode === 'universal'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>✨ स्मार्ट ऑटो-डिटेक्टर & एरर क्लीनर (5-in-1 Universal)</span>
+            <span>स्मार्ट ऑटो-डिटेक्टर (5-in-1 Universal)</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveMainTab('manual')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
-              activeMainTab === 'manual'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            onClick={() => setImportMode('manual')}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer ${
+              importMode === 'manual'
+                ? 'bg-slate-900 dark:bg-slate-700 text-white shadow-sm'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>📑 मॅन्युअल इम्पोर्ट (Category Wise)</span>
+            <Layers className="w-4 h-4" />
+            <span>मॅन्युअल इम्पोर्ट (Category Wise)</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('search')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer ${
-              activeMainTab === 'search'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            <span>🔍 अपलोड झालेला सर्व डेटा शोधा</span>
-          </button>
+          {onSwitchTab && (
+            <button
+              type="button"
+              onClick={() => onSwitchTab('uploaded-data')}
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs"
+            >
+              <Database className="w-4 h-4 text-emerald-600" />
+              <span>🔍 मास्टर सर्च</span>
+            </button>
+          )}
         </div>
-
-        {/* Small Red Button under tabs from Screenshot 2 */}
-        <button
-          type="button"
-          onClick={() => setShowResetModal(true)}
-          className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>डेटा रीसेट (Start Clean)</span>
-        </button>
       </div>
 
-      {/* ========================================================= */}
-      {/* TAB 1: SMART AUTO-DETECTOR & ERROR CLEANER (Universal)    */}
-      {/* ========================================================= */}
-      {activeMainTab === 'universal' && (
-        <div className="space-y-6 animate-in fade-in">
-          
-          {/* Deep Navy/Indigo Hero Feature Banner (Screenshot 2) */}
-          <div className="rounded-3xl bg-gradient-to-br from-[#0F1E36] via-[#0B1528] to-[#08101E] text-white p-6 sm:p-8 relative overflow-hidden shadow-2xl border border-blue-900/40">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="relative z-10 space-y-4">
-              {/* Active Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+      {importMode === 'universal' ? (
+        <div className="space-y-6">
+          {/* Universal Header & Rules Banner */}
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-950 text-white p-6 rounded-3xl shadow-md relative overflow-hidden">
+            <div className="relative z-10 space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-xs font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>स्वयंचलित स्पेलिंग, तारीख व खाते दुरुस्ती प्रणाली सक्रिय</span>
               </div>
-
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-snug">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
                 कोणतीही CSV फाईल टाका — आपोआप ओळखून अचूक ठिकाणी सेव्ह होईल!
               </h2>
-
-              <p className="text-xs sm:text-sm text-slate-300 max-w-4xl leading-relaxed">
-                ही प्रणाली ५ पैकी कोणत्याही फाईलमधील स्पेलिंग चुका (उदा. <span className="text-amber-300 font-bold">KELHZAR → Kelzar</span>, <span className="text-amber-300 font-bold">VAYFAD → Waifad</span>, <span className="text-amber-300 font-bold">NILIMA → Nilima</span>), नावातील कंसात असलेले गाव वेगळे करणे, फोन नंबर दुरुस्ती, आणि चुकीचे मायनस बॅलन्स आपोआप दुरुस्त करून थेट योग्य लेजरमध्ये जमा करते.
+              <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+                ही प्रणाली ५ पैकी कोणत्याही फाईलमधील स्पेलिंग चुका (उदा. <i>KELHZAR ➔ Kelzar</i>, <i>VAYFAD ➔ Waifad</i>, <i>NI,LIMA ➔ NILIMA</i>), नावातील कंसात असलेले गाव वेगळे करणे, फोन नंबर दुरुस्ती, आणि चुकीचे मायनस बॅलन्स आपोआप दुरुस्त करून थेट योग्य लेजरमध्ये जमा करते.
               </p>
 
-              {/* 4 Feature Badges Grid from Screenshot 2 */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0 font-bold text-xs">
-                    १
-                  </div>
-                  <div>
-                    <span className="block text-[11px] text-slate-400">विक्री बिले</span>
-                    <span className="text-xs font-black text-white flex items-center gap-1">
-                      <Receipt className="w-3 h-3 text-amber-400" />
-                      All Entries & Ledger
-                    </span>
+              {/* Destination Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
+                  <div className="text-[11px] text-slate-300 font-medium">१. विक्री बिले</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
+                    <FileText className="w-3.5 h-3.5 text-amber-400" />
+                    <span>All Entries & Ledger</span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-300 shrink-0 font-bold text-xs">
-                    २
-                  </div>
-                  <div>
-                    <span className="block text-[11px] text-slate-400">ग्राहक खाती</span>
-                    <span className="text-xs font-black text-white flex items-center gap-1">
-                      <CreditCard className="w-3 h-3 text-emerald-400" />
-                      Customers Khata
-                    </span>
+                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
+                  <div className="text-[11px] text-slate-300 font-medium">२. ग्राहक खाती</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Customers Khata</span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-300 shrink-0 font-bold text-xs">
-                    ३
-                  </div>
-                  <div>
-                    <span className="block text-[11px] text-slate-400">बचत योजना</span>
-                    <span className="text-xs font-black text-white flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-amber-400" />
-                      Card Scheme 1, 2, 3
-                    </span>
+                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
+                  <div className="text-[11px] text-slate-300 font-medium">३. बचत योजना</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Card Scheme 1, 2, 3</span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 shrink-0 font-bold text-xs">
-                    ४
-                  </div>
-                  <div>
-                    <span className="block text-[11px] text-slate-400">जमा पावत्या</span>
-                    <span className="text-xs font-black text-white flex items-center gap-1">
-                      <FileText className="w-3 h-3 text-purple-400" />
-                      Receipts & Passbook
-                    </span>
+                <div className="bg-white/10 backdrop-blur-xs rounded-xl p-2.5 border border-white/10">
+                  <div className="text-[11px] text-slate-300 font-medium">४. जमा पावत्या</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1 mt-0.5">
+                    <Receipt className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Receipts & Passbook</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Sample File Loaders (Screenshot 2: Scheme 2, Scheme 3 buttons) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Quick Load Server Files */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-amber-500 text-base">⚡</span>
-                <h3 className="font-extrabold text-slate-900 text-sm">
-                  रेडी सॅम्पल फाईल त्वरित लोड करा:
-                </h3>
+              <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>रेडी सॅम्पल फाईल त्वरित लोड करा:</span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                खालील बटनावर क्लिक करून थेट उपलब्ध CSV तपासून टेस्ट करू शकता:
+                खालील बटणावर क्लिक करून थेट उपलब्ध CSV तपासून टेस्ट करू शकता:
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => handleLoadSampleScheme(2)}
-                className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/data/scheme2.csv');
+                    const text = await res.text();
+                    setTargetSchemeId('scheme2');
+                    setCsvText(text);
+                    handleProcessCsvString(text, 'scheme2');
+                  } catch (e: any) {
+                    setParseError('Scheme 2 फाईल लोड करता आली नाही: ' + e.message);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <Download className="w-3.5 h-3.5" />
                 <span>Scheme 2 लोड करा</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleLoadSampleScheme(3)}
-                className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/data/scheme3.csv');
+                    const text = await res.text();
+                    setTargetSchemeId('scheme3');
+                    setCsvText(text);
+                    handleProcessCsvString(text, 'scheme3');
+                  } catch (e: any) {
+                    setParseError('Scheme 3 फाईल लोड करता आली नाही: ' + e.message);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
               >
-                <Download className="w-3.5 h-3.5 text-purple-600" />
+                <Download className="w-3.5 h-3.5" />
                 <span>Scheme 3 लोड करा</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleLoadSampleScheme(1)}
-                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/data/receipts_against_bill.csv');
+                    const text = await res.text();
+                    setCsvText(text);
+                    handleProcessCsvString(text);
+                  } catch (e: any) {
+                    setParseError('Receipts फाईल लोड करता आली नाही: ' + e.message);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition"
               >
-                <Download className="w-3.5 h-3.5 text-slate-600" />
-                <span>Scheme 1 लोड करा</span>
+                <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                <span>🧾 ग्राहक पावती (Receipts) लोड करा</span>
               </button>
             </div>
           </div>
 
-          {/* Universal Drag & Drop Upload Zone (Screenshot 2) */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition cursor-pointer relative bg-white ${
-              isDragging
-                ? 'border-blue-600 bg-blue-50/50 scale-[1.005]'
-                : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50/50'
-            }`}
-          >
-            <input
-              type="file"
-              accept=".csv,.txt"
-              onChange={handleFileInput}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            
-            <div className="max-w-md mx-auto space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
-                <Upload className="w-8 h-8" />
+          {/* Scheme Selection for Universal Mode */}
+          <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                <CreditCard className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-extrabold text-slate-800 text-base">
-                  {fileName ? (
-                    <span className="text-blue-600">निवडलेली फाईल: {fileName}</span>
-                  ) : (
-                    'CSV किंवा Text फाईल येथे ड्रॅग करा किंवा कॉम्प्युटरवरून निवडा'
-                  )}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Supports UTF-8 CSV, Excel Exports (.csv), Scheme Cards, Bills & Receipts
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-center gap-3">
-                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 font-mono text-[11px]">
-                  .csv फाईल निवडा
-                </span>
-                <span className="text-slate-400 text-xs font-semibold">• किंवा •</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowPasteArea(!showPasteArea);
-                  }}
-                  className="text-xs text-blue-600 hover:underline font-bold"
-                >
-                  {showPasteArea ? 'पेस्ट बॉक्स लपवा' : 'CSV मजकूर थेट पेस्ट करा'}
-                </button>
+                <div className="text-xs font-black text-indigo-950 dark:text-indigo-200">
+                  कार्ड योजना निवड (Card Scheme Target):
+                </div>
+                <div className="text-[11px] text-indigo-700 dark:text-indigo-400">
+                  ऑटो-डिटेक्ट ठेवा किंवा हवी असलेली योजना (1, 2, 3) निवडून थेट इम्पोर्ट करा:
+                </div>
               </div>
             </div>
+            <select
+              value={targetSchemeId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTargetSchemeId(val);
+                if (csvText.trim()) {
+                  handleProcessCsvString(csvText, val);
+                }
+              }}
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 border-2 border-indigo-400 dark:border-indigo-600 rounded-xl font-bold text-xs sm:text-sm text-indigo-950 dark:text-indigo-200 shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="auto">✨ Auto-Detect (आपोआप ओळखा)</option>
+              <option value="scheme1">Scheme 1 (योजना 1)</option>
+              <option value="scheme2">Scheme 2 (योजना 2)</option>
+              <option value="scheme3">Scheme 3 (योजना 3)</option>
+              <option value="scheme4">Scheme 4 (योजना 4)</option>
+              <option value="scheme5">Scheme 5 (योजना 5)</option>
+              <option value="scheme6">Scheme 6 (योजना 6)</option>
+            </select>
           </div>
 
-          {/* Optional Direct Paste Area */}
-          {showPasteArea && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
-              <label className="block text-xs font-bold text-slate-700">
-                येथे CSV मजकूर पेस्ट करा (Paste Raw CSV Data):
-              </label>
-              <textarea
-                rows={6}
-                value={csvText}
-                onChange={(e) => {
-                  setCsvText(e.target.value);
-                  processAndCleanCSV(e.target.value, 'Pasted-Data.csv');
-                }}
-                placeholder="NAME,CARD.NO,VILLEGE,MOBILE.NO,OPENING AMT,DATE,SHEET NO&#10;PRAKASH BUDHBAWARE (ANTERGAON),4150,ANTERGAON,8262988399,800,01-09-2025,4102"
-                className="w-full p-3 rounded-xl border border-slate-200 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          {/* Upload Dropzone */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="relative border-2 border-dashed border-indigo-300 hover:border-indigo-600 rounded-2xl p-8 text-center bg-indigo-50/40 hover:bg-indigo-50/70 transition cursor-pointer">
+              <input
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
               />
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-800">
+                  कोणतीही CSV फाईल निवडण्यासाठी येथे क्लिक करा किंवा ड्रॅग करा
+                </p>
+                <p className="text-xs text-slate-500">
+                  (Scheme 1, Scheme 2, Scheme 3, Sales Bills, किंवा Receipts फाईल)
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* ========================================================= */}
-          {/* CLEANED DATA PREVIEW & ANALYSIS RESULT                    */}
-          {/* ========================================================= */}
-          {detectedRecords.length > 0 && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5 animate-in fade-in">
-              
-              {/* Header Analysis Result */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                      <span className="text-[11px] font-bold text-slate-500 px-2">प्रकार बदला:</span>
-                      <select
-                        value={detectedType}
-                        onChange={(e) => setDetectedType(e.target.value as any)}
-                        className="bg-white text-xs font-bold text-slate-800 rounded-lg px-2.5 py-1 border border-slate-200 shadow-2xs focus:outline-none cursor-pointer"
-                      >
-                        <option value="bills">विक्री बिले (Bills)</option>
-                        <option value="receipts">जमा पावत्या (Receipts - Credit Against Bill)</option>
-                        <option value="scheme1">योजना कार्ड १ (Card Scheme 1)</option>
-                        <option value="scheme2">योजना कार्ड २ (Card Scheme 2)</option>
-                        <option value="scheme3">योजना कार्ड ३ (Card Scheme 3)</option>
-                        <option value="customers">सामान्य ग्राहक (Customers)</option>
-                        <option value="purchases">खरेदी (Purchases)</option>
-                      </select>
-                    </div>
-                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" />
-                      {cleanStats.totalRows} रेकॉर्ड्स सापडले
+            {parseError && (
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>{parseError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Universal Result Analysis & Destination Mapping */}
+          {universalResult && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-6">
+              {/* Header Analysis Box */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white uppercase tracking-wider">
+                      {universalResult.detectedType === 'purchases' && '📦 Purchases / Inward Goods (खरेदी बिले)'}
+                      {universalResult.detectedType === 'bills' && '🛒 Sales Invoices (विक्री बिले)'}
+                      {universalResult.detectedType === 'receipts' && '🧾 Receipts / Payments (पावत्या)'}
+                      {universalResult.detectedType === 'cards_raw' && '💳 Card Scheme Members (कार्ड योजना)'}
+                      {universalResult.detectedType === 'cards_master' && '💳 Card Scheme Master (मास्टर कार्ड्स)'}
+                      {universalResult.detectedType === 'unknown' && '📄 CSV फाईल'}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      ओळखण्यात आलेली फाईल
                     </span>
                   </div>
-                  <h3 className="font-extrabold text-slate-900 text-base mt-1">
-                    स्वयंचलित दुरुस्ती अहवाल (Automated Cleanup Report)
-                  </h3>
+                  <p className="text-sm font-bold text-slate-900 mt-1">
+                    {universalResult.summaryText}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDetectedRecords([]);
-                      setCsvText('');
-                      setFileName('');
-                    }}
-                    className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    रद्द करा
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isImporting}
-                    onClick={handleCommitUniversalImport}
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg transition ${
-                      isImporting
-                        ? 'bg-slate-400 text-white cursor-not-allowed'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95 cursor-pointer'
-                    }`}
-                  >
-                    {isImporting ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>प्रक्रिया सुरू आहे... (Importing...)</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>सिस्टीममध्ये सेव्ह करा (Import & Save)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleCommitUniversal}
+                  className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2 transition"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>✓ सर्व दुरुस्त डेटा योग्य ठिकाणी सेव्ह करा</span>
+                </button>
               </div>
 
-              {/* Cleanup Metrics Pills */}
-              {detectedType === 'bills' ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200">
-                    <span className="text-[11px] text-blue-700 font-semibold block">एकूण विक्री बिले (Total Bills)</span>
-                    <span className="text-xl font-black text-blue-950 font-mono">
-                      {cleanStats.totalRows} बिले
-                    </span>
+              {/* Destination Breakdown Counters */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50">
+                  <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-amber-600" />
+                    <span>विक्री बिले (Sales Invoices)</span>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200">
-                    <span className="text-[11px] text-indigo-700 font-semibold block">एकूण खरेदी किंमत (Total Amount)</span>
-                    <span className="text-xl font-black text-indigo-950 font-mono">
-                      ₹{cleanStats.totalSales.toLocaleString()}
-                    </span>
+                  <div className="text-2xl font-black text-amber-950 mt-2">
+                    {universalResult.bills.length}
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200">
-                    <span className="text-[11px] text-emerald-700 font-semibold block">एकूण जमा (Advance Received)</span>
-                    <span className="text-xl font-black text-emerald-950 font-mono">
-                      ₹{cleanStats.totalPaid.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200">
-                    <span className="text-[11px] text-rose-700 font-semibold block">एकूण बाकी शिल्लक (Balance Due)</span>
-                    <span className="text-xl font-black text-rose-950 font-mono">
-                      ₹{cleanStats.totalDue.toLocaleString()}
-                    </span>
+                  <div className="text-[11px] text-amber-700 mt-0.5">
+                    {universalResult.bills.length > 0 ? 'नवीन बिले लेजरमध्ये जातील' : 'एकही विक्री बिल नाही (पावत्या फाईल)'}
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200">
-                    <span className="text-[11px] text-amber-800 font-medium block">स्पेलिंग दुरुस्ती</span>
-                    <span className="text-lg font-black text-amber-900 font-mono">
-                      {cleanStats.spellingFixed} गावे
+
+                <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50">
+                  <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-indigo-600" />
+                    <span>कार्ड्स मेंबर्स (Card Schemes)</span>
+                  </div>
+                  <div className="text-2xl font-black text-indigo-950 mt-2">
+                    {universalResult.cardMembers.length}
+                  </div>
+                  <div className="text-[11px] text-indigo-700 mt-0.5">योजना सभासद जोडले जातील</div>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50">
+                  <div className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-purple-600" />
+                    <span>जमा पावत्या (Receipts)</span>
+                  </div>
+                  <div className="text-2xl font-black text-purple-950 mt-2">
+                    {(universalResult.salesReceipts?.length || 0) + universalResult.cardTransactions.length}
+                  </div>
+                  <div className="text-[11px] text-purple-700 mt-0.5">
+                    {universalResult.cardTransactions.length > 0 && (universalResult.salesReceipts?.length || 0) > 0
+                      ? `${universalResult.cardTransactions.length} कार्ड योजना + ${universalResult.salesReceipts?.length || 0} ग्राहक जमा`
+                      : universalResult.cardTransactions.length > 0
+                      ? `${universalResult.cardTransactions.length} कार्ड योजना पावत्या जमा होतील`
+                      : `${universalResult.salesReceipts?.length || 0} ग्राहक उधारी जमा पावत्या`}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50">
+                  <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <span>ग्राहक खाती (Khata Ledger)</span>
+                  </div>
+                  <div className="text-2xl font-black text-blue-950 mt-2">
+                    {universalResult.customers.length}
+                  </div>
+                  <div className="text-[11px] text-blue-700 mt-0.5">खाती अपडेट / शिल्लक जमा होईल</div>
+                </div>
+
+                {universalResult.purchases && universalResult.purchases.length > 0 && (
+                  <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 col-span-2 md:col-span-4">
+                    <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-emerald-600" />
+                      <span>डीलर खरेदी बिले (Purchases & Stock Inward)</span>
+                    </div>
+                    <div className="flex items-baseline gap-3 mt-2">
+                      <div className="text-2xl font-black text-emerald-950">
+                        {universalResult.purchases.length} बिले
+                      </div>
+                      <div className="text-sm font-bold text-emerald-800">
+                        ({universalResult.dealers?.length || 0} डीलर्स, {universalResult.stockItems?.length || 0} प्रॉडक्ट्स साठ्यात जमा)
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Audit & Error Corrections Report Box */}
+              <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/80 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                      {universalResult.auditIssues.length}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">
+                        स्वयंचलित दुरुस्ती अहवाल (Automated Audit & Fixes)
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {universalResult.auditIssues.length} विसंगती व स्पेलिंग चुका सापडल्या आणि आपोआप सुधारल्या गेल्या.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAuditModal(!showAuditModal)}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs self-start sm:self-auto"
+                  >
+                    <span>{showAuditModal ? 'तपशील लपवा' : 'सर्व दुरुस्त्या तपासा'}</span>
+                    {showAuditModal ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {/* Audit Issues List Accordion */}
+                {showAuditModal && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {['all', 'spelling', 'date', 'phone', 'amount', 'card_number'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setAuditFilter(cat)}
+                          className={`px-3 py-1 rounded-lg font-bold capitalize cursor-pointer transition ${
+                            auditFilter === cat
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {cat === 'all' && `सर्व दुरुस्त्या (${universalResult.auditIssues.length})`}
+                          {cat === 'spelling' && 'स्पेलिंग व गावे'}
+                          {cat === 'date' && 'तारीख स्वरूप'}
+                          {cat === 'phone' && 'मोबाईल नंबर'}
+                          {cat === 'amount' && 'चुकीची रक्कम'}
+                          {cat === 'card_number' && 'कार्ड नंबर वाटप'}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-100 font-bold text-slate-700 sticky top-0 border-b border-slate-200">
+                          <tr>
+                            <th className="p-2.5">प्रकार</th>
+                            <th className="p-2.5">वर्णन</th>
+                            <th className="p-2.5 text-rose-600">मूळ फाईलमध्ये (अगोदर)</th>
+                            <th className="p-2.5 text-emerald-700">दुरुस्त केलेले रूप (आता)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {universalResult.auditIssues
+                            .filter((iss) => auditFilter === 'all' || iss.type === auditFilter)
+                            .slice(0, 50)
+                            .map((iss, i) => (
+                              <tr key={i} className="hover:bg-slate-50">
+                                <td className="p-2.5 font-bold uppercase text-[10px] text-slate-500">
+                                  {iss.type}
+                                </td>
+                                <td className="p-2.5 text-slate-700">{iss.description}</td>
+                                <td className="p-2.5 font-mono text-rose-700 bg-rose-50/50">{iss.original}</td>
+                                <td className="p-2.5 font-mono font-bold text-emerald-800 bg-emerald-50/50">{iss.corrected}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bills Preview Table showing Product, Total, Advance, and Balance */}
+              {universalResult.bills && universalResult.bills.length > 0 && (
+                <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span>विक्री बिले तपशील (Product, Total, Advance & Balance Preview)</span>
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        फाईलमधून शोधण्यात आलेली बिले, वस्तू (Product), एकूण रक्कम (Total), अॅडव्हान्स (Advance) आणि बाकी (Balance)
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 self-start sm:self-auto">
+                      एकूण {universalResult.bills.length} बिले
                     </span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200">
-                    <span className="text-[11px] text-blue-800 font-medium block">कंसातील गावे वेगळी केली</span>
-                    <span className="text-lg font-black text-blue-900 font-mono">
-                      {cleanStats.villagesExtracted} नावे
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                    <span className="text-[11px] text-emerald-800 font-medium block">१०-अंकी फोन फॉरमॅट</span>
-                    <span className="text-lg font-black text-emerald-900 font-mono">
-                      {cleanStats.phonesFormatted} नंबर
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-200">
-                    <span className="text-[11px] text-purple-800 font-medium block">₹0 बिल सुधारणा</span>
-                    <span className="text-lg font-black text-purple-900 font-mono">
-                      {cleanStats.zeroBillsFixed} बिले
-                    </span>
+
+                  <div className="overflow-x-auto max-h-72 overflow-y-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
+                        <tr>
+                          <th className="p-2.5">बिल # / तारीख</th>
+                          <th className="p-2.5">ग्राहक</th>
+                          <th className="p-2.5">प्रॉडक्ट / साहित्य (Product)</th>
+                          <th className="p-2.5 text-right">एकूण (Total)</th>
+                          <th className="p-2.5 text-right text-emerald-700">अॅडव्हान्स (Advance/Paid)</th>
+                          <th className="p-2.5 text-right text-amber-700">बाकी (Balance)</th>
+                          <th className="p-2.5 text-center">मोड</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {universalResult.bills.slice(0, 50).map((bill, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/80">
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="font-mono font-bold text-slate-800">#{bill.invoiceNo}</span>
+                              <div className="text-[11px] text-slate-400">{bill.date}</div>
+                            </td>
+                            <td className="p-2.5">
+                              <div className="font-semibold text-slate-900">{bill.customerName}</div>
+                              {bill.village && <div className="text-[11px] text-slate-500">{bill.village}</div>}
+                            </td>
+                            <td className="p-2.5 max-w-xs">
+                              <div className="font-bold text-indigo-950 truncate">
+                                {bill.stockItemName || bill.itemDetails || '-'}
+                              </div>
+                              {bill.quantity && bill.quantity > 1 && (
+                                <div className="text-[10px] text-slate-400">नग: {bill.quantity}</div>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              ₹{bill.totalAmount.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              ₹{bill.payingNow.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-amber-700 whitespace-nowrap">
+                              ₹{bill.dueAmount.toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-center whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                {bill.paymentMode || 'Cash'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
-
-              {/* Clean Preview Table */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-96 overflow-y-auto shadow-inner">
-                {detectedType === 'bills' ? (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
-                      <tr>
-                        <th className="p-2.5">#</th>
-                        <th className="p-2.5">बिल नं</th>
-                        <th className="p-2.5">तारीख</th>
-                        <th className="p-2.5">ग्राहक नाव</th>
-                        <th className="p-2.5">गाव</th>
-                        <th className="p-2.5">मोबाईल</th>
-                        <th className="p-2.5">खरेदी वस्तू</th>
-                        <th className="p-2.5 text-right font-black text-slate-900">वस्तू किंमत (Total)</th>
-                        <th className="p-2.5 text-right font-black text-emerald-700">जमा (Advance)</th>
-                        <th className="p-2.5 text-right font-black text-rose-700">उरलेली बाकी (Balance)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                      {detectedRecords.slice(0, 60).map((r, i) => (
-                        <tr key={i} className="hover:bg-slate-50/80">
-                          <td className="p-2.5 text-slate-400 font-mono">{i + 1}</td>
-                          <td className="p-2.5 font-mono font-bold text-blue-700">
-                            #{r['BILL NO'] || r.BillNo || r.InvoiceNo || '-'}
-                          </td>
-                          <td className="p-2.5 text-slate-500 font-mono whitespace-nowrap">
-                            {r.DATE || r.Date || '-'}
-                          </td>
-                          <td className="p-2.5 font-bold text-slate-900">
-                            {r._cleanedName}
-                          </td>
-                          <td className="p-2.5">
-                            <span className={r._wasSpellingFixed ? 'text-emerald-700 font-bold' : ''}>
-                              {r._cleanedVillage || '-'}
-                            </span>
-                          </td>
-                          <td className="p-2.5 font-mono text-slate-600">
-                            {r._cleanedPhone || '-'}
-                          </td>
-                          <td className="p-2.5 text-slate-700 font-medium max-w-[140px] truncate" title={r._productDetails || r.PRODUCT || ''}>
-                            {r._productDetails || r.PRODUCT || '-'}
-                          </td>
-                          <td className="p-2.5 font-mono font-bold text-right text-slate-900">
-                            ₹{(r._totalAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="p-2.5 font-mono font-bold text-right text-emerald-700">
-                            ₹{(r._paidAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="p-2.5 font-mono font-bold text-right text-rose-700">
-                            ₹{(r._dueAmount || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-bold">
-                      <tr>
-                        <th className="p-3">#</th>
-                        <th className="p-3">दुरुस्त केलेले नाव</th>
-                        <th className="p-3">कार्ड नं</th>
-                        <th className="p-3">गाव (Cleaned)</th>
-                        <th className="p-3">मोबाईल नं</th>
-                        <th className="p-3">रक्कम / जमा</th>
-                        <th className="p-3">{detectedType === 'receipts' ? 'क्रेडिट बिल (Bill No)' : 'शीट नं / तारीख'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                      {detectedRecords.slice(0, 50).map((r, i) => (
-                        <tr key={i} className="hover:bg-slate-50/80">
-                          <td className="p-3 text-slate-400 font-mono">{i + 1}</td>
-                          <td className="p-3 font-bold text-slate-900">
-                            {r._cleanedName}
-                            {r._wasVillageExtracted && (
-                              <span className="ml-1.5 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px]">
-                                Extracted
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3 font-mono font-bold text-blue-600">
-                            {r._cardNumber ? `#${r._cardNumber}` : '-'}
-                          </td>
-                          <td className="p-3">
-                            <span className={r._wasSpellingFixed ? 'text-emerald-700 font-bold' : ''}>
-                              {r._cleanedVillage || '-'}
-                            </span>
-                          </td>
-                          <td className="p-3 font-mono text-slate-600">
-                            {r._cleanedPhone || '-'}
-                          </td>
-                          <td className="p-3 font-mono font-bold text-slate-900">
-                            ₹{(r._receiptAmount || r._openingAmt || r._totalAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="p-3 text-slate-500">
-                            {detectedType === 'receipts' ? (
-                              r._invoiceRef ? (
-                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[11px] font-bold">
-                                  #{r._invoiceRef} जमा
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 font-mono text-[11px]">थेट खात्यावर</span>
-                              )
-                            ) : (
-                              r._sheetNo ? `Sheet ${r._sheetNo}` : r.DATE || r.Date || '-'
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
             </div>
           )}
-
         </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* TAB 2: MANUAL CATEGORY WISE IMPORT                        */}
-      {/* ========================================================= */}
-      {activeMainTab === 'manual' && (
-        <div className="space-y-6 animate-in fade-in">
+      ) : (
+        /* Manual Import Category Interface */
+        <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              {
-                type: 'bills' as ManualImportType,
-                label: '1. Old Sales Bills',
-                sub: 'पुराने ग्राहक बिल CSV',
-                icon: Receipt,
-              },
-              {
-                type: 'receipts' as ManualImportType,
-                label: '2. Weekly Receipts',
-                sub: 'किस्त रसीदें व रिफंड CSV',
-                icon: FileSpreadsheet,
-              },
-              {
-                type: 'cards' as ManualImportType,
-                label: '3. Scheme Cards',
-                sub: 'कार्ड धारक डेटा CSV',
-                icon: CreditCard,
-              },
-              {
-                type: 'purchases' as ManualImportType,
-                label: '4. Dealer Purchases',
-                sub: 'डीलर खरीद (Manisha Ent.)',
-                icon: Building2,
-              },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeManualType === tab.type;
+              { type: 'cards' as ImportType, label: '1. Card Members (योजना ग्राहक)', desc: 'Scheme 1, 2, 3 फाइल', icon: CreditCard },
+              { type: 'bills' as ImportType, label: '2. Sales Bills (दुकान बिल/बिक्री)', desc: 'Total, Paid, Due फाइल', icon: FileText },
+              { type: 'receipts' as ImportType, label: '3. Receipts (जमा रसीदें)', desc: 'Amount Received फाइल', icon: Receipt },
+              { type: 'purchases' as ImportType, label: '4. Purchases (सप्लायर खरीदी)', desc: 'Dealer Purchases', icon: Building2 },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeImportType === item.type;
               return (
                 <button
-                  key={tab.type}
+                  key={item.type}
                   onClick={() => {
-                    setActiveManualType(tab.type);
-                    setCsvText('');
+                    setActiveImportType(item.type);
+                    setParsedRows([]);
                   }}
-                  className={`p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
-                    isActive
-                      ? 'border-2 border-blue-600 bg-blue-50/40 shadow-sm'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  className={`p-4 rounded-2xl border text-left cursor-pointer transition ${
+                    isActive ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    {isActive && <span className="w-2 h-2 rounded-full bg-blue-600" />}
+                    <Icon className={`w-6 h-6 ${isActive ? 'text-emerald-400' : 'text-slate-600'}`} />
+                    {isActive && <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>}
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-900 text-xs">{tab.label}</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{tab.sub}</p>
-                  </div>
+                  <div className="font-bold text-sm">{item.label}</div>
+                  <div className={`text-xs ${isActive ? 'text-slate-300' : 'text-slate-400'}`}>{item.desc}</div>
                 </button>
               );
             })}
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          {activeImportType === 'cards' && (
+            <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">
-                  Upload CSV File for {manualTemplates[activeManualType].desc}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select a .csv file from your computer or download the sample template below.
-                </p>
+                <h3 className="font-bold text-indigo-950 text-sm">Target Scheme Selection (यह फाइल किस योजना की है?)</h3>
+                <p className="text-xs text-indigo-800">चुनें कि यह फाइल Scheme 1, 2 या 3 किसकी है:</p>
               </div>
-
-              <button
-                onClick={() => handleDownloadSample(activeManualType)}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
+              <select
+                value={targetSchemeId}
+                onChange={(e) => setTargetSchemeId(e.target.value)}
+                className="px-4 py-2 bg-white border border-indigo-300 rounded-xl font-bold text-sm text-indigo-950"
               >
-                <Download className="w-3.5 h-3.5 text-blue-600" />
-                Download Sample {manualTemplates[activeManualType].filename}
-              </button>
+                <option value="auto">✨ Auto-Detect (कार्ड नंबर से पहचानें)</option>
+                <option value="scheme1">Scheme 1 (योजना 1)</option>
+                <option value="scheme2">Scheme 2 (योजना 2)</option>
+                <option value="scheme3">Scheme 3 (योजना 3)</option>
+              </select>
             </div>
+          )}
 
-            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+          {/* Upload Dropzone */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="relative border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 text-center bg-slate-50 cursor-pointer">
               <input
                 type="file"
-                accept=".csv,.txt"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                      const text = event.target?.result as string;
-                      processAndCleanCSV(text, file.name, activeManualType);
-                      setActiveMainTab('universal');
-                    };
-                    reader.readAsText(file);
-                  }
-                }}
-                className="text-xs text-slate-600"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
               />
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <Upload className="w-8 h-8 text-blue-600" />
+                <p className="text-sm font-bold text-slate-800">CSV फाईल निवडण्यासाठी येथे क्लिक करा</p>
+                <p className="text-xs text-slate-400">Excel किंवा Google Sheets मधील .csv फाईल</p>
+              </div>
             </div>
+
+            {parseError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
+                {parseError}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* TAB 3: SEARCH ALL UPLOADED DATA (Screenshot 2)            */}
-      {/* ========================================================= */}
-      {activeMainTab === 'search' && (
-        <div className="space-y-5 animate-in fade-in">
-          
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-extrabold text-slate-900 text-base">
-                  अपलोड झालेल्या सर्व डेटाची थेट शोध मोहीम
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  कार्ड नंबर, ग्राहक नाव, गाव किंवा मोबाईल नंबर टाकून तात्काळ शोध घ्या.
-                </p>
-              </div>
+      {/* Manual Rows Preview & Confirm Table (if rows parsed) */}
+      {parsedRows.length > 0 && importMode === 'manual' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-lg">डेटा प्रीव्ह्यू ({parsedRows.length} रेकॉर्ड्स मिळाले)</h3>
+              <p className="text-xs text-slate-500">तपासून खालील हिरव्या बटनावर क्लिक करून सेव्ह करा.</p>
+            </div>
+            <button
+              onClick={handleCommitManual}
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md cursor-pointer"
+            >
+              ✓ Confirm & Save {parsedRows.length} Records Now
+            </button>
+          </div>
 
-              {/* Filter Chips */}
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-                {(['all', 'cards', 'bills', 'receipts'] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSearchFilterCategory(cat)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      searchFilterCategory === cat
-                        ? 'bg-white text-blue-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {cat === 'all'
-                      ? 'सर्व'
-                      : cat === 'cards'
-                      ? `Cards (${existingCardMembers.length})`
-                      : cat === 'bills'
-                      ? `Bills (${existingBills.length})`
-                      : `Receipts (${existingReceipts.length})`}
-                  </button>
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="p-2.5">#</th>
+                  {activeImportType === 'cards' && (
+                    <>
+                      <th className="p-2.5">Card No</th>
+                      <th className="p-2.5">Customer Name</th>
+                      <th className="p-2.5">Village</th>
+                      <th className="p-2.5">Opening Amt</th>
+                      <th className="p-2.5">Date</th>
+                    </>
+                  )}
+                  {activeImportType === 'bills' && (
+                    <>
+                      <th className="p-2.5">Bill No</th>
+                      <th className="p-2.5">Customer</th>
+                      <th className="p-2.5">Total Amount</th>
+                      <th className="p-2.5">Paid Amount</th>
+                      <th className="p-2.5">Balance Due</th>
+                    </>
+                  )}
+                  {activeImportType === 'receipts' && (
+                    <>
+                      <th className="p-2.5">Receipt No</th>
+                      <th className="p-2.5">Customer</th>
+                      <th className="p-2.5">Amount</th>
+                      <th className="p-2.5">Against Bill</th>
+                    </>
+                  )}
+                  {activeImportType === 'purchases' && (
+                    <>
+                      <th className="p-2.5">Bill No</th>
+                      <th className="p-2.5">Supplier / Dealer</th>
+                      <th className="p-2.5">Product</th>
+                      <th className="p-2.5 text-right">Total</th>
+                      <th className="p-2.5 text-right">Paid</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {parsedRows.slice(0, 10).map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50">
+                    <td className="p-2.5 text-slate-400">{idx + 1}</td>
+                    {activeImportType === 'cards' && (
+                      <>
+                        <td className="p-2.5 font-bold text-indigo-700">#{getField(row, ['CARD.NO', 'Card No'])}</td>
+                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['NAME', 'Customer Name'])}</td>
+                        <td className="p-2.5 text-slate-600">{getField(row, ['VILLEGE', 'Village'])}</td>
+                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['OPENING AMT', 'Saving Balance']))}</td>
+                        <td className="p-2.5 text-slate-500">{normalizeDate(getField(row, ['DATE', 'Date']))}</td>
+                      </>
+                    )}
+                    {activeImportType === 'bills' && (
+                      <>
+                        <td className="p-2.5 font-bold text-amber-700">{getField(row, ['Bill No', 'InvoiceNo'])}</td>
+                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['Customer Name', 'NAME'])}</td>
+                        <td className="p-2.5 font-bold text-slate-900">₹{parseNum(getField(row, ['Grand Total', 'Total']))}</td>
+                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['Amount Paid', 'Paid']))}</td>
+                        <td className="p-2.5 font-bold text-rose-600">₹{parseNum(getField(row, ['Balance Due', 'Due']))}</td>
+                      </>
+                    )}
+                    {activeImportType === 'receipts' && (
+                      <>
+                        <td className="p-2.5 font-bold text-blue-700">{getField(row, ['Receipt No'])}</td>
+                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['Customer Name'])}</td>
+                        <td className="p-2.5 font-bold text-emerald-700">₹{parseNum(getField(row, ['Amount Received']))}</td>
+                        <td className="p-2.5 font-mono text-amber-700">{getField(row, ['Against Bill No', 'Ref Bill No'])}</td>
+                      </>
+                    )}
+                    {activeImportType === 'purchases' && (
+                      <>
+                        <td className="p-2.5 font-bold text-emerald-700">{getField(row, ['Bill No', 'BILL.NO', 'InvoiceNo'])}</td>
+                        <td className="p-2.5 font-bold text-slate-900">{getField(row, ['Supplier', 'DEALER', 'Dealer', 'Party'])}</td>
+                        <td className="p-2.5 font-semibold text-indigo-900">{getField(row, ['Product', 'Item', 'PRODUCT', 'Description'])}</td>
+                        <td className="p-2.5 text-right font-bold text-slate-900">₹{parseNum(getField(row, ['Total', 'GRAND TOTAL', 'Total Amount']))}</td>
+                        <td className="p-2.5 text-right font-bold text-emerald-700">₹{parseNum(getField(row, ['Paid', 'PAID', 'Deposit']))}</td>
+                      </>
+                    )}
+                  </tr>
                 ))}
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="कार्ड नंबर (उदा. 1001, 3191, 4107), नाव किंवा गाव (उदा. Kelzar, Hingni)..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Results List */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="p-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 flex items-center justify-between">
-              <span>एकूण {searchResults.length} नोंदी सापडल्या</span>
-              <span className="text-[11px] text-slate-400 font-normal">Real-time across all schemes</span>
-            </div>
-
-            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-              {searchResults.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs font-medium">
-                  कोणतीही नोंद सापडली नाही. कृपया वेगळा नंबर किंवा नाव टाकून शोधा.
-                </div>
-              ) : (
-                searchResults.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3.5 hover:bg-slate-50/80 flex items-center justify-between gap-3 text-xs transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-                        item.category === 'card'
-                          ? 'bg-blue-100 text-blue-700'
-                          : item.category === 'bill'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-purple-100 text-purple-700'
-                      }`}>
-                        {item.category === 'card' ? <CreditCard className="w-4 h-4" /> : item.category === 'bill' ? <Receipt className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                      </div>
-
-                      <div>
-                        <span className="font-bold text-slate-900 block text-xs sm:text-sm">
-                          {item.title}
-                        </span>
-                        <div className="flex items-center gap-2 text-slate-400 text-[11px] mt-0.5">
-                          <span>{item.subtitle}</span>
-                          {item.village && (
-                            <>
-                              <span>•</span>
-                              <span className="text-slate-600 font-semibold">{item.village}</span>
-                            </>
-                          )}
-                          {item.phone && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono">{item.phone}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      {item.amount !== undefined && (
-                        <span className="block font-bold text-slate-900 font-mono">
-                          ₹{item.amount.toLocaleString()}
-                        </span>
-                      )}
-                      {item.due !== undefined && item.due > 0 && (
-                        <span className="text-[10px] font-bold text-rose-600 block">
-                          बाकी: ₹{item.due.toLocaleString()}
-                        </span>
-                      )}
-                      {item.extra && (
-                        <span className="text-[10px] text-slate-400 block">{item.extra}</span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* 4. CLEAN DATA RESET MODAL (Start Clean)                   */}
-      {/* ========================================================= */}
-      {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <Trash2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-lg">
-                    डेटा रीसेट व दुरुस्ती टूल (Start Clean)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    डेटा व्यवस्थित करण्यासाठी खालील योग्य पर्याय निवडा:
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowResetModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Current counts indicator */}
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-wrap gap-2 text-xs text-slate-700">
-              <span className="font-semibold text-slate-500">सध्या सिस्टीममध्ये:</span>
-              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
-                {existingCustomers.length} ग्राहक
-              </span>
-              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
-                {existingBills.length} बिले
-              </span>
-              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
-                {existingCardMembers.length} कार्ड मेंबर्स
-              </span>
-              <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-900">
-                {existingReceipts.length} पावत्या
-              </span>
-            </div>
-
-            {/* Options */}
-            <div className="space-y-3 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onResetData) onResetData('zero-bills');
-                  setShowResetModal(false);
-                  setSuccessMessage('सर्व ₹0 असलेले चुकीचे बिल यशस्वीरीत्या दुरुस्त केले गेले आहेत!');
-                }}
-                className="w-full p-4 rounded-2xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/60 text-left transition cursor-pointer space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-amber-900 text-xs sm:text-sm">
-                    १. फक्त ₹0 असलेले चुकीचे बिल दुरुस्त करा (Safe Fix)
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold">
-                    Safe Fix
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  काही जुन्या बिलांमध्ये एकूण रक्कम ₹0 दाखवत असल्यास, जमा रक्कम व बाकी जुळवून अचूक बिल रक्कम तयार केली जाईल. कोणताही डेटा डिलीट होणार नाही.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (onResetData) onResetData('all');
-                  setShowResetModal(false);
-                  setSuccessMessage('सर्व डेटा यशस्वीरित्या रिसेट (साफ़) करण्यात आला आहे! सर्व रेकॉर्ड्स आता 0 आहेत.');
-                }}
-                className="w-full p-4 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/60 text-left transition cursor-pointer space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-rose-900 text-xs sm:text-sm">
-                    २. संपूर्ण डेटा गायब / रिसेट करा (Complete Full Reset)
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 text-[10px] font-bold">
-                    0 Records
-                  </span>
-                </div>
-                <p className="text-[11px] text-rose-800 leading-relaxed">
-                  विद्यमान सर्व {existingCustomers.length} ग्राहक, {existingBills.length} बिले, {existingCardMembers.length} कार्ड मेंबर्स, हप्ते व खरेदी पूर्णपणे डिलीट होऊन सिस्टीम ₹0 सह ताजी व स्वच्छ होईल.
-                </p>
-              </button>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowResetModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-              >
-                रद्द करा
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
-
     </div>
   );
 };

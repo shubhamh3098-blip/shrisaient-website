@@ -440,7 +440,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
-                      value={search}
+                      value={search || ''}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="ग्राहकाचे नाव किंवा मोबाईल नंबर टाईप करा..."
                       className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30"
@@ -536,7 +536,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
                 <div className="pt-1">
                   <input
                     type="text"
-                    value={againstBillNo}
+                    value={againstBillNo || ''}
                     onChange={(e) => setAgainstBillNo(e.target.value)}
                     placeholder="उदा. INV-2026-101 किंवा मॅन्युअल बिल क्र."
                     className="w-full px-3 py-2 rounded-lg border border-blue-300 dark:border-blue-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -558,7 +558,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
                 <input
                   type="text"
                   required
-                  value={receiptNo}
+                  value={receiptNo || ''}
                   onChange={(e) => setReceiptNo(e.target.value)}
                   placeholder="उदा. 101, RCPT-45, 2026/12"
                   className="w-full px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-mono font-bold placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -616,7 +616,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
                   type="number"
                   step="any"
                   required
-                  value={amount}
+                  value={amount || ''}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
                   className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
@@ -662,7 +662,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
                 </label>
                 <input
                   type="date"
-                  value={date}
+                  value={date || ''}
                   onChange={(e) => setDate(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
@@ -676,7 +676,7 @@ export const QuickPavtiModal: React.FC<QuickPavtiModalProps> = ({
               </label>
               <input
                 type="text"
-                value={notes}
+                value={notes || ''}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder={
                   receiptType === 'against-bill' && againstBillNo

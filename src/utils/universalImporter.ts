@@ -3,6 +3,9 @@ import {
   CardSchemeId,
   CardTransaction,
   Customer,
+  Dealer,
+  PurchaseEntry,
+  PurchaseLineItem,
   StockItem,
   TransactionEntry
 } from '../types';
@@ -22,13 +25,15 @@ export interface ImportAuditIssue {
 }
 
 export interface UniversalImportResult {
-  detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'unknown';
+  detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'customers' | 'purchases' | 'unknown';
   bills: TransactionEntry[];
   salesReceipts: TransactionEntry[];
   cardMembers: CardMember[];
   cardTransactions: CardTransaction[];
   customers: Customer[];
   stockItems: StockItem[];
+  purchases: PurchaseEntry[];
+  dealers: Dealer[];
   auditIssues: ImportAuditIssue[];
   summaryText: string;
 }
@@ -69,9 +74,30 @@ const parseCSVLines = (csvText: string): string[][] => {
   return result;
 };
 
+export function parseSerialNumbersList(val: string): string[] {
+  if (!val) return [];
+  const parts = val
+    .split(/[,;\n\r|/]+/)
+    .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+    .filter((s) => {
+      if (!s || s.length < 2) return false;
+      const lower = s.toLowerCase();
+      return !['na', 'none', 'null', 'nil', 'serial', 'serials', 'srno', 'sn', '-', '--', 'n/a', 'no'].includes(lower);
+    });
+  return Array.from(new Set(parts));
+}
+
+export function cleanModelNo(val: string): string {
+  if (!val) return '';
+  const s = val.trim().replace(/^["']|["']$/g, '');
+  if (['na', 'none', 'null', 'nil', '-', '--', 'n/a'].includes(s.toLowerCase())) return '';
+  return s;
+}
+
 export function processUniversalCsv(
   csvContent: string,
-  forceType?: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'auto'
+  forceType?: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'customers' | 'purchases' | 'auto',
+  targetSchemeId?: string
 ): UniversalImportResult {
   const parsed = parseCSVLines(csvContent);
   const auditIssues: ImportAuditIssue[] = [];
@@ -85,9 +111,62 @@ export function processUniversalCsv(
       cardTransactions: [],
       customers: [],
       stockItems: [],
+      purchases: [],
+      dealers: [],
       auditIssues,
       summaryText: 'CSV file contains no data or is empty.',
     };
+  }
+
+  // Scan top 5 lines for file-level scheme hint (e.g. "Scheme 2", "Scheme 3", "योजना २", "योजना ३")
+  let fileSchemeHint = '';
+  for (let r = 0; r < Math.min(5, parsed.length); r++) {
+    const rawLineStr = parsed[r].join(' ').toLowerCase();
+    if (
+      rawLineStr.includes('scheme 3') ||
+      rawLineStr.includes('scheme3') ||
+      rawLineStr.includes('योजना 3') ||
+      rawLineStr.includes('योजना ३') ||
+      rawLineStr.includes('योजना-3') ||
+      rawLineStr.includes('योजना-३') ||
+      rawLineStr.includes('स्कीम ३') ||
+      rawLineStr.includes('स्कीम 3') ||
+      rawLineStr.includes('sch-3') ||
+      rawLineStr.includes('sch3')
+    ) {
+      fileSchemeHint = 'scheme3';
+      break;
+    }
+    if (
+      rawLineStr.includes('scheme 2') ||
+      rawLineStr.includes('scheme2') ||
+      rawLineStr.includes('योजना 2') ||
+      rawLineStr.includes('योजना २') ||
+      rawLineStr.includes('योजना-2') ||
+      rawLineStr.includes('योजना-२') ||
+      rawLineStr.includes('स्कीम २') ||
+      rawLineStr.includes('स्कीम 2') ||
+      rawLineStr.includes('sch-2') ||
+      rawLineStr.includes('sch2')
+    ) {
+      fileSchemeHint = 'scheme2';
+      break;
+    }
+    if (
+      rawLineStr.includes('scheme 1') ||
+      rawLineStr.includes('scheme1') ||
+      rawLineStr.includes('योजना 1') ||
+      rawLineStr.includes('योजना १') ||
+      rawLineStr.includes('योजना-1') ||
+      rawLineStr.includes('योजना-१') ||
+      rawLineStr.includes('स्कीम १') ||
+      rawLineStr.includes('स्कीम 1') ||
+      rawLineStr.includes('sch-1') ||
+      rawLineStr.includes('sch1')
+    ) {
+      fileSchemeHint = 'scheme1';
+      break;
+    }
   }
 
   // 1. Intelligent Header Row Finder (scans rows 0 to 4 in case file has title or empty leading lines)
@@ -122,7 +201,7 @@ export function processUniversalCsv(
   const headerJoined = headerLine.join(',');
 
   // Detect File Type
-  let detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'unknown' = 'unknown';
+  let detectedType: 'bills' | 'receipts' | 'cards_raw' | 'cards_master' | 'customers' | 'purchases' | 'unknown' = 'unknown';
 
   // Receipt indicators (Receipt No, Amount Received, Against Bill No, Ref Bill No, Recived By, etc.)
   const hasReceiptIndicator =
@@ -178,14 +257,42 @@ export function processUniversalCsv(
     headerJoined.includes('sheetno') ||
     headerJoined.includes('savingbalance');
 
+  const hasPurchaseIndicators =
+    (headerJoined.includes('dealer') ||
+      headerJoined.includes('supplier') ||
+      headerJoined.includes('vendor') ||
+      headerJoined.includes('खरेदी') ||
+      headerJoined.includes('सप्लायर') ||
+      headerJoined.includes('डीलर') ||
+      headerJoined.includes('ewaybill') ||
+      headerJoined.includes('purchaseprice') ||
+      headerJoined.includes('purchaserate')) &&
+    !hasCardIndicators;
+
+  const hasCustomerKhataIndicators =
+    (headerJoined.includes('customer') || headerJoined.includes('party') || headerJoined.includes('नाव') || headerJoined.includes('ग्राहक') || headerJoined.includes('grahak')) &&
+    (headerJoined.includes('balance') || headerJoined.includes('due') || headerJoined.includes('baki') || headerJoined.includes('बाकी') || headerJoined.includes('शिल्लक') || headerJoined.includes('udhar') || headerJoined.includes('उधारी') || headerJoined.includes('khata') || headerJoined.includes('खाते') || headerJoined.includes('purchased') || headerJoined.includes('खरेदी')) &&
+    !hasCardIndicators &&
+    !hasLineItemIndicators &&
+    !hasPurchaseIndicators &&
+    !headerLine.includes('billno') &&
+    !headerLine.includes('invoiceno');
+
   // Enforce forceType if specified by user in UI
   if (forceType && forceType !== 'auto') {
     detectedType = forceType;
   } else {
     // Intelligent auto-detection
-    if (
-      (hasReceiptIndicator && !hasGrandTotal && !hasLineItemIndicators) ||
-      (headerJoined.includes('againstbill') || headerJoined.includes('refbill')) ||
+    if (hasPurchaseIndicators) {
+      detectedType = 'purchases';
+    } else if (
+      (hasReceiptIndicator && !hasGrandTotal && !hasLineItemIndicators && !hasCustomerKhataIndicators) ||
+      (headerJoined.includes('againstbill') || headerJoined.includes('refbill'))
+    ) {
+      detectedType = 'receipts';
+    } else if (hasCustomerKhataIndicators) {
+      detectedType = 'customers';
+    } else if (
       (!hasBillIndicators && !hasCardIndicators && headerJoined.includes('amount') && (headerJoined.includes('name') || headerJoined.includes('customer') || headerJoined.includes('नाव')))
     ) {
       detectedType = 'receipts';
@@ -225,14 +332,19 @@ export function processUniversalCsv(
   const cardTransactions: CardTransaction[] = [];
   const customerMap = new Map<string, Customer>();
   const productMap = new Map<string, StockItem>();
+  const purchaseMap = new Map<string, PurchaseEntry>();
+  const dealerMap = new Map<string, Dealer>();
 
   const getColIdx = (candidates: string[]): number => {
     for (const cand of candidates) {
       const cleanCand = cleanHeaderWord(cand);
+      if (!cleanCand) continue;
       const idx = headerLine.indexOf(cleanCand);
-      if (idx !== -1) return idx;
-      // Also match partial substring if candidate is descriptive enough
-      const pIdx = headerLine.findIndex((h) => h === cleanCand || (cleanCand.length >= 4 && (h.includes(cleanCand) || cleanCand.includes(h))));
+      if (idx !== -1 && headerLine[idx].length > 0) return idx;
+      // Also match partial substring if header word is at least 2 chars and candidate is descriptive enough
+      const pIdx = headerLine.findIndex(
+        (h) => h.length >= 2 && (h === cleanCand || (cleanCand.length >= 4 && (h.includes(cleanCand) || (h.length >= 4 && cleanCand.includes(h)))))
+      );
       if (pIdx !== -1) return pIdx;
     }
     return -1;
@@ -624,17 +736,23 @@ export function processUniversalCsv(
       }
       const remarks = (idxRemarks !== -1 && row[idxRemarks] ? row[idxRemarks].trim() : '') || (receivedBy ? `जमा घेणारा: ${receivedBy}` : '') || extraNote;
 
-      // If cardNo is not directly in card column, inspect text for 4-digit card number (1001-6999)
-      if (isNaN(cardNo) || cardNo <= 0) {
-        const textToScan = `${remarks} ${rcptNo} ${rawCust}`;
-        const cardMatch = textToScan.match(/(?:card|scheme|c|no|#)\s*[:#-]?\s*([1-6]\d{3})\b/i);
+      // If cardNo is not directly in card column, only inspect remarks if scheme/card is explicitly mentioned
+      if ((isNaN(cardNo) || cardNo <= 0) && idxCardNo !== -1) {
+        const textToScan = `${remarks} ${rawCust}`;
+        const cardMatch = textToScan.match(/\b(?:card|scheme|कार्ड|योजना)\s*[:#-]?\s*([1-6]\d{3})\b/i);
         if (cardMatch) {
           cardNo = parseInt(cardMatch[1], 10);
         }
       }
 
-      // Check if this is a Card Scheme deposit receipt
-      if ((!isNaN(cardNo) && cardNo > 0) || remarks.toLowerCase().includes('scheme') || rcptNo.includes('SCHEME')) {
+      // Check if this is a Card Scheme deposit receipt (only when card column exists or explicitly marked as scheme)
+      const isCardSchemeDeposit =
+        (idxCardNo !== -1 && !isNaN(cardNo) && cardNo > 0) ||
+        remarks.toLowerCase().includes('scheme') ||
+        remarks.toLowerCase().includes('योजना') ||
+        rcptNo.toUpperCase().includes('SCHEME');
+
+      if (isCardSchemeDeposit) {
         const targetCardNo = isNaN(cardNo) ? 1001 : cardNo;
         const { schemeId } = getSchemeForCard(targetCardNo, remarks);
 
@@ -701,14 +819,15 @@ export function processUniversalCsv(
       }
     }
   } else if (detectedType === 'cards_raw' || detectedType === 'cards_master') {
-    const idxCardNo = getColIdx(['cardno', 'cardnumber', 'कार्डक्र', 'कार्ड']);
+    const idxCardNo = getColIdx(['cardno', 'cardnumber', 'कार्डक्र', 'कार्ड', 'cno', 'c.no']);
     const idxName = getColIdx(['name', 'customername', 'सभासदाचेनाव', 'नाव']);
     const idxVillage = getColIdx(['villege', 'village', 'address', 'city', 'गाव', 'पत्ता']);
     const idxPhone = getColIdx(['mobileno', 'mobile', 'phone', 'मोबाईल']);
     const idxOpening = getColIdx(['openingamt', 'savingbalance', 'balance', 'opening', 'जमारक्कम', 'शिल्लक']);
     const idxDate = getColIdx(['date', 'joiningdate', 'दिनांक', 'तारीख']);
     const idxSheetNo = getColIdx(['sheetno', 'sheet', 'शीटक्र']);
-    const idxAgent = getColIdx(['agentname', 'agent', 'scheme', 'schemename', 'एजंट']);
+    const idxScheme = getColIdx(['scheme', 'schemename', 'schemeno', 'cardscheme', 'योजना', 'योजनानाव', 'योजनाक्र', 'योजनानं', 'कार्डयोजना', 'स्कीम']);
+    const idxAgent = getColIdx(['agentname', 'agent', 'एजंट']);
 
     for (let r = 0; r < dataRows.length; r++) {
       const row = dataRows[r];
@@ -739,6 +858,7 @@ export function processUniversalCsv(
 
       const openingAmt = parseFloat((idxOpening !== -1 && row[idxOpening]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
       const sheetNo = idxSheetNo !== -1 && row[idxSheetNo] ? row[idxSheetNo].trim() : '';
+      const rawScheme = idxScheme !== -1 && row[idxScheme] ? row[idxScheme].trim() : '';
       const agentText = idxAgent !== -1 && row[idxAgent] ? row[idxAgent].trim() : '';
 
       // If card number was empty in sheet, assign a safe unique card number in 4000/3000 series
@@ -752,7 +872,12 @@ export function processUniversalCsv(
         });
       }
 
-      const { schemeId, schemeName } = getSchemeForCard(cardNum, agentText);
+      const schemeHint =
+        targetSchemeId && targetSchemeId !== 'auto'
+          ? targetSchemeId
+          : (rawScheme || agentText || fileSchemeHint);
+
+      const { schemeId, schemeName } = getSchemeForCard(cardNum, schemeHint);
       const cardId = `cm-${schemeId}-${cardNum}`;
 
       cardMembers.push({
@@ -776,6 +901,35 @@ export function processUniversalCsv(
         notes: `Imported card member${sheetNo ? ` • Sheet #${sheetNo}` : ''}`,
       });
 
+      // Synchronize Card Member to Customer Master / Khata
+      if (cleanName && cleanName !== 'Customer') {
+        const custKey = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `cust-${r}`;
+        const existingCust = customerMap.get(custKey);
+        if (existingCust) {
+          if (!existingCust.phone && phone) existingCust.phone = phone;
+          if ((!existingCust.address || existingCust.address === 'Wardha') && village) existingCust.address = `${village}, Wardha`;
+          if (!existingCust.linkedCardNumber) {
+            existingCust.linkedCardNumber = cardNum;
+            existingCust.linkedSchemeId = schemeId;
+          }
+        } else {
+          customerMap.set(custKey, {
+            id: `cust-${custKey}`,
+            name: cleanName,
+            phone: phone || '',
+            address: village ? `${village}, Wardha` : 'Wardha',
+            village: village || undefined,
+            totalPurchases: 0,
+            totalPurchased: 0,
+            totalPaid: openingAmt || 0,
+            balanceDue: 0,
+            linkedCardNumber: cardNum,
+            linkedSchemeId: schemeId,
+            lastVisit: date,
+          });
+        }
+      }
+
       if (openingAmt > 0) {
         cardTransactions.push({
           id: `rcpt-opn-${schemeId}-${cardNum}-${r}`,
@@ -796,19 +950,272 @@ export function processUniversalCsv(
         });
       }
     }
+  } else if (detectedType === 'customers') {
+    const idxName = getColIdx(['customername', 'name', 'party', 'सभासद', 'ग्राहकनाव', 'ग्राहक', 'नाव']);
+    const idxVillage = getColIdx(['village', 'address', 'city', 'गाव', 'पत्ता']);
+    const idxPhone = getColIdx(['phone', 'mobile', 'mobileno', 'contact', 'मोबाईल', 'फोन']);
+    const idxDue = getColIdx(['balancedue', 'due', 'balance', 'baki', 'shillak', 'udhar', 'udhari', 'उधारी', 'बाकी', 'शिल्लक', 'बाकीरक्कम']);
+    const idxTotal = getColIdx(['totalpurchases', 'totalpurchased', 'total', 'grandtotal', 'khata', 'एकूणखरेदी', 'खरेदी']);
+    const idxPaid = getColIdx(['totalpaid', 'paid', 'jama', 'रक्कमजमा', 'जमा']);
+    const idxDate = getColIdx(['date', 'lastvisit', 'दिनांक', 'तारीख']);
+
+    for (let r = 0; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      const rawName = idxName !== -1 && row[idxName] ? row[idxName] : '';
+      if (!rawName) continue;
+
+      const { cleanName, extractedVillage } = cleanCustomerName(rawName);
+      const rawVillage = (idxVillage !== -1 && row[idxVillage]) || extractedVillage || '';
+      const village = cleanVillage(rawVillage);
+      const rawPhone = idxPhone !== -1 && row[idxPhone] ? row[idxPhone] : '';
+      const phone = cleanPhone(rawPhone);
+      const rawDate = idxDate !== -1 && row[idxDate] ? row[idxDate] : '';
+      const date = cleanDate(rawDate);
+
+      const dueAmount = parseFloat((idxDue !== -1 && row[idxDue]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
+      let totalPurchased = parseFloat((idxTotal !== -1 && row[idxTotal]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
+      let totalPaid = parseFloat((idxPaid !== -1 && row[idxPaid]?.replace(/[^0-9.-]/g, '')) || '0') || 0;
+
+      if (totalPurchased === 0 && dueAmount > 0) {
+        totalPurchased = dueAmount + totalPaid;
+      }
+      if (totalPurchased > 0 && totalPaid === 0 && dueAmount > 0 && totalPurchased > dueAmount) {
+        totalPaid = totalPurchased - dueAmount;
+      }
+
+      const finalDue = dueAmount > 0 ? dueAmount : Math.max(0, totalPurchased - totalPaid);
+      const custKey = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `cust-${r}`;
+
+      customerMap.set(custKey, {
+        id: `cust-${custKey}`,
+        name: cleanName,
+        phone: phone || '',
+        address: village ? `${village}, Wardha` : 'Wardha',
+        village: village || undefined,
+        totalPurchases: totalPurchased,
+        totalPurchased: totalPurchased,
+        totalPaid: totalPaid,
+        balanceDue: finalDue,
+        lastVisit: date || new Date().toISOString().split('T')[0],
+      });
+    }
+  } else if (detectedType === 'purchases') {
+    const idxBillNo = getColIdx(['billno', 'invoiceno', 'bill', 'purchasebill', 'बिलक्र', 'बिलनंबर', 'बिल']);
+    const idxDate = getColIdx(['date', 'billdate', 'purchasedate', 'दिनांक', 'तारीख']);
+    const idxSupplier = getColIdx(['dealer', 'dealername', 'supplier', 'suppliername', 'vendor', 'party', 'सप्लायर', 'डीलर', 'नाव']);
+    const idxPhone = getColIdx(['phone', 'mobile', 'supplierphone', 'dealerphone', 'मोबाईल', 'फोन']);
+    const idxAddress = getColIdx(['address', 'city', 'location', 'village', 'पत्ता', 'गाव']);
+    const idxGstin = getColIdx(['gstin', 'gst', 'suppliergstin', 'gstno']);
+    const idxProduct = getColIdx(['item', 'product', 'items', 'description', 'particulars', 'goods', 'productname', 'itemname', 'वस्तू', 'साहित्य']);
+    const idxModel = getColIdx(['model', 'modelno', 'itemcode', 'code']);
+    const idxHsn = getColIdx(['hsn', 'hsncode']);
+    const idxQty = getColIdx(['qty', 'quantity', 'pieces', 'nos', 'count', 'नग']);
+    const idxRate = getColIdx(['rate', 'purchaseprice', 'purchaserate', 'price', 'दर', 'खरेदीकिंमत']);
+    const idxSellingPrice = getColIdx(['sellingprice', 'mrp', 'vikrikimmat', 'विक्रीकिंमत', 'bhav']);
+    const idxTaxable = getColIdx(['taxable', 'taxableamount', 'taxableval', 'subtotal']);
+    const idxTaxRate = getColIdx(['taxrate', 'gst', 'tax', 'cgst', 'sgst', 'igst']);
+    const idxTotal = getColIdx(['grandtotal', 'totalamount', 'total', 'billamount', 'एकूण']);
+    const idxPaid = getColIdx(['paidamount', 'paid', 'cashpaid', 'advance', 'deposit', 'jama', 'जमा']);
+    const idxDue = getColIdx(['balancedue', 'dueamount', 'due', 'balance', 'बाकी']);
+    const idxMode = getColIdx(['paymentmode', 'mode', 'पेमेंटमोड']);
+    const idxTransporter = getColIdx(['transporter', 'transport', 'वाहतूक']);
+    const idxVehicle = getColIdx(['vehicle', 'vehicleno', 'गाडीनंबर']);
+    const idxEway = getColIdx(['eway', 'ewaybill', 'ewaybillno']);
+    const idxSerials = getColIdx(['serialno', 'serialnumbers', 'serials', 'srno', 'सीरियलनंबर']);
+    const idxPo = getColIdx(['pono', 'po', 'orderno']);
+    const idxNotes = getColIdx(['notes', 'remarks', 'टीप']);
+
+    for (let r = 0; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      const rawSupplier = idxSupplier !== -1 && row[idxSupplier] ? row[idxSupplier].trim() : '';
+      const rawBillNo = idxBillNo !== -1 && row[idxBillNo] ? row[idxBillNo].trim() : '';
+      if (!rawSupplier && !rawBillNo) continue;
+
+      const supplierName = rawSupplier || 'MANISHA ENTERPRISES';
+      const billNo = rawBillNo || `PB-${Date.now().toString().slice(-4)}-${r + 1}`;
+      const rawDate = idxDate !== -1 && row[idxDate] ? row[idxDate] : '';
+      const date = cleanDate(rawDate) || new Date().toISOString().split('T')[0];
+
+      const phone = idxPhone !== -1 && row[idxPhone] ? cleanPhone(row[idxPhone]) : '';
+      const address = idxAddress !== -1 && row[idxAddress] ? row[idxAddress].trim() : '';
+      const gstin = idxGstin !== -1 && row[idxGstin] ? row[idxGstin].trim().toUpperCase() : '';
+
+      const productName = idxProduct !== -1 && row[idxProduct] ? row[idxProduct].trim() : 'Electronics Goods';
+      const modelNo = idxModel !== -1 && row[idxModel] ? cleanModelNo(row[idxModel]) : '';
+      const hsn = idxHsn !== -1 && row[idxHsn] ? row[idxHsn].trim() : '84182100';
+
+      const rawQty = idxQty !== -1 && row[idxQty] ? parseFloat(row[idxQty].replace(/[^0-9.-]/g, '')) : 1;
+      const qty = isNaN(rawQty) || rawQty <= 0 ? 1 : rawQty;
+
+      const rawRate = idxRate !== -1 && row[idxRate] ? parseFloat(row[idxRate].replace(/[^0-9.-]/g, '')) : 0;
+      const rate = isNaN(rawRate) ? 0 : rawRate;
+
+      const rawSelling = idxSellingPrice !== -1 && row[idxSellingPrice] ? parseFloat(row[idxSellingPrice].replace(/[^0-9.-]/g, '')) : 0;
+      const sellingPrice = isNaN(rawSelling) ? 0 : rawSelling;
+
+      const rawTaxRate = idxTaxRate !== -1 && row[idxTaxRate] ? parseFloat(row[idxTaxRate].replace(/[^0-9.-]/g, '')) : 18;
+      const taxRate = isNaN(rawTaxRate) || rawTaxRate < 0 ? 18 : rawTaxRate;
+
+      const rawTaxable = idxTaxable !== -1 && row[idxTaxable] ? parseFloat(row[idxTaxable].replace(/[^0-9.-]/g, '')) : 0;
+      const taxableAmount = rawTaxable > 0 ? rawTaxable : qty * rate;
+
+      const halfTax = Math.round(taxableAmount * (taxRate / 200));
+      const lineTotal = taxableAmount + halfTax * 2;
+
+      let totalAmount = idxTotal !== -1 && row[idxTotal] ? parseFloat(row[idxTotal].replace(/[^0-9.-]/g, '')) : 0;
+      if (isNaN(totalAmount) || totalAmount <= 0) {
+        totalAmount = lineTotal;
+      }
+
+      let paidAmount = idxPaid !== -1 && row[idxPaid] ? parseFloat(row[idxPaid].replace(/[^0-9.-]/g, '')) : 0;
+      if (isNaN(paidAmount)) paidAmount = 0;
+
+      const rawMode = idxMode !== -1 && row[idxMode] ? row[idxMode].trim().toLowerCase() : '';
+      const paymentMode: 'Cash' | 'Online' | 'Cheque' = rawMode.includes('cheque') ? 'Cheque' : rawMode.includes('cash') ? 'Cash' : 'Online';
+
+      const serials = idxSerials !== -1 && row[idxSerials] ? parseSerialNumbersList(row[idxSerials]) : [];
+      const transporter = idxTransporter !== -1 && row[idxTransporter] ? row[idxTransporter].trim() : undefined;
+      const vehicleNo = idxVehicle !== -1 && row[idxVehicle] ? row[idxVehicle].trim() : undefined;
+      const ewayBillNo = idxEway !== -1 && row[idxEway] ? row[idxEway].trim() : undefined;
+      const poNo = idxPo !== -1 && row[idxPo] ? row[idxPo].trim() : undefined;
+      const notes = idxNotes !== -1 && row[idxNotes] ? row[idxNotes].trim() : undefined;
+
+      const lineItem: PurchaseLineItem = {
+        id: `p-item-${r + 1}`,
+        description: productName,
+        modelNo: modelNo || undefined,
+        hsn: hsn || undefined,
+        quantity: qty,
+        rate: rate > 0 ? rate : Math.round(totalAmount / qty),
+        discount: 0,
+        taxableAmount,
+        cgstRate: taxRate / 2,
+        cgstAmount: halfTax,
+        sgstRate: taxRate / 2,
+        sgstAmount: halfTax,
+        totalAmount: lineTotal,
+        serialNumbers: serials,
+      };
+
+      // Key by billNo + supplierName so multi-item bills merge into one purchase
+      const purchaseKey = `${supplierName.toLowerCase()}-${billNo.toLowerCase()}`;
+      const existingPurchase = purchaseMap.get(purchaseKey);
+
+      if (existingPurchase) {
+        existingPurchase.lineItems = [...(existingPurchase.lineItems || []), lineItem];
+        existingPurchase.totalAmount += lineTotal;
+        existingPurchase.items = (existingPurchase.lineItems || []).map((it) => `${it.description} (${it.quantity} नग)`).join(', ');
+        existingPurchase.taxableAmount = (existingPurchase.taxableAmount || 0) + taxableAmount;
+        existingPurchase.cgstAmount = (existingPurchase.cgstAmount || 0) + halfTax;
+        existingPurchase.sgstAmount = (existingPurchase.sgstAmount || 0) + halfTax;
+        if (paidAmount > existingPurchase.paidAmount) {
+          existingPurchase.paidAmount = paidAmount;
+        }
+        existingPurchase.status = existingPurchase.paidAmount >= existingPurchase.totalAmount ? 'Paid' : existingPurchase.paidAmount > 0 ? 'Partial' : 'Pending';
+      } else {
+        const purchaseEntry: PurchaseEntry = {
+          id: `pur-imp-${Date.now()}-${r}`,
+          billNo,
+          date,
+          supplierName,
+          supplierPhone: phone || undefined,
+          supplierAddress: address || undefined,
+          supplierGstin: gstin || undefined,
+          poNo,
+          items: `${productName}${modelNo ? ` [${modelNo}]` : ''} (${qty} नग)`,
+          lineItems: [lineItem],
+          taxableAmount,
+          cgstAmount: halfTax,
+          sgstAmount: halfTax,
+          totalAmount,
+          paidAmount,
+          status: paidAmount >= totalAmount ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Pending',
+          paymentMode,
+          transporter,
+          vehicleNo,
+          ewayBillNo,
+          notes,
+        };
+        purchaseMap.set(purchaseKey, purchaseEntry);
+      }
+
+      // Register or update Dealer
+      const dealerKey = supplierName.toLowerCase().trim();
+      let dealer = dealerMap.get(dealerKey);
+      if (!dealer) {
+        dealer = {
+          id: `dlr-${dealerKey.replace(/[^a-z0-9]/g, '-')}`,
+          name: supplierName,
+          phone: phone || '',
+          address: address || undefined,
+          gstin: gstin || undefined,
+          totalPurchases: 0,
+          totalPaid: 0,
+          balanceDue: 0,
+          lastTransactionDate: date,
+        };
+        dealerMap.set(dealerKey, dealer);
+      }
+      dealer.totalPurchases += lineTotal;
+      dealer.totalPaid += paidAmount;
+      dealer.balanceDue = Math.max(0, dealer.totalPurchases - dealer.totalPaid);
+      if (!dealer.phone && phone) dealer.phone = phone;
+      if (!dealer.gstin && gstin) dealer.gstin = gstin;
+      if (!dealer.address && address) dealer.address = address;
+      if (date && (!dealer.lastTransactionDate || date > dealer.lastTransactionDate)) {
+        dealer.lastTransactionDate = date;
+      }
+
+      // Auto-add purchased item to Stock Inventory
+      const prodKey = productName.toLowerCase().trim();
+      let stockItem = productMap.get(prodKey);
+      if (!stockItem) {
+        stockItem = {
+          id: `stk-${Date.now()}-${r}`,
+          name: productName,
+          code: modelNo || `PRD-${(productMap.size + 1).toString().padStart(3, '0')}`,
+          category: 'इलेक्ट्रॉनिक्स & घरगुती उपकरणे',
+          modelNo: modelNo || undefined,
+          hsnCode: hsn || undefined,
+          quantity: 0,
+          unit: 'नग',
+          purchasePrice: rate > 0 ? rate : Math.round(totalAmount / qty),
+          sellingPrice: sellingPrice > 0 ? sellingPrice : Math.round((rate > 0 ? rate : totalAmount / qty) * 1.2),
+          minStockLevel: 2,
+          serialNumbers: [],
+          description: `डीलर ${supplierName} कडून खरेदी (बिल #${billNo})`,
+        };
+        productMap.set(prodKey, stockItem);
+      }
+      stockItem.quantity += qty;
+      if (serials.length > 0) {
+        stockItem.serialNumbers = Array.from(new Set([...(stockItem.serialNumbers || []), ...serials]));
+      }
+      if (rate > 0) stockItem.purchasePrice = rate;
+      if (sellingPrice > 0) stockItem.sellingPrice = sellingPrice;
+      if (modelNo && !stockItem.modelNo) stockItem.modelNo = modelNo;
+    }
   }
 
   const customers = Array.from(customerMap.values());
   const stockItems = Array.from(productMap.values());
+  const purchases = Array.from(purchaseMap.values());
+  const dealers = Array.from(dealerMap.values());
   const totalReceipts = salesReceipts.length + cardTransactions.length;
   let summaryText = '';
 
-  if (detectedType === 'receipts') {
+  if (detectedType === 'purchases') {
+    const totalPurchasedAmt = purchases.reduce((s, p) => s + p.totalAmount, 0);
+    summaryText = `सफलता: PURCHASES (डीलर खरेदी बिले) फाईल ओळखली गेली! एकूण ${purchases.length} खरेदी बिले (रक्कम ₹${totalPurchasedAmt.toLocaleString()}), ${dealers.length} डीलर्स/सप्लायर्स, आणि ${stockItems.length} वस्तू दुकानाच्या इन्व्हेंटरीमध्ये आपोआप जोडल्या गेल्या!`;
+  } else if (detectedType === 'receipts') {
     summaryText = `सफलता: RECEIPTS (पावत्या) फाईल ओळखली गेली! एकूण ${totalReceipts} जमा पावत्या (${cardTransactions.length > 0 ? `${cardTransactions.length} कार्ड योजना पावत्या + ` : ''}${salesReceipts.length} ग्राहक उधारी जमा पावत्या), ० विक्री बिले, आणि ${customers.length} ग्राहक खाती सुरक्षित अपडेट झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
   } else if (detectedType === 'bills') {
     summaryText = `सफलता: BILLS (विक्री बिले) फाईल ओळखली गेली! ${bills.length} विक्री बिले, ${stockItems.length > 0 ? `${stockItems.length} प्रॉडक्ट्स/वस्तू (Products), ` : ''}${totalReceipts > 0 ? `${totalReceipts} जमा पावत्या, ` : ''}आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+  } else if (detectedType === 'customers') {
+    const totalDue = customers.reduce((s, c) => s + (c.balanceDue || 0), 0);
+    summaryText = `सफलता: CUSTOMERS (ग्राहक खातेवही / खतावणी) फाईल ओळखली गेली! एकूण ${customers.length} ग्राहकांची खाती आणि ₹${totalDue.toLocaleString()} एकूण बाकी उधारी सिस्टीममध्ये लोड झाली!`;
   } else {
-    summaryText = `सफलता: ${detectedType.toUpperCase()} ओळखले गेले! ${bills.length} बिले, ${stockItems.length > 0 ? `${stockItems.length} वस्तू, ` : ''}${cardMembers.length} कार्ड्स, ${totalReceipts} पावत्या/डिपॉझिट, आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
+    summaryText = `सफलता: ${detectedType.toUpperCase()} ओळखले गेले! ${bills.length} बिले, ${stockItems.length > 0 ? `${stockItems.length} वस्तू, ` : ''}${cardMembers.length} कार्ड्स (योजना 1, 2, 3 अचूक मॅप), ${totalReceipts} पावत्या/डिपॉझिट, आणि ${customers.length} ग्राहक खाती तयार झाली! (${auditIssues.length} दुरुस्त्या केल्या).`;
   }
 
   return {
@@ -819,6 +1226,8 @@ export function processUniversalCsv(
     cardTransactions,
     customers,
     stockItems,
+    purchases,
+    dealers,
     auditIssues,
     summaryText,
   };

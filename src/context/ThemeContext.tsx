@@ -1,52 +1,63 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'day' | 'night';
 
 interface ThemeContextType {
   theme: ThemeMode;
   toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
-  isDark: boolean;
+  setTheme: (mode: ThemeMode) => void;
+  isNight: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const THEME_STORAGE_KEY = 'shri_sai_theme';
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (typeof window === 'undefined') return 'light';
-    const saved = localStorage.getItem('shri_sai_theme') as ThemeMode;
-    if (saved === 'dark' || saved === 'light') return saved;
-    // Default to clean light theme so backgrounds are not black beforehand
-    return 'light';
+    if (typeof window === 'undefined') return 'day';
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
+      if (saved === 'day' || saved === 'night') return saved;
+      // Default to day mode matching the style guide
+      return 'day';
+    } catch {
+      return 'day';
+    }
   });
 
-  useEffect(() => {
+  const applyTheme = (mode: ThemeMode) => {
     const root = document.documentElement;
-    const body = document.body;
-    if (theme === 'dark') {
+    if (mode === 'night') {
       root.classList.add('dark');
-      body.classList.add('dark');
-      root.style.colorScheme = 'dark';
-      root.setAttribute('data-theme', 'dark');
+      root.setAttribute('data-theme', 'night');
+      document.body.classList.add('dark');
+      document.body.setAttribute('data-theme', 'night');
     } else {
       root.classList.remove('dark');
-      body.classList.remove('dark');
-      root.style.colorScheme = 'light';
-      root.setAttribute('data-theme', 'light');
+      root.setAttribute('data-theme', 'day');
+      document.body.classList.remove('dark');
+      document.body.setAttribute('data-theme', 'day');
     }
-    localStorage.setItem('shri_sai_theme', theme);
+  };
+
+  useEffect(() => {
+    applyTheme(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {}
   }, [theme]);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setThemeState((prev) => (prev === 'day' ? 'night' : 'day'));
   };
 
-  const setTheme = (newTheme: ThemeMode) => {
-    setThemeState(newTheme);
+  const setTheme = (mode: ThemeMode) => {
+    setThemeState(mode);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, isDark: theme === 'dark' }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, isNight: theme === 'night' }}>
       {children}
     </ThemeContext.Provider>
   );

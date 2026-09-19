@@ -67,7 +67,6 @@ function aistudioMediaPlugin(): Plugin {
 
 export default defineConfig(() => {
   return {
-    base: './',
     plugins: [
       react(),
       tailwindcss(),
@@ -105,41 +104,11 @@ export default defineConfig(() => {
               type: 'image/png',
               purpose: 'maskable'
             }
-          ],
-          shortcuts: [
-            {
-              name: 'कार्ड हफ्ता कलेक्शन',
-              short_name: 'Card Collection',
-              description: 'साप्ताहिक कार्ड हफ्ता जमा करा (Weekly Payment)',
-              url: '/?tab=card-scheme&action=collection',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            },
-            {
-              name: 'नवीन विक्री बिल',
-              short_name: 'New Sale',
-              description: 'मार्केटमध्ये नवीन विक्री बिल तयार करा',
-              url: '/?tab=add-entry&action=sales',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            },
-            {
-              name: 'उधार पावती जमा',
-              short_name: 'Receipt (जमा)',
-              description: 'ग्राहकाची जुनी बाकी पावती जमा करा',
-              url: '/?tab=customers&action=receipt',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            },
-            {
-              name: 'ग्राहक खातेवही',
-              short_name: 'Customer Ledger',
-              description: 'सर्व खाते, बाकी आणि स्टेटमेंट तपासा',
-              url: '/?tab=customers&action=ledger',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            }
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -158,8 +127,7 @@ export default defineConfig(() => {
           ]
         },
         devOptions: {
-          enabled: true,
-          type: 'module'
+          enabled: false,
         }
       })
     ],

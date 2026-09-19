@@ -25,18 +25,20 @@ export const AgentAdvanceModal: React.FC<AgentAdvanceModalProps> = ({
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online'>('Cash');
   const [notes, setNotes] = useState<string>('');
   const [submitted, setSubmitted] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string>('');
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     const numAmount = Number(amount);
     if (!selectedAgent) {
-      alert('कृपया एजंट निवडा (Please select an agent)');
+      setFormError('कृपया एजंट निवडा (Please select an agent)');
       return;
     }
     if (!numAmount || numAmount <= 0) {
-      alert('कृपया वैध रक्कम टाका (Please enter valid amount)');
+      setFormError('कृपया वैध रक्कम टाका (Please enter valid amount)');
       return;
     }
 
@@ -82,6 +84,12 @@ export const AgentAdvanceModal: React.FC<AgentAdvanceModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {formError && (
+            <div className="p-3 bg-rose-950/60 border border-rose-700 text-rose-200 rounded-xl text-xs font-semibold">
+              ⚠️ {formError}
+            </div>
+          )}
+
           {/* Agent Selection */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">

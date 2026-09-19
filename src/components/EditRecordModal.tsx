@@ -13,6 +13,8 @@ import {
   Building2,
   Tag,
   CheckCircle2,
+  Wrench,
+  ExternalLink,
 } from 'lucide-react';
 import { CardMember, CardTransaction, Customer, Dealer, PurchaseEntry, TransactionEntry } from '../types';
 
@@ -37,6 +39,7 @@ interface EditRecordModalProps {
   record: EditableRecordData | null;
   onSave: (category: 'bill' | 'receipt' | 'card' | 'customer' | 'purchase' | 'dealer', id: string, updatedData: any) => void;
   onDelete?: (category: 'bill' | 'receipt' | 'card' | 'customer' | 'purchase' | 'dealer', id: string) => void;
+  onOpenFullEditor?: (entry: any) => void;
 }
 
 export const EditRecordModal: React.FC<EditRecordModalProps> = ({
@@ -45,6 +48,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
   record,
   onSave,
   onDelete,
+  onOpenFullEditor,
 }) => {
   if (!isOpen || !record) return null;
 
@@ -69,6 +73,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
   const [isQuotation, setIsQuotation] = useState(false);
   const [quotationValidity, setQuotationValidity] = useState('');
   const [againstBillNo, setAgainstBillNo] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [supplierName, setSupplierName] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -264,15 +269,6 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
     }, 600);
   };
 
-  const handleDelete = () => {
-    if (!record || !onDelete) return;
-    const confirmText = `तुम्हाला ही नोंद (${record.title}) कायमची सिस्टीममधून हटवायची आहे का?`;
-    if (window.confirm(confirmText)) {
-      onDelete(record.category, record.rawItem?.id || record.id);
-      onClose();
-    }
-  };
-
   const getCategoryTitle = () => {
     switch (record.category) {
       case 'card':
@@ -353,7 +349,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={sheetNo}
+                    value={sheetNo || ''}
                     onChange={(e) => setSheetNo(e.target.value)}
                     placeholder="उदा. 5104 किंवा 2793"
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -370,7 +366,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={customerName}
+                    value={customerName || ''}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   />
@@ -387,7 +383,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="tel"
-                      value={phone}
+                      value={phone || ''}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="उदा. 9822000000"
                       className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -404,7 +400,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      value={village}
+                      value={village || ''}
                       onChange={(e) => setVillage(e.target.value)}
                       placeholder="उदा. HINGNI, KELZAR"
                       className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -420,7 +416,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={agentName}
+                    value={agentName || ''}
                     onChange={(e) => setAgentName(e.target.value)}
                     placeholder="उदा. Rahul Sharma"
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -435,7 +431,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="date"
-                      value={date}
+                      value={date || ''}
                       onChange={(e) => setDate(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     />
@@ -449,7 +445,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </label>
                 <textarea
                   rows={2}
-                  value={notes}
+                  value={notes || ''}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="अतिरिक्त माहिती किंवा संदर्भ..."
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
@@ -504,7 +500,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={quotationValidity}
+                    value={quotationValidity || ''}
                     onChange={(e) => setQuotationValidity(e.target.value)}
                     placeholder="उदा. 15 दिवस वैध (15 Days)"
                     className="w-full px-3 py-2 border border-amber-300 dark:border-amber-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium"
@@ -520,7 +516,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={referenceNo}
+                    value={referenceNo || ''}
                     onChange={(e) => setReferenceNo(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold font-mono bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -534,7 +530,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="date"
-                      value={date}
+                      value={date || ''}
                       onChange={(e) => setDate(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     />
@@ -550,7 +546,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={customerName}
+                    value={customerName || ''}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -562,7 +558,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="tel"
-                    value={phone}
+                    value={phone || ''}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -577,7 +573,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    value={village}
+                    value={village || ''}
                     onChange={(e) => setVillage(e.target.value)}
                     placeholder="उदा. HINGNI, KELZAR, WARDHA"
                     className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -591,7 +587,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={itemDetails}
+                  value={itemDetails || ''}
                   onChange={(e) => setItemDetails(e.target.value)}
                   placeholder="उदा. Cooler, LED TV 32, Mixer"
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -606,7 +602,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={modelNo}
+                    value={modelNo || ''}
                     onChange={(e) => setModelNo(e.target.value)}
                     placeholder="उदा. LG-260L-INV"
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -618,7 +614,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={serialNo}
+                    value={serialNo || ''}
                     onChange={(e) => setSerialNo(e.target.value)}
                     placeholder="उदा. SN-8942109"
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -634,7 +630,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="number"
                     required
-                    value={amount}
+                    value={amount ?? 0}
                     onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white font-mono bg-white dark:bg-slate-800"
                   />
@@ -646,7 +642,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={secondaryAmount}
+                    value={secondaryAmount ?? 0}
                     onChange={(e) => setSecondaryAmount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 font-mono bg-white dark:bg-slate-800"
                   />
@@ -665,6 +661,24 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <option value="Online">Online / UPI</option>
                   </select>
                 </div>
+
+                {/* Due amount exceeds total error with fix */}
+                {secondaryAmount > amount && (
+                  <div className="col-span-full p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-xl flex items-center justify-between gap-2 text-xs text-rose-800 dark:text-rose-200 animate-fade-in">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>बाकी रक्कम (₹{secondaryAmount}) एकूण बिलापेक्षा (₹{amount}) जास्त असू शकत नाही!</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSecondaryAmount(amount)}
+                      className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition shrink-0"
+                    >
+                      <Wrench className="w-2.5 h-2.5" />
+                      रक्कम जुळवा (Due = {amount})
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -680,7 +694,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={referenceNo}
+                    value={referenceNo || ''}
                     onChange={(e) => setReferenceNo(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold font-mono bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -694,7 +708,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="date"
-                      value={date}
+                      value={date || ''}
                       onChange={(e) => setDate(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     />
@@ -710,7 +724,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={customerName}
+                    value={customerName || ''}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -722,7 +736,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="tel"
-                    value={phone}
+                    value={phone || ''}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -737,7 +751,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    value={village}
+                    value={village || ''}
                     onChange={(e) => setVillage(e.target.value)}
                     placeholder="उदा. HINGNI, KELZAR"
                     className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -753,7 +767,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <input
                     type="number"
                     required
-                    value={amount}
+                    value={amount ?? 0}
                     onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono bg-white dark:bg-slate-800"
                   />
@@ -764,7 +778,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     पेमेंट पद्धत (Mode)
                   </label>
                   <select
-                    value={paymentMode}
+                    value={paymentMode || 'Cash'}
                     onChange={(e) => setPaymentMode(e.target.value as any)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   >
@@ -780,7 +794,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={againstBillNo}
+                  value={againstBillNo || ''}
                   onChange={(e) => setAgainstBillNo(e.target.value)}
                   placeholder="उदा. 1042 किंवा SSE/2024/05"
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -796,7 +810,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={notes || itemDetails}
+                  value={notes || itemDetails || ''}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="उदा. हप्ता #4 जमा, उधारी क्लिअर"
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -815,7 +829,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 <input
                   type="text"
                   required
-                  value={customerName}
+                  value={customerName || ''}
                   onChange={(e) => setCustomerName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
@@ -828,7 +842,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="tel"
-                    value={phone}
+                    value={phone || ''}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -840,7 +854,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={village}
+                    value={village || ''}
                     onChange={(e) => setVillage(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                   />
@@ -853,7 +867,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={amount}
+                  value={amount ?? 0}
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-rose-600 dark:text-rose-400 font-mono bg-white dark:bg-slate-800"
                 />
@@ -862,17 +876,55 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-            {onDelete ? (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-800"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>नोंद हटवा (Delete)</span>
-              </button>
-            ) : <div />}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {onDelete && (
+                confirmDelete ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDelete(record.category, record.rawItem?.id || record.id);
+                        onClose();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>नक्की हटवा</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="text-xs text-slate-500 hover:text-slate-700 underline px-1"
+                    >
+                      रद्द
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-800"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>नोंद हटवा</span>
+                  </button>
+                )
+              )}
+              {record.category === 'bill' && onOpenFullEditor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenFullEditor(record.rawItem);
+                    onClose();
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-amber-300 dark:border-amber-800"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
+                  <span>पूर्ण बिल एडिटरमध्ये उघडा (Full Editor)</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-2">
               <button

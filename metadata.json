@@ -1,7 +1,9 @@
 {
   "name": "Shri Sai Enterprises - Cash & Business Manager",
-  "description": "Shri Sai Enterprises, Wardha - Premium electronics, contemporary furniture showroom, and 30-month savings scheme management system.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Shri Sai Enterprises, Wardha - Electronics & Furniture showroom, home appliances, 30-month savings scheme, and business billing ERP system for shrisaient.in",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
 

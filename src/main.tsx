@@ -5,8 +5,8 @@ import './index.css';
 import { ThemeProvider } from './context/ThemeContext';
 import { registerSW } from 'virtual:pwa-register';
 
-// Auto-register and update PWA service worker for offline support
-if ('serviceWorker' in navigator) {
+// Auto-register and update PWA service worker in production
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   registerSW({
     immediate: true,
     onNeedRefresh() {

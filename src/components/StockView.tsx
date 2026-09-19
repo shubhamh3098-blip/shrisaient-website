@@ -6,9 +6,11 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Edit2,
-  Trash2
+  Trash2,
+  Download
 } from 'lucide-react';
 import { StockItem } from '../types';
+import { exportStockToCsv } from '../utils/csvExporter';
 
 interface StockViewProps {
   stock: StockItem[];
@@ -79,7 +81,7 @@ export const StockView: React.FC<StockViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -90,13 +92,23 @@ export const StockView: React.FC<StockViewProps> = ({
             Real-time stock quantities, pricing, and auto-deduction on sales.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          + Add New Stock Item
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportStockToCsv(stock)}
+            className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Download inventory list in CSV / Excel format"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            + Add New Stock Item
+          </button>
+        </div>
       </div>
 
       {/* KPI Stats */}
@@ -125,7 +137,7 @@ export const StockView: React.FC<StockViewProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            value={search}
+            value={search || ''}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by product name or item code..."
             className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-800"
@@ -163,10 +175,10 @@ export const StockView: React.FC<StockViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((item) => {
+              {filtered.map((item, idx) => {
                 const isLow = item.quantity <= item.minStockLevel;
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                  <tr key={`${item.id}-${idx}`} className="hover:bg-slate-50/80 transition">
                     <td className="py-3.5 px-4">
                       <p className="font-semibold text-slate-900">{item.name}</p>
                       <span className="text-[11px] font-mono text-slate-400">
@@ -252,7 +264,7 @@ export const StockView: React.FC<StockViewProps> = ({
                 <input
                   type="text"
                   required
-                  value={name}
+                  value={name || ''}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Copper Wire 2.5mm or Switch Board 8-Modular"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
@@ -266,7 +278,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={code}
+                    value={code || ''}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="e.g. STK-CW25"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
@@ -278,7 +290,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={category}
+                    value={category || ''}
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="Electricals, Hardware, Pipes"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
@@ -294,7 +306,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   <input
                     type="number"
                     required
-                    value={sellingPrice}
+                    value={sellingPrice ?? 0}
                     onChange={(e) => setSellingPrice(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold"
                   />
@@ -305,7 +317,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={purchasePrice}
+                    value={purchasePrice ?? 0}
                     onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -316,7 +328,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={unit}
+                    value={unit || ''}
                     onChange={(e) => setUnit(e.target.value)}
                     placeholder="Piece, Roll, Box"
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
@@ -332,7 +344,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   <input
                     type="number"
                     min="0"
-                    value={quantity}
+                    value={quantity ?? 0}
                     onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -344,7 +356,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   <input
                     type="number"
                     min="1"
-                    value={minStockLevel}
+                    value={minStockLevel ?? 5}
                     onChange={(e) => setMinStockLevel(parseInt(e.target.value) || 5)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />

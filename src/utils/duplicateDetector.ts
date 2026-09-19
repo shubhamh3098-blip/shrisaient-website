@@ -1,13 +1,7 @@
 import { Customer } from '../types';
+import { DuplicatePair } from '../components/DuplicateCustomerMergeModal';
 
-// Standalone interface to prevent circular dependency
-export interface DuplicatePair {
-  id: string;
-  custA: Customer;
-  custB: Customer;
-  reason: string;
-  matchScore: number;
-}
+export type { DuplicatePair };
 
 function normalizeText(text?: string): string {
   if (!text) return '';
@@ -21,42 +15,45 @@ function normalizeText(text?: string): string {
 function normalizePhone(phone?: string): string {
   if (!phone) return '';
   const digits = phone.replace(/\D/g, '');
-  if (digits.length >= 10) return digits.slice(-10);
+  if (digits.length > 10) return digits.slice(-10);
   return digits;
 }
 
-// Fast Levenshtein distance
+// Memory-efficient 1D Levenshtein with length difference guard
 function fastLevenshtein(s1: string, s2: string): number {
   if (s1 === s2) return 0;
-  if (!s1.length) return s2.length;
-  if (!s2.length) return s1.length;
+  const len1 = s1.length;
+  const len2 = s2.length;
+  if (Math.abs(len1 - len2) > 4) return 99;
 
-  let prev = Array.from({ length: s2.length + 1 }, (_, i) => i);
-  let curr = new Array(s2.length + 1);
+  let prev = Array.from({ length: len2 + 1 }, (_, i) => i);
+  let curr = new Array(len2 + 1);
 
-  for (let i = 0; i < s1.length; i++) {
-    curr[0] = i + 1;
-    for (let j = 0; j < s2.length; j++) {
-      const cost = s1[i] === s2[j] ? 0 : 1;
-      curr[j + 1] = Math.min(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost);
+  for (let i = 1; i <= len1; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
     }
     const temp = prev;
     prev = curr;
     curr = temp;
   }
-  return prev[s2.length];
+  return prev[len2];
 }
 
-function stringSimilarity(s1: string, s2: string): number {
+function fastSimilarity(s1: string, s2: string): number {
   if (!s1 || !s2) return 0;
   if (s1 === s2) return 1;
   const maxLen = Math.max(s1.length, s2.length);
   if (maxLen === 0) return 1;
-  return 1 - fastLevenshtein(s1, s2) / maxLen;
+  const dist = fastLevenshtein(s1, s2);
+  return Math.max(0, 1 - dist / maxLen);
 }
 
+// Standardize common Marathi names variations
 function simplifyMarathiName(name: string): string {
-  let norm = normalizeText(name);
+  const norm = normalizeText(name);
   return norm
     .replace(/\brao\b/g, 'rav')
     .replace(/\brav\b/g, 'rao')
@@ -65,28 +62,40 @@ function simplifyMarathiName(name: string): string {
     .replace(/\bcontractor\b/g, '')
     .replace(/\belectricals\b/g, '')
     .replace(/\bshri\b/g, '')
+    .replace(/\b(satoda|wardha|arvi|hinganghat)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+/**
+ * High-performance, non-blocking duplicate customer detection.
+ * Uses O(N) Hash indexing by Phone & Normalized Name first,
+ * with bounded bucket-based similarity checking to avoid UI freezing.
+ */
 export function detectDuplicateCustomers(
-  customers: any[],
+  customers: Customer[],
   dismissedPairIds: Set<string> = new Set()
 ): DuplicatePair[] {
-  if (!customers || customers.length === 0) return [];
+  if (!Array.isArray(customers) || customers.length < 2) return [];
 
   const results: DuplicatePair[] = [];
-  const addedPairKeys = new Set<string>();
+  const visitedPairs = new Set<string>();
+  const MAX_PAIRS = 30;
 
-  const addMatch = (cA: any, cB: any, score: number, reason: string) => {
-    if (cA.id === cB.id) return;
-    const pairKey = [String(cA.id), String(cB.id)].sort().join(':::');
-    if (addedPairKeys.has(pairKey)) return;
+  const addPair = (
+    cA: Customer,
+    cB: Customer,
+    reason: string,
+    score: number
+  ) => {
+    if (!cA || !cB || cA.id === cB.id) return;
+    const pairKey = [cA.id, cB.id].sort().join(':::');
+    if (visitedPairs.has(pairKey)) return;
+    visitedPairs.add(pairKey);
 
     const pairId = `pair-${pairKey}`;
     if (dismissedPairIds.has(pairId)) return;
 
-    addedPairKeys.add(pairKey);
     results.push({
       id: pairId,
       custA: cA,
@@ -96,72 +105,118 @@ export function detectDuplicateCustomers(
     });
   };
 
-  // 1. Phone Number Hash Map
-  const phoneMap = new Map<string, any[]>();
+  // Phase 1: Fast O(N) Hash Grouping by 10-digit Phone Number
+  const phoneBuckets = new Map<string, Customer[]>();
+  // Phase 2: Fast O(N) Hash Grouping by Normalized Name
+  const nameBuckets = new Map<string, Customer[]>();
+  // Phase 3: Prefix grouping for fuzzy matching (first 3 letters)
+  const prefixBuckets = new Map<string, Customer[]>();
 
-  for (const c of customers) {
+  for (let i = 0; i < customers.length; i++) {
+    const c = customers[i];
+    if (!c) continue;
+
     const p = normalizePhone(c.phone);
-    if (p.length === 10) {
-      if (!phoneMap.has(p)) phoneMap.set(p, []);
-      phoneMap.get(p)!.push(c);
+    if (p && p.length === 10) {
+      const bucket = phoneBuckets.get(p) || [];
+      bucket.push(c);
+      phoneBuckets.set(p, bucket);
+    }
+
+    const normName = normalizeText(c.name);
+    if (normName && normName.length > 2) {
+      const bucket = nameBuckets.get(normName) || [];
+      bucket.push(c);
+      nameBuckets.set(normName, bucket);
+
+      const prefix = normName.slice(0, 3);
+      const pBucket = prefixBuckets.get(prefix) || [];
+      if (pBucket.length < 15) {
+        pBucket.push(c);
+        prefixBuckets.set(prefix, pBucket);
+      }
     }
   }
 
-  phoneMap.forEach((matchedList, phone) => {
-    if (matchedList.length > 1) {
-      for (let i = 0; i < matchedList.length; i++) {
-        for (let j = i + 1; j < matchedList.length; j++) {
-          addMatch(
-            matchedList[i],
-            matchedList[j],
-            0.98,
-            `समान मोबाईल नंबर (${phone}) दोन्ही खात्यांमध्ये नोंदवला आहे.`
+  // Check Exact Phone matches (O(N) - instant)
+  for (const [phone, list] of phoneBuckets.entries()) {
+    if (list.length > 1) {
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          addPair(
+            list[i],
+            list[j],
+            `समान मोबाईल नंबर (${phone}) दोन्ही खात्यांमध्ये नोंदवला आहे.`,
+            0.95
           );
+          if (results.length >= MAX_PAIRS) break;
         }
+        if (results.length >= MAX_PAIRS) break;
       }
     }
-  });
+    if (results.length >= MAX_PAIRS) break;
+  }
 
-  // 2. Village / Address Bucketing
-  const villageMap = new Map<string, any[]>();
-
-  for (const c of customers) {
-    const v = normalizeText(c.village || c.address);
-    if (v.length >= 3) {
-      if (!villageMap.has(v)) villageMap.set(v, []);
-      villageMap.get(v)!.push(c);
+  // Check Exact Name matches (O(N) - instant)
+  if (results.length < MAX_PAIRS) {
+    for (const [, list] of nameBuckets.entries()) {
+      if (list.length > 1) {
+        for (let i = 0; i < list.length; i++) {
+          for (let j = i + 1; j < list.length; j++) {
+            addPair(
+              list[i],
+              list[j],
+              `एकच नाव दोन्ही खात्यांमध्ये नोंदवले आहे: "${list[i].name}"`,
+              1.0
+            );
+            if (results.length >= MAX_PAIRS) break;
+          }
+          if (results.length >= MAX_PAIRS) break;
+        }
+      }
+      if (results.length >= MAX_PAIRS) break;
     }
   }
 
-  villageMap.forEach((group, village) => {
-    if (group.length > 1 && group.length <= 150) {
-      for (let i = 0; i < group.length; i++) {
-        for (let j = i + 1; j < group.length; j++) {
-          const cA = group[i];
-          const cB = group[j];
+  // Check bounded prefix buckets for Marathi variations (e.g. Sheshrao vs Sheshrav)
+  // Strict budget of comparisons to guarantee 0ms UI freeze
+  let comparisonBudget = 300;
+  if (results.length < MAX_PAIRS) {
+    for (const [, list] of prefixBuckets.entries()) {
+      if (list.length > 1 && list.length <= 10) {
+        for (let i = 0; i < list.length; i++) {
+          for (let j = i + 1; j < list.length; j++) {
+            comparisonBudget--;
+            if (comparisonBudget <= 0) break;
 
-          const nameA = normalizeText(cA.name);
-          const nameB = normalizeText(cB.name);
-          if (!nameA || !nameB) continue;
+            const cA = list[i];
+            const cB = list[j];
+            const nameA = normalizeText(cA.name);
+            const nameB = normalizeText(cB.name);
+            const simpleA = simplifyMarathiName(cA.name);
+            const simpleB = simplifyMarathiName(cB.name);
 
-          if (nameA[0] !== nameB[0]) continue;
-
-          const simpleA = simplifyMarathiName(cA.name);
-          const simpleB = simplifyMarathiName(cB.name);
-
-          const sim = stringSimilarity(simpleA, simpleB);
-          if (sim >= 0.82) {
-            addMatch(
-              cA,
-              cB,
-              0.85,
-              `एकाच गावातील (${village}) समान नाव: "${cA.name}" आणि "${cB.name}"`
-            );
+            if (
+              fastSimilarity(nameA, nameB) >= 0.8 ||
+              fastSimilarity(simpleA, simpleB) >= 0.82
+            ) {
+              const place = cA.village || cB.village || 'वर्धा / सातोडा';
+              addPair(
+                cA,
+                cB,
+                `एकाच व्यक्तीचे नाव: "${cA.name}" व "${cB.name}" (${place})`,
+                0.85
+              );
+              if (results.length >= MAX_PAIRS) break;
+            }
           }
+          if (comparisonBudget <= 0 || results.length >= MAX_PAIRS) break;
         }
       }
+      if (comparisonBudget <= 0 || results.length >= MAX_PAIRS) break;
     }
-  });
+  }
 
+  // Sort higher score first
   return results.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 }
