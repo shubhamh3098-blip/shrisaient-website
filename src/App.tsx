@@ -71,7 +71,7 @@ import { usePWAInstall } from './utils/usePWAInstall';
 import { DayNightToggle } from './components/DayNightToggle';
 import { QuickActionBar } from './components/QuickActionBar';
 import { QuickPavtiModal } from './components/QuickPavtiModal';
-import { FinanceCalculatorModal } from './components/FinanceCalculatorModal';
+import { FinanceCalculatorModal, FinanceDetailsPayload } from './components/FinanceCalculatorModal';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(() => loadDatabase());
@@ -80,11 +80,18 @@ export default function App() {
   const [selectedInvoice, setSelectedInvoice] = useState<TransactionEntry | null>(null);
   const [cardSchemeInitialAction, setCardSchemeInitialAction] = useState<'payment' | 'add-card' | 'refund' | null>(null);
   const [editingEntry, setEditingEntry] = useState<TransactionEntry | null>(null);
+  const [financePrefill, setFinancePrefill] = useState<FinanceDetailsPayload | null>(null);
   const [showQuickPavtiModal, setShowQuickPavtiModal] = useState<boolean>(false);
   const [quickPavtiCustomer, setQuickPavtiCustomer] = useState<Customer | null>(null);
   const [quickPavtiBillNo, setQuickPavtiBillNo] = useState<string | undefined>(undefined);
   const [quickPavtiAmount, setQuickPavtiAmount] = useState<number | undefined>(undefined);
   const [showFinanceModal, setShowFinanceModal] = useState<boolean>(false);
+
+  const handleApplyFinanceToBill = (details: FinanceDetailsPayload) => {
+    setFinancePrefill(details);
+    setActiveTab('add-entry');
+    showToast(`✓ ${details.customerName ? details.customerName + ' करिता ' : ''}${details.provider} फायनान्स तपशील बिलामध्ये जोडले!`, 'success');
+  };
 
   const handleOpenQuickPavti = (customer?: Customer | null, billNo?: string, amount?: number) => {
     setQuickPavtiCustomer(customer || null);
@@ -2631,10 +2638,11 @@ export default function App() {
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-xs">
                 <FinanceCalculatorModal
                   settings={db.settings}
+                  customers={db.customers}
                   isOpen={true}
                   onClose={() => setActiveTab('dashboard')}
-                  onApplyToBill={() => {
-                    setActiveTab('add-entry');
+                  onApplyToBill={(financeDetails) => {
+                    handleApplyFinanceToBill(financeDetails);
                   }}
                 />
               </div>
@@ -2663,10 +2671,13 @@ export default function App() {
                 setEditingEntry(null);
               }}
               initialEntryToEdit={editingEntry}
+              initialFinancePrefill={financePrefill}
+              onClearFinancePrefill={() => setFinancePrefill(null)}
               onCancelEdit={() => setEditingEntry(null)}
               allTransactions={db.transactions}
               onBackToDashboard={() => {
                 setEditingEntry(null);
+                setFinancePrefill(null);
                 setActiveTab('dashboard');
               }}
               stockList={db.stock}
@@ -2938,11 +2949,12 @@ export default function App() {
       {showFinanceModal && (
         <FinanceCalculatorModal
           settings={db.settings}
+          customers={db.customers}
           isOpen={showFinanceModal}
           onClose={() => setShowFinanceModal(false)}
-          onApplyToBill={() => {
+          onApplyToBill={(financeDetails) => {
             setShowFinanceModal(false);
-            setActiveTab('add-entry');
+            handleApplyFinanceToBill(financeDetails);
           }}
         />
       )}

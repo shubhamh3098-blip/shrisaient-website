@@ -37,7 +37,7 @@ import {
   ValidationIssue
 } from '../utils/billingValidator';
 import { BillingDiagnosticBox } from './BillingDiagnosticBox';
-import { FinanceCalculatorModal } from './FinanceCalculatorModal';
+import { FinanceCalculatorModal, FinanceDetailsPayload } from './FinanceCalculatorModal';
 
 export interface BillItemRow {
   id: string;
@@ -64,6 +64,8 @@ interface AddEntryViewProps {
   cardMembers?: CardMember[];
   onOpenInvoiceModal: (entry: TransactionEntry) => void;
   initialEntryToEdit?: TransactionEntry | null;
+  initialFinancePrefill?: FinanceDetailsPayload | null;
+  onClearFinancePrefill?: () => void;
   onUpdateEntry?: (id: string, entry: Omit<TransactionEntry, 'id' | 'createdAt'>) => void;
   onCancelEdit?: () => void;
 }
@@ -79,6 +81,8 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
   cardMembers = [],
   onOpenInvoiceModal,
   initialEntryToEdit = null,
+  initialFinancePrefill = null,
+  onClearFinancePrefill,
   onUpdateEntry,
   onCancelEdit,
 }) => {
@@ -194,6 +198,41 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
       }
     }
   }, [initialEntryToEdit]);
+
+  // Auto-fill from Finance Calculator (बिलामध्ये फायनान्स तपशील भरा)
+  useEffect(() => {
+    if (initialFinancePrefill) {
+      if (initialFinancePrefill.customerName) {
+        setCustomerName(initialFinancePrefill.customerName);
+      }
+      if (initialFinancePrefill.customerPhone) {
+        setCustomerPhone(initialFinancePrefill.customerPhone);
+      }
+      if (initialFinancePrefill.customerVillage) {
+        setVillage(initialFinancePrefill.customerVillage);
+      }
+      if (initialFinancePrefill.productName && initialFinancePrefill.productPrice) {
+        setItems([
+          {
+            id: `item-fin-${Date.now()}`,
+            description: initialFinancePrefill.productName,
+            qty: 1,
+            rate: initialFinancePrefill.productPrice,
+            amount: initialFinancePrefill.productPrice,
+            unit: 'नग',
+          },
+        ]);
+        setTotalAmount(String(initialFinancePrefill.productPrice));
+      }
+      setAppliedFinance(initialFinancePrefill);
+      setPayingNow(String(initialFinancePrefill.upfrontPaid));
+      const emiNote = `[${initialFinancePrefill.provider.toUpperCase()} Finance: Down Payment ₹${initialFinancePrefill.downPayment}, Loan ₹${initialFinancePrefill.financedAmount}, EMI ₹${initialFinancePrefill.monthlyEmi} x ${initialFinancePrefill.tenure} mo]`;
+      setNotes((prev) => (prev ? `${prev} | ${emiNote}` : emiNote));
+      if (onClearFinancePrefill) {
+        onClearFinancePrefill();
+      }
+    }
+  }, [initialFinancePrefill, onClearFinancePrefill]);
 
   // Auto-generate invoice/quotation number (only for new bills)
   useEffect(() => {
@@ -1805,12 +1844,38 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
       {/* Finance Calculator Modal */}
       <FinanceCalculatorModal
         settings={settings}
+        customers={customersList}
         isOpen={showFinanceModal}
         onClose={() => setShowFinanceModal(false)}
         initialAmount={parseFloat(totalAmount) || undefined}
         initialProductName={items[0]?.description || itemDetails || undefined}
+        initialCustomerName={customerName}
+        initialCustomerPhone={customerPhone}
+        initialCustomerVillage={village}
         onApplyToBill={(details) => {
           setAppliedFinance(details);
+          if (details.customerName) {
+            setCustomerName(details.customerName);
+          }
+          if (details.customerPhone) {
+            setCustomerPhone(details.customerPhone);
+          }
+          if (details.customerVillage) {
+            setVillage(details.customerVillage);
+          }
+          if (details.productName && (!items[0]?.description || items[0]?.description === '')) {
+            setItems([
+              {
+                id: `item-fin-${Date.now()}`,
+                description: details.productName,
+                qty: 1,
+                rate: details.productPrice,
+                amount: details.productPrice,
+                unit: 'नग',
+              },
+            ]);
+            setTotalAmount(String(details.productPrice));
+          }
           setPayingNow(String(details.upfrontPaid));
           const emiNote = `[${details.provider.toUpperCase()} Finance: Down Payment ₹${details.downPayment}, Loan ₹${details.financedAmount}, EMI ₹${details.monthlyEmi} x ${details.tenure} mo]`;
           setNotes((prev) => (prev ? `${prev} | ${emiNote}` : emiNote));
