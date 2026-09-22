@@ -25,6 +25,8 @@ import {
   AuthUser
 } from '../types';
 import { AgentHisabWidget } from './AgentHisabWidget';
+import { LiveCartOrdersWidget } from './LiveCartOrdersWidget';
+import { AdminNotification } from './AdminNotificationDropdown';
 
 interface DashboardViewProps {
   transactions: TransactionEntry[];
@@ -36,9 +38,12 @@ interface DashboardViewProps {
   agentAdvances?: AgentAdvanceEntry[];
   staff?: StaffMember[];
   currentUser?: AuthUser | null;
+  adminNotifications?: AdminNotification[];
+  onOpenStorefront?: () => void;
   onNavigate: (tab: any) => void;
   onOpenInvoiceModal: (entry: TransactionEntry) => void;
   onSaveAdvance?: (advance: Omit<AgentAdvanceEntry, 'id' | 'createdAt'>) => void;
+  onEditNotification?: (notification: AdminNotification) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -51,9 +56,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   agentAdvances = [],
   staff = [],
   currentUser,
+  adminNotifications = [],
+  onOpenStorefront = () => {},
   onNavigate,
   onOpenInvoiceModal,
   onSaveAdvance = () => {},
+  onEditNotification,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -213,6 +221,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Live Customer Cart & Online Orders Hub */}
+      <LiveCartOrdersWidget
+        notifications={adminNotifications}
+        onOpenStorefront={onOpenStorefront}
+        onNavigateToEntries={() => onNavigate('all-entries')}
+        onEditNotification={onEditNotification}
+      />
 
       {/* Real-time Agent Hisab, 4% Commission & ₹50 Card Bonus Hub */}
       <AgentHisabWidget

@@ -19,6 +19,8 @@ import {
 import { BusinessSettings, TransactionEntry, InvoiceLineItem } from '../types';
 import { AppLogo } from './AppLogo';
 import { ProfessionalGstInvoice, DispatchDetails } from './ProfessionalGstInvoice';
+import { ThermalReceiptModal, ThermalReceiptData } from './ThermalReceiptModal';
+import { DynamicUpiQrCode } from './DynamicUpiQrCode';
 
 interface InvoiceModalProps {
   entry: TransactionEntry | null;
@@ -54,6 +56,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   // Model & Serial number state
   const [modelNo, setModelNo] = useState(entry.modelNo || '');
   const [serialNo, setSerialNo] = useState(entry.serialNo || '');
+  const [showThermalModal, setShowThermalModal] = useState(false);
   const [validityDays, setValidityDays] = useState(entry.quotationValidity || '15 दिवस वैध (15 Days)');
   const [buyerAddress, setBuyerAddress] = useState(
     entry.buyerAddress ||
@@ -393,6 +396,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 <span className="hidden sm:inline">Items व तपशील एडिट</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setShowThermalModal(true)}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition shadow-xs"
+              title="2-इंच / 3-इंच POS थर्मल प्रिंट पावती"
+            >
+              <Printer className="w-3.5 h-3.5 text-cyan-400" />
+              <span>थर्मल पावती</span>
+            </button>
             <button
               onClick={handlePrint}
               className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition shadow-xs"
@@ -750,12 +762,24 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   )}
                 </div>
 
-                {/* Bank Details & Signature */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-[10px]">
+                {/* Bank Details, UPI QR & Signature */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-[10px]">
                   <div className="bg-slate-50 p-2 rounded border border-slate-200">
                     <p className="font-bold text-slate-900">Bank Details:</p>
                     <p>HDFC Bank | A/C: 50200083215914</p>
                     <p>IFSC: HDFC0000965</p>
+                    <p className="font-mono mt-0.5">UPI: {settings.upiId || '8766486915@ybl'}</p>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <DynamicUpiQrCode
+                      upiId={settings.upiId || '8766486915@ybl'}
+                      payeeName={settings.businessName || 'Shri Sai Enterprises'}
+                      amount={Number(entry.dueAmount) > 0 ? Number(entry.dueAmount) : Number(entry.totalAmount) || 0}
+                      note={`Rec #${displayDocNumber}`}
+                      size={80}
+                      showBadges={false}
+                      showAmountPill={true}
+                    />
                   </div>
                   <div className="text-right flex flex-col justify-end">
                     <p className="font-bold text-slate-900">श्री साई इंटरप्राइजेस</p>
@@ -767,6 +791,32 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           )}
         </div>
       </div>
+
+      {showThermalModal && entry && (
+        <ThermalReceiptModal
+          isOpen={showThermalModal}
+          onClose={() => setShowThermalModal(false)}
+          settings={settings}
+          data={{
+            type: 'sales_bill',
+            receiptNo: displayDocNumber,
+            date: entry.date || new Date().toISOString().split('T')[0],
+            customerName: entry.customerName || 'ग्राहक',
+            customerPhone: entry.customerPhone,
+            customerVillage: entry.village || buyerAddress,
+            paidAmount: Number(entry.payingNow) || Number(entry.totalAmount) || 0,
+            totalAmount: Number(entry.totalAmount) || 0,
+            dueAmount: Number(entry.dueAmount) || 0,
+            paymentMode: entry.paymentMode || 'Cash',
+            items: lineItems.map((li) => ({
+              name: li.description,
+              qty: Number(li.qty) || 1,
+              rate: Number(li.rate) || 0,
+              amount: Number(li.amount) || Number(li.qty) * Number(li.rate) || 0,
+            })),
+          }}
+        />
+      )}
     </div>
   );
 

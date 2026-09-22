@@ -288,10 +288,20 @@ input, select, textarea {
 }
 
 /* Mobile Fit & Performance Enhancements */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-area-bottom,
   .safe-area-pb {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+  .safe-area-bottom-nav {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -313,7 +323,22 @@ input, select, textarea {
 
   /* Fast, responsive touch targets */
   button, a, input, select {
-    min-height: 38px;
+    min-height: 40px;
+  }
+}
+
+/* Laptop Density (1366x768 to 1920x1080 at 100%-125% Windows scaling) */
+@media (min-width: 1024px) and (max-height: 900px) {
+  .tactile-card {
+    padding: 1rem !important;
+  }
+  table th,
+  table td {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+  .summary-metric-card {
+    padding: 0.75rem 1rem !important;
   }
 }
 

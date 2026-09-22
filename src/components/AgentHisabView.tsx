@@ -16,7 +16,11 @@ import {
   Banknote,
   Smartphone,
   ArrowRight,
-  Receipt
+  Receipt,
+  MapPin,
+  Building2,
+  Users,
+  Eye
 } from 'lucide-react';
 import {
   CardMember,
@@ -28,14 +32,18 @@ import {
 } from '../types';
 import {
   getDistinctAgents,
+  getDistinctVillages,
   getAgentDailyStats,
   getAgentMonthlyStats,
+  getVillageWiseSummaries,
   buildAgentDailyWhatsAppText,
   COMMISSION_RATE,
   CARD_BONUS_RATE
 } from '../utils/agentCalculator';
 import { AgentAdvanceModal } from './AgentAdvanceModal';
 import { AgentMonthlySettlementModal } from './AgentMonthlySettlementModal';
+import { AgentCollectionSheetModal } from './AgentCollectionSheetModal';
+import { AgentDaySettlementModal } from './AgentDaySettlementModal';
 
 interface AgentHisabViewProps {
   cardMembers: CardMember[];
@@ -67,37 +75,61 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
     return getDistinctAgents(cardMembers, cardTransactions, staff);
   }, [cardMembers, cardTransactions, staff]);
 
+  const allVillages = useMemo(() => {
+    return getDistinctVillages(cardMembers);
+  }, [cardMembers]);
+
   const isAgentLoggedIn = currentUser?.role === 'staff' && currentUser?.name;
 
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'village'>('daily');
   const [selectedAgent, setSelectedAgent] = useState<string>(isAgentLoggedIn ? currentUser.name : 'all');
+  const [selectedVillage, setSelectedVillage] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [showAdvanceModal, setShowAdvanceModal] = useState<boolean>(false);
   const [showMonthlyModal, setShowMonthlyModal] = useState<boolean>(false);
+  const [showPrintSheetModal, setShowPrintSheetModal] = useState<boolean>(false);
+  const [showDaySettlementModal, setShowDaySettlementModal] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Daily Stats
+  // Daily Stats with village filtering
   const dailyStats = useMemo(() => {
     return getAgentDailyStats(
       selectedAgent,
       selectedDate,
       cardTransactions,
       cardMembers,
-      agentAdvances
+      agentAdvances,
+      selectedVillage
     );
-  }, [selectedAgent, selectedDate, cardTransactions, cardMembers, agentAdvances]);
+  }, [selectedAgent, selectedDate, cardTransactions, cardMembers, agentAdvances, selectedVillage]);
 
-  // Monthly Stats
+  // Monthly Stats with village filtering
   const monthlyStats = useMemo(() => {
     return getAgentMonthlyStats(
       selectedAgent,
       selectedMonth,
       cardTransactions,
       cardMembers,
-      agentAdvances
+      agentAdvances,
+      selectedVillage
     );
-  }, [selectedAgent, selectedMonth, cardTransactions, cardMembers, agentAdvances]);
+  }, [selectedAgent, selectedMonth, cardTransactions, cardMembers, agentAdvances, selectedVillage]);
+
+  // Village Wise aggregated summaries
+  const villageSummaries = useMemo(() => {
+    const filter = viewMode === 'daily'
+      ? { type: 'daily' as const, value: selectedDate }
+      : { type: 'monthly' as const, value: selectedMonth };
+    return getVillageWiseSummaries(cardMembers, cardTransactions, filter);
+  }, [cardMembers, cardTransactions, viewMode, selectedDate, selectedMonth]);
+
+  // Filtered village summaries by search
+  const displayedVillages = useMemo(() => {
+    if (!searchQuery.trim()) return villageSummaries;
+    const q = searchQuery.toLowerCase().trim();
+    return villageSummaries.filter(v => v.village.toLowerCase().includes(q));
+  }, [villageSummaries, searchQuery]);
 
   // Advances list for selected filter
   const filteredAdvances = useMemo(() => {
@@ -147,6 +179,20 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
         {/* Top Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={() => setShowDaySettlementModal(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm transition flex items-center gap-2 cursor-pointer shadow-md"
+          >
+            <Banknote className="w-4 h-4" />
+            🤝 दैनिक कॅश जमा व पावती (Cash Handover)
+          </button>
+          <button
+            onClick={() => setShowPrintSheetModal(true)}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition flex items-center gap-2 cursor-pointer shadow-md"
+          >
+            <Printer className="w-4 h-4" />
+            गाव / एजंट कलेक्शन प्रिंट (Print Sheet)
+          </button>
+          <button
             onClick={() => setShowAdvanceModal(true)}
             className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition flex items-center gap-2 cursor-pointer shadow-md"
           >
@@ -165,32 +211,62 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
 
       {/* Control Tabs & Filter Bar */}
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
-        {/* Toggle: Daily vs Monthly */}
-        <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800">
+        {/* Toggle: Daily vs Monthly vs Village Wise */}
+        <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 flex-wrap">
           <button
             onClick={() => setViewMode('daily')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'daily'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            दैनिक हिशोब (Daily Hisab)
+            दैनिक हिशोब (Daily)
           </button>
           <button
             onClick={() => setViewMode('monthly')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'monthly'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            मासिक सेटलमेंट (Monthly Breakdown)
+            मासिक सेटलमेंट (Monthly)
+          </button>
+          <button
+            onClick={() => setViewMode('village')}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'village'
+                ? 'bg-cyan-500 text-slate-950 shadow-xs font-black'
+                : 'text-cyan-400 hover:text-white'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            गाव हिशोब (Village Wise)
           </button>
         </div>
 
         {/* Filter Controls */}
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Village Filter Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-cyan-400" /> गाव:
+            </span>
+            <select
+              value={selectedVillage}
+              onChange={(e) => setSelectedVillage(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-cyan-300 font-medium text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
+            >
+              <option value="all">📍 सर्व गावे (All Villages)</option>
+              {allVillages.map((vg) => (
+                <option key={vg} value={vg}>
+                  🏡 {vg}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Agent Dropdown */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-400">एजंट:</span>
@@ -215,17 +291,7 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
           </div>
 
           {/* Date or Month Picker */}
-          {viewMode === 'daily' ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400">तारीख:</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-              />
-            </div>
-          ) : (
+          {viewMode === 'monthly' ? (
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-slate-400">महिना:</span>
               <input
@@ -235,9 +301,27 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
                 className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
               />
             </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400">तारीख:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+              />
+            </div>
           )}
 
-          {/* Share button */}
+          {/* Action buttons */}
+          <button
+            onClick={() => setShowPrintSheetModal(true)}
+            title="गाव व एजंटनिहाय प्रिंट पावती"
+            className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            प्रिंट पत्रक
+          </button>
           <button
             onClick={viewMode === 'daily' ? handleShareWhatsAppDaily : () => setShowMonthlyModal(true)}
             className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
@@ -337,8 +421,155 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
         </div>
       </div>
 
-      {/* Mode Content: Daily or Monthly Breakdown Table */}
-      {viewMode === 'monthly' ? (
+      {/* Mode Content: Village Wise, Monthly Breakdown, or Daily View */}
+      {viewMode === 'village' ? (
+        <div className="space-y-6">
+          {/* Village Wise Aggregation Table */}
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-cyan-400" />
+                  गावनिहाय हिशोब व कलेक्शन सारांश (Village-wise Hisab)
+                </h2>
+                <p className="text-xs text-slate-400">
+                  प्रत्येक गावातील एकूण सभासद, चालू कार्ड्स, एकूण जमा रक्कम आणि एजंटनिहाय विभाजन
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="गाव शोधा (Search village)..."
+                    className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-500 w-44 sm:w-56"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowPrintSheetModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  प्रिंट शीट
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-800/80 text-slate-300 border-b border-slate-700">
+                  <tr>
+                    <th className="p-3 font-bold">गाव (Village)</th>
+                    <th className="p-3 font-bold text-center">एकूण सभासद</th>
+                    <th className="p-3 font-bold text-center">सक्रिय कार्ड्स</th>
+                    <th className="p-3 font-bold text-right">एकूण कलेक्शन (₹)</th>
+                    <th className="p-3 font-bold text-center">पावत्या</th>
+                    <th className="p-3 font-bold text-right">४% कमिशन (₹)</th>
+                    <th className="p-3 font-bold text-center">नवीन कार्ड्स</th>
+                    <th className="p-3 font-bold">कलेक्शन करणारे एजंट्स</th>
+                    <th className="p-3 font-bold text-center">कृती</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800 text-slate-200">
+                  {displayedVillages.map((v) => (
+                    <tr key={v.village} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-bold text-white flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span>{v.village}</span>
+                      </td>
+                      <td className="p-3 text-center font-semibold text-slate-300">
+                        {v.totalMembers}
+                      </td>
+                      <td className="p-3 text-center font-bold text-emerald-400">
+                        {v.activeCards}
+                      </td>
+                      <td className="p-3 text-right font-black text-amber-300 text-sm">
+                        ₹{v.totalCollection.toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center text-slate-300">
+                        {v.collectionCount}
+                      </td>
+                      <td className="p-3 text-right font-bold text-blue-300">
+                        ₹{v.commission.toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center">
+                        {v.newCardsCount > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold">
+                            +{v.newCardsCount}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-1">
+                          {v.agentBreakdown.length > 0 ? (
+                            v.agentBreakdown.map((ag) => (
+                              <span
+                                key={ag.agentName}
+                                className="px-2 py-0.5 rounded-md bg-slate-800 text-[11px] text-slate-300 border border-slate-700 flex items-center gap-1"
+                              >
+                                <span className="font-semibold">{ag.agentName}:</span>
+                                <span className="text-amber-300 font-bold">₹{ag.amount.toLocaleString()}</span>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">कोणतीही वसुली नोंद नाही</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => {
+                            setSelectedVillage(v.village);
+                            setViewMode('daily');
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-[11px] font-bold border border-cyan-500/30 transition flex items-center gap-1 mx-auto cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" />
+                          तपशील
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {displayedVillages.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-400 text-xs">
+                        कोणतेही गाव आढळले नाही.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {displayedVillages.length > 0 && (
+                  <tfoot className="bg-slate-800 font-bold border-t-2 border-slate-700 text-white">
+                    <tr>
+                      <td className="p-3">सर्व गावे एकूण बेरीज:</td>
+                      <td className="p-3 text-center">{displayedVillages.reduce((s, v) => s + v.totalMembers, 0)}</td>
+                      <td className="p-3 text-center text-emerald-400">{displayedVillages.reduce((s, v) => s + v.activeCards, 0)}</td>
+                      <td className="p-3 text-right text-amber-300 text-sm">
+                        ₹{displayedVillages.reduce((s, v) => s + v.totalCollection, 0).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center">{displayedVillages.reduce((s, v) => s + v.collectionCount, 0)}</td>
+                      <td className="p-3 text-right text-blue-300">
+                        ₹{displayedVillages.reduce((s, v) => s + v.commission, 0).toLocaleString()}
+                      </td>
+                      <td className="p-3 text-center text-indigo-300">
+                        {displayedVillages.reduce((s, v) => s + v.newCardsCount, 0)}
+                      </td>
+                      <td colSpan={2} className="p-3 text-slate-400 text-right">
+                        एकूण {displayedVillages.length} गावे
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === 'monthly' ? (
         <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
             <div>
@@ -621,6 +852,35 @@ export const AgentHisabView: React.FC<AgentHisabViewProps> = ({
             setShowMonthlyModal(false);
             setShowAdvanceModal(true);
           }}
+        />
+      )}
+
+      {/* Agent & Village Collection Sheet Print Modal */}
+      {showPrintSheetModal && (
+        <AgentCollectionSheetModal
+          isOpen={showPrintSheetModal}
+          onClose={() => setShowPrintSheetModal(false)}
+          cardMembers={cardMembers}
+          cardTransactions={cardTransactions}
+          settings={settings}
+          initialDate={viewMode === 'monthly' ? `${selectedMonth}-01` : selectedDate}
+          initialAgent={selectedAgent === 'all' ? 'All' : selectedAgent}
+          initialVillage={selectedVillage === 'all' ? 'All' : selectedVillage}
+        />
+      )}
+
+      {/* Day-End Cash Handover & Settlement Modal */}
+      {showDaySettlementModal && (
+        <AgentDaySettlementModal
+          isOpen={showDaySettlementModal}
+          onClose={() => setShowDaySettlementModal(false)}
+          agents={allAgents}
+          initialAgent={selectedAgent === 'all' ? allAgents[0] : selectedAgent}
+          cardTransactions={cardTransactions}
+          cardMembers={cardMembers}
+          agentAdvances={agentAdvances}
+          settings={settings}
+          activeUserName={currentUser?.name || 'Admin (Shubham)'}
         />
       )}
     </div>

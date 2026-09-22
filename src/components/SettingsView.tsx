@@ -18,6 +18,8 @@ import {
   Sparkles,
   KeyRound,
   Lock,
+  Shield,
+  MessageSquare,
   FileSpreadsheet,
   Layers,
   ShoppingBag,
@@ -385,8 +387,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   सुरक्षा व लॉगिन पासवर्ड (Security & Passwords)
                 </h3>
                 <p className="text-xs text-slate-500">
-                  हा पासवर्ड टाकून ॲडमिन थेट संपूर्ण बिझनेस अकाउंटिंग आणि सर्व खाती एका सेकंदात उघडू शकतात.
+                  येथून तुम्ही ॲडमिन (मालक) व कर्मचाऱ्यांसाठीचे ईआरपी (ERP) लॉगिन पासवर्ड बदलू शकता.
                 </p>
+
+                {/* Real-time Zero-Trust Security Guarantee Box */}
+                <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs space-y-2">
+                  <div className="font-bold text-blue-950 dark:text-blue-200 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-blue-600" />
+                    <span>ईआरपी सुरक्षा हमी (ERP Zero-Trust Security):</span>
+                  </div>
+                  <ul className="space-y-1 text-[11px] text-blue-900 dark:text-blue-300 leading-relaxed list-disc list-inside">
+                    <li>
+                      <strong>स्टाफ पासवर्ड बदलल्यास:</strong> जुन्या पासवर्डने कोणीही ईआरपी उघडू शकत नाही. नवीन पासवर्ड त्वरित लागू होतो.
+                    </li>
+                    <li>
+                      <strong>दोन-स्तरीय सुरक्षा (Two-Level Guard):</strong> नुसता पासवर्ड असून चालत नाही; लॉगिन करण्यासाठी कर्मचाऱ्याचे नाव किंवा मोबाईल नंबर तुमच्या <strong>&quot;Staff&quot;</strong> यादीत ॲडमिनने मंजूर (Approved) असणे अनिवार्य आहे.
+                    </li>
+                    <li>
+                      <strong>ॲडमिन पासवर्ड:</strong> मालक (Shubham) पासवर्ड बदलल्यास मुख्य खाती व सेटिंग्स फक्त नवीन पासवर्डनेच उघडतील.
+                    </li>
+                  </ul>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -414,7 +435,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       placeholder="उदा. staff किंवा 1234"
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-medium focus:ring-2 focus:ring-blue-500 outline-hidden"
                     />
-                    <span className="text-[10px] text-slate-500">कर्मचाऱ्यांसाठी मर्यादित बिलिंग ॲक्सेस</span>
+                    <span className="text-[10px] text-slate-500">हा बदलताच जुन्या पासवर्डने लॉगिन पूर्णपणे बंद होईल</span>
+                  </div>
+
+                  {/* WhatsApp VIP Group Link */}
+                  <div className="md:col-span-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        व्हॉट्सॲप व्हीआयपी ग्रुप लिंक (WhatsApp VIP Group Invite Link)
+                      </label>
+                      {formData.whatsappGroupLink && (
+                        <a
+                          href={formData.whatsappGroupLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold underline"
+                        >
+                          ग्रुप लिंक तपासा ↗
+                        </a>
+                      )}
+                    </div>
+                    <input
+                      type="url"
+                      value={formData.whatsappGroupLink || ''}
+                      onChange={(e) => handleChange('whatsappGroupLink', e.target.value)}
+                      placeholder="https://chat.whatsapp.com/..."
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm font-mono text-emerald-900 bg-emerald-50/40 focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      ही ग्रुप लिंक बिलावरील व पासबुकवरील क्यूआर (QR) कोडमध्ये आणि ग्राहकांना डायरेक्ट व्हॉट्सॲप आमंत्रण पाठवण्यासाठी वापरली जाते.
+                    </p>
                   </div>
                 </div>
               </div>

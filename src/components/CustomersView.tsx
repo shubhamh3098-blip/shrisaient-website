@@ -78,6 +78,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'due' | 'high-due' | 'cleared'>('all');
+  const [selectedVillage, setSelectedVillage] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'due-desc' | 'due-asc'>('due-desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [showAll, setShowAll] = useState(false);
@@ -214,6 +215,39 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
     };
   }, [customers, customerLiveMetricsMap]);
 
+  // Extract all distinct villages from customers
+  const allVillages = useMemo(() => {
+    const set = new Set<string>();
+    (customers || []).forEach((c) => {
+      if (c && c.village && c.village.trim()) {
+        set.add(c.village.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [customers]);
+
+  // Calculate village-wise udhar breakdown & customer counts
+  const villageUdharSummary = useMemo(() => {
+    const map = new Map<string, { totalDue: number; dueCount: number; totalCustomers: number }>();
+    (customers || []).forEach((c) => {
+      if (!c) return;
+      const v = (c.village && c.village.trim()) ? c.village.trim() : 'इतर / नोंद नाही';
+      const metrics = customerLiveMetricsMap.get(c.id);
+      const due = metrics ? metrics.due : (Number(c.balanceDue) || 0);
+      const current = map.get(v) || { totalDue: 0, dueCount: 0, totalCustomers: 0 };
+      current.totalCustomers += 1;
+      if (due > 0) {
+        current.dueCount += 1;
+        current.totalDue += due;
+      }
+      map.set(v, current);
+    });
+
+    return Array.from(map.entries())
+      .filter(([_, stats]) => stats.totalDue > 0 || stats.dueCount > 0)
+      .sort((a, b) => b[1].totalDue - a[1].totalDue);
+  }, [customers, customerLiveMetricsMap]);
+
   // Robust, crash-proof filtering & sorting
   const filtered = useMemo(() => {
     const q = (search || '').toLowerCase().trim();
@@ -236,6 +270,15 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 
         if (!matchesSearch) return false;
 
+        // Village filter matching
+        if (selectedVillage !== 'all') {
+          if (selectedVillage === 'इतर / नोंद नाही') {
+            if (c.village && c.village.trim()) return false;
+          } else {
+            if ((c.village || '').trim().toLowerCase() !== selectedVillage.toLowerCase()) return false;
+          }
+        }
+
         const metrics = customerLiveMetricsMap.get(c.id);
         const due = metrics ? metrics.due : (Number(c.balanceDue) || 0);
         if (filterType === 'due') return due > 0;
@@ -253,7 +296,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
         if (sortBy === 'due-asc') return dueA - dueB;
         return String(a?.name || '').localeCompare(String(b?.name || ''));
       });
-  }, [customers, search, filterType, sortBy, customerLiveMetricsMap]);
+  }, [customers, search, selectedVillage, filterType, sortBy, customerLiveMetricsMap]);
 
   // Pagination chunking to eliminate mobile/laptop freezing
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -268,6 +311,27 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
     const due = Number(c.balanceDue) || 0;
     const text = encodeURIComponent(
       `Namaste ${c.name || 'Customer'},\nThis is a gentle reminder from *${settings.businessName || 'Shri Sai Enterprises'}* regarding your outstanding balance of *₹${due.toLocaleString()}*.\nKindly clear the payment at your earliest convenience via Cash or UPI.\nContact: ${settings.phone || '8766486915'}\nWebsite: ${settings.domainName || 'shrisaient.in'}`
+    );
+    const phone = String(c.phone || '').replace(/[^0-9]/g, '');
+    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
+
+  const handleSendWelcomeAndInvite = (c: Customer) => {
+    if (!c) return;
+    const groupLink = settings.whatsappGroupLink || 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4';
+    const text = encodeURIComponent(
+      `*श्री साई इंटरप्रायजेस (Shri Sai Enterprises)*\n` +
+      `मातोश्री सभागृह समोर, आर्वी रोड, वर्धा\n` +
+      `--------------------------------\n` +
+      `सस्नेह नमस्कार, *${c.name || 'ग्राहक'}* जी! 🙏\n\n` +
+      `श्री साई इंटरप्रायजेस परिवारात आपले सहर्ष स्वागत आहे! आपल्या खात्याची नोंद आमच्या अधिकृत सिस्टीममध्ये यशस्वीरित्या झाली आहे.\n\n` +
+      `आमच्या दुकानातील नवीन इलेक्ट्रॉनिक्स, फर्निचर, खास ऑफर्स व साप्ताहिक बचत योजनांची माहिती थेट मिळवण्यासाठी खालील लिंकवरून आमच्या अधिकृत व्हॉट्सॲप ग्रुपमध्ये जॉईन व्हा:\n\n` +
+      `👉 *व्हॉट्सॲप ग्रुप लिंक:* \n${groupLink}\n\n` +
+      `आपला विश्वास हीच आमची ताकद!\n` +
+      `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
+      `📞 संपर्क: 8766486915 / 8600122798\n` +
+      `🌐 वेबसाईट: ${settings.domainName || 'shrisaient.in'}`
     );
     const phone = String(c.phone || '').replace(/[^0-9]/g, '');
     const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
@@ -374,14 +438,23 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 
           {/* Download CSV button */}
           <button
-            onClick={() => exportCustomersToCsv(filtered, 'ShriSai_Customers_Khata')}
+            onClick={() =>
+              exportCustomersToCsv(
+                filtered,
+                selectedVillage !== 'all'
+                  ? `ShriSai_Udhar_Khata_${selectedVillage.replace(/[\s\/]/g, '_')}`
+                  : 'ShriSai_Customers_Khata'
+              )
+            }
             className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Download Customers Khata CSV"
+            title={selectedVillage !== 'all' ? `${selectedVillage} गावातील ग्राहक व उधारी CSV डाउनलोड करा` : 'Download Customers Khata CSV'}
           >
             <Download className="w-4 h-4 text-emerald-600" />
             <div className="flex flex-col text-left leading-tight">
-              <span>Download CSV</span>
-              <span className="text-[9px] text-emerald-700/80 font-normal">ग्राहक खाती एक्सपोर्ट</span>
+              <span>{selectedVillage !== 'all' ? `CSV (${selectedVillage})` : 'Download CSV'}</span>
+              <span className="text-[9px] text-emerald-700/80 font-normal">
+                {selectedVillage !== 'all' ? 'गावनिहाय उधारी यादी' : 'ग्राहक खाती एक्सपोर्ट'}
+              </span>
             </div>
           </button>
 
@@ -583,8 +656,32 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
             )}
           </div>
 
-          {/* Sort Selector & View Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Village Filter & Sort Selector & View Toggle */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Village Selector Dropdown */}
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-sm sm:text-xs text-[var(--tactile-text-main)]">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="text-xs sm:text-[11px] font-bold text-[var(--tactile-text-muted)] hidden sm:inline">गाव:</span>
+              <select
+                value={selectedVillage}
+                onChange={(e) => {
+                  setSelectedVillage(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-sm sm:text-xs font-bold text-[var(--tactile-text-main)] focus:outline-none cursor-pointer max-w-[150px] truncate"
+                title="गावानुसार ग्राहक व उधारी फिल्टर"
+              >
+                <option value="all">सर्व गावे (All Villages)</option>
+                {allVillages.map((v) => (
+                  <option key={v} value={v}>
+                    📍 {v}
+                  </option>
+                ))}
+                <option value="इतर / नोंद नाही">इतर / नोंद नसलेली गावे</option>
+              </select>
+            </div>
+
+            {/* Sort Selector */}
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--tactile-surface-inset)] border border-[var(--tactile-border)] text-sm sm:text-xs text-[var(--tactile-text-main)] flex-1 sm:flex-none">
               <ArrowUpDown className="w-3.5 h-3.5 text-[var(--tactile-text-muted)] shrink-0" />
               <span className="text-xs sm:text-[11px] font-medium text-[var(--tactile-text-muted)] hidden sm:inline">Sort:</span>
@@ -630,6 +727,52 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Village-wise Udhar Breakdown Quick Bar (गावानुसार उधारी समरी) */}
+        {villageUdharSummary.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs no-scrollbar border-t border-[var(--tactile-border)]/60 pt-2">
+            <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 shrink-0 flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              गावनिहाय उधारी:
+            </span>
+            <button
+              onClick={() => {
+                setSelectedVillage('all');
+                setCurrentPage(1);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer ${
+                selectedVillage === 'all'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-2xs'
+                  : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)]'
+              }`}
+            >
+              सर्व गावे ({villageUdharSummary.length})
+            </button>
+            {villageUdharSummary.slice(0, 10).map(([villName, stats]) => (
+              <button
+                key={villName}
+                onClick={() => {
+                  setSelectedVillage(selectedVillage === villName ? 'all' : villName);
+                  setCurrentPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition cursor-pointer flex items-center gap-1 border ${
+                  selectedVillage === villName
+                    ? 'bg-amber-600 text-white border-amber-700 shadow-2xs'
+                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-800/60 hover:bg-amber-100'
+                }`}
+                title={`${villName}: एकूण उधारी ₹${stats.totalDue.toLocaleString()} (${stats.dueCount} ग्राहक बाकी)`}
+              >
+                <span>{villName}</span>
+                <span className={`text-[10px] font-mono px-1 rounded ${
+                  selectedVillage === villName ? 'bg-amber-800 text-white' : 'bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-100'
+                }`}>
+                  ₹{stats.totalDue >= 100000 ? `${(stats.totalDue / 100000).toFixed(1)}L` : stats.totalDue >= 1000 ? `${Math.round(stats.totalDue / 1000)}k` : stats.totalDue}
+                </span>
+                <span className="text-[9px] opacity-75">({stats.dueCount})</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Quick Filter Chips */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -767,7 +910,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                           </button>
                           <button
                             onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                            className="py-1.5 px-2.5 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            className="min-h-[44px] py-1.5 px-2.5 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer flex items-center gap-1"
                             title="रक्कम जमा करा / पावती फाडा"
                           >
                             <Receipt className="w-3.5 h-3.5 text-emerald-600" />
@@ -779,9 +922,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                               setQuickHisabCustomer(c);
                               setShowQuickHisabModal(true);
                             }}
-                            className="p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
+                            className="min-h-[44px] py-1.5 px-2.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer flex items-center gap-1.5 text-xs font-bold whitespace-nowrap"
                           >
-                            <Calculator className="w-3.5 h-3.5" />
+                            <Calculator className="w-3.5 h-3.5 text-amber-600" />
+                            <span>हिशोब / Breakup</span>
                           </button>
                           <button
                             title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge with another account)"
@@ -794,17 +938,27 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                               }
                               setShowDuplicateMergeModal(true);
                             }}
-                            className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
+                            className="min-h-[44px] px-2.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer flex items-center gap-1 text-xs font-semibold"
                           >
                             <GitMerge className="w-3.5 h-3.5" />
+                            <span>Merge</span>
+                          </button>
+                          <button
+                            title="व्हॉट्सॲप स्वागत संदेश व ग्रुप इनव्हाईट पाठवा (Send Welcome & Group Invite)"
+                            onClick={() => handleSendWelcomeAndInvite(c)}
+                            className="min-h-[44px] px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1 text-xs font-bold whitespace-nowrap shadow-2xs"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-emerald-200" />
+                            <span>स्वागत व ग्रुप</span>
                           </button>
                           {due > 0 && (
                             <button
                               title="Send WhatsApp Due Reminder"
                               onClick={() => handleSendReminder(c)}
-                              className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
+                              className="min-h-[44px] px-2.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer flex items-center gap-1 text-xs font-semibold"
                             >
                               <Share2 className="w-3.5 h-3.5" />
+                              <span>Share Due</span>
                             </button>
                           )}
                         </div>
@@ -897,12 +1051,12 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                     <span>Statement & Bills (खातेवही)</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => (onOpenQuickPavti ? onOpenQuickPavti(c) : setSettleModalCust(c))}
-                      className="flex-1 py-2 sm:py-1.5 px-3 rounded-lg bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-sm sm:text-xs font-bold transition cursor-pointer text-center flex items-center justify-center gap-1"
+                      className="min-h-[44px] py-2 px-3 rounded-xl bg-[var(--tactile-surface-inset)] hover:bg-[var(--tactile-surface)] text-[var(--tactile-text-main)] border border-[var(--tactile-border)] text-xs font-bold transition cursor-pointer text-center flex items-center justify-center gap-1.5"
                     >
-                      <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                      <Receipt className="w-4 h-4 text-emerald-600" />
                       <span>+ Receive Payment</span>
                     </button>
 
@@ -912,11 +1066,14 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                         setQuickHisabCustomer(c);
                         setShowQuickHisabModal(true);
                       }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
+                      className="min-h-[44px] px-3 py-2 rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-200 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold"
                     >
-                      <Calculator className="w-4 h-4" />
+                      <Calculator className="w-4 h-4 text-amber-600" />
+                      <span>हिशोब / Breakup</span>
                     </button>
+                  </div>
 
+                  <div className="flex items-center gap-2">
                     <button
                       title="हे खाते दुसऱ्या खात्यात विलीन करा (Merge Accounts)"
                       onClick={() => {
@@ -928,21 +1085,33 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                         }
                         setShowDuplicateMergeModal(true);
                       }}
-                      className="p-2 sm:p-1.5 rounded-lg bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer"
+                      className="min-h-[44px] flex-1 py-2 px-3 rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30 transition cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold"
                     >
                       <GitMerge className="w-4 h-4" />
+                      <span>Merge Account</span>
                     </button>
 
                     {due > 0 && (
                       <button
                         title="Send WhatsApp Due Reminder (व्हॉट्सॲप स्मरणपत्र)"
                         onClick={() => handleSendReminder(c)}
-                        className="p-2 sm:p-1.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer"
+                        className="min-h-[44px] flex-1 py-2 px-3 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition cursor-pointer flex items-center justify-center gap-1.5 text-xs font-bold"
                       >
                         <Share2 className="w-4 h-4" />
+                        <span>Share Due</span>
                       </button>
                     )}
                   </div>
+
+                  {/* 1-Click Send Welcome & WhatsApp Group Invite */}
+                  <button
+                    onClick={() => handleSendWelcomeAndInvite(c)}
+                    className="min-h-[44px] w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                    title="ग्राहक स्वागत व ग्रुप इनव्हाईट पाठवा"
+                  >
+                    <Share2 className="w-4 h-4 text-emerald-200" />
+                    <span>Send Welcome & WhatsApp Group Invite (स्वागत व ग्रुप)</span>
+                  </button>
                 </div>
               </div>
             );

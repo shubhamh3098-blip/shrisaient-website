@@ -96,16 +96,18 @@ export const FloatingCallAndWhatsApp: React.FC<FloatingCallAndWhatsAppProps> = (
       )}
 
       {/* Floating Action Buttons: Left = Call Us, Right = WhatsApp Instant Chat */}
-      <div className="fixed bottom-16 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
+      {/* Positioned at bottom-20 on mobile to strictly avoid overlapping the bottom nav bar (bottom-0) */}
+      <div className="fixed bottom-20 sm:bottom-6 left-3 sm:left-6 z-40 no-print">
         <a
           href={`tel:${primaryPhone}`}
-          className="group flex items-center gap-2.5 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[#0B1528] hover:bg-slate-800 text-white shadow-xl shadow-slate-900/30 hover:scale-105 active:scale-95 transition-all duration-200 border border-slate-700/60 cursor-pointer"
-          title="Direct Call to Shri Sai Enterprises"
+          className="group flex items-center justify-center p-2.5 sm:px-4 sm:py-2.5 rounded-full bg-[#0B1528] hover:bg-slate-800 text-white shadow-xl shadow-slate-900/40 hover:scale-105 active:scale-95 transition-all duration-200 border border-slate-700/80 cursor-pointer"
+          title={`Direct Call: ${primaryPhone}`}
+          aria-label="Call Shri Sai Enterprises"
         >
-          <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <Phone className="w-3.5 h-3.5" />
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <div className="flex flex-col text-left leading-tight">
+          <div className="hidden sm:flex flex-col text-left leading-tight ml-2.5">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Call Us
             </span>
@@ -116,13 +118,14 @@ export const FloatingCallAndWhatsApp: React.FC<FloatingCallAndWhatsAppProps> = (
         </a>
       </div>
 
-      <div className="fixed bottom-16 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
+      <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-40 no-print">
         <button
           onClick={() => setShowWhatsAppPicker(true)}
-          className="group flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[#0D5C4D] hover:bg-[#094539] text-white shadow-xl shadow-emerald-900/30 hover:scale-105 active:scale-95 transition-all duration-200 border border-emerald-600/40 cursor-pointer"
+          className="group flex items-center justify-center p-2.5 sm:px-4 sm:py-2.5 rounded-full bg-[#0D5C4D] hover:bg-[#094539] text-white shadow-xl shadow-emerald-950/40 hover:scale-105 active:scale-95 transition-all duration-200 border border-emerald-500/60 cursor-pointer"
           title="Chat with Shri Sai Enterprises on WhatsApp"
+          aria-label="Chat on WhatsApp"
         >
-          <div className="flex flex-col text-right leading-tight">
+          <div className="hidden sm:flex flex-col text-right leading-tight mr-2">
             <span className="text-xs font-bold text-white tracking-tight">
               WhatsApp
             </span>
@@ -130,8 +133,8 @@ export const FloatingCallAndWhatsApp: React.FC<FloatingCallAndWhatsAppProps> = (
               Instant Chat
             </span>
           </div>
-          <div className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
-            <MessageCircle className="w-4 h-4 text-white" />
+          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/20 text-white flex items-center justify-center shrink-0">
+            <MessageCircle className="w-4 h-4 sm:w-4 sm:h-4 text-white" />
           </div>
         </button>
       </div>

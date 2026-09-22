@@ -129,6 +129,8 @@ export interface TransactionEntry {
   supplierRef?: string;
   buyersOrderNo?: string;
   salesConsultant?: string;
+  warrantyMonths?: number;
+  warrantyExpiryDate?: string;
   notes?: string;
   createdAt: string;
 }
@@ -143,6 +145,7 @@ export interface Customer {
   totalPurchases?: number; // alias for totalPurchased
   totalPaid: number;
   balanceDue: number;
+  creditLimit?: number; // Maximum credit allowed (default e.g. 10000)
   openingBalance?: number;
   openingBalanceDate?: string;
   linkedCardNumber?: number;
@@ -211,6 +214,10 @@ export interface PurchaseEntry {
   paidAmount: number;
   status: 'Paid' | 'Partial' | 'Pending';
   paymentMode: 'Cash' | 'Online' | 'Cheque';
+  dueDate?: string; // Credit payment due date
+  chequeNo?: string;
+  chequeDate?: string;
+  chequeStatus?: 'Pending' | 'Cleared' | 'Bounced';
   transporter?: string;
   vehicleNo?: string;
   ewayBillNo?: string;
@@ -289,6 +296,9 @@ export interface BusinessSettings {
   whatsappSecondaryNumber?: string;
   bankDetails?: BusinessBankDetails;
   warrantyDisclaimer?: string;
+  upiId?: string;
+  upiPayeeName?: string;
+  whatsappGroupLink?: string;
   adminPassword?: string;
   staffPassword?: string;
 }
@@ -344,5 +354,72 @@ export type ActiveTab =
   | 'staff'
   | 'expenses'
   | 'settings';
+
+export interface DailyCashClosing {
+  id: string;
+  date: string;
+  expectedCash: number;
+  countedCash: number;
+  difference: number; // countedCash - expectedCash
+  denominations: {
+    note500: number;
+    note200: number;
+    note100: number;
+    note50: number;
+    note20: number;
+    note10: number;
+    coins: number;
+  };
+  cashSales: number;
+  cardCashPayments: number;
+  cashExpenses: number;
+  cashAdvances: number;
+  cashDealerPayments: number;
+  cashRefunds: number;
+  closedBy?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AgentDaySettlement {
+  id: string;
+  date: string;
+  agentName: string;
+  totalCollection: number;
+  collectionCount: number;
+  commissionEarned: number;
+  newCardsCount: number;
+  cardBonusEarned: number;
+  grossEarnings: number;
+  advancesDeducted: number;
+  netCommissionPayable: number;
+  cashHandedOverToShop: number;
+  settlementStatus: 'Settled' | 'Pending';
+  settledBy?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface CardPrizeDeliveryChallan {
+  id: string;
+  challanNo: string;
+  date: string;
+  cardNumber: number;
+  customerName: string;
+  customerPhone: string;
+  village: string;
+  deliveryAddress: string;
+  schemeType: 'Scheme Complete (30 Months)' | 'Lucky Draw Winner';
+  itemsDelivered: string; // e.g. "LG 43-inch Smart LED TV + Godrej 185L Refrigerator"
+  modelNumber?: string;
+  serialNumber?: string;
+  deliveredByStaff?: string;
+  agentName?: string;
+  vehicleNumber?: string;
+  status: 'Delivered' | 'In Transit' | 'Pending Delivery';
+  notes?: string;
+  createdAt: string;
+}
+
 
 

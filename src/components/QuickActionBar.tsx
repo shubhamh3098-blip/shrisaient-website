@@ -16,7 +16,9 @@ import {
   Clock,
   AlertCircle,
   Package,
-  BadgePercent
+  BadgePercent,
+  Truck,
+  ShieldCheck
 } from 'lucide-react';
 
 interface QuickActionBarProps {
@@ -24,6 +26,7 @@ interface QuickActionBarProps {
   onNewCard: () => void;
   onCardPassbook?: () => void;
   onRefund?: () => void;
+  onDeliveryChallan?: () => void;
   onCustomerLedger: () => void;
   onCustomerDueList?: () => void;
   onAllCustomers?: () => void;
@@ -32,6 +35,7 @@ interface QuickActionBarProps {
   onReceivePavti: () => void;
   onPurchases?: () => void;
   onFinanceCalc?: () => void;
+  onWarrantyTracker?: () => void;
 }
 
 export const QuickActionBar: React.FC<QuickActionBarProps> = ({
@@ -39,6 +43,7 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onNewCard,
   onCardPassbook,
   onRefund,
+  onDeliveryChallan,
   onCustomerLedger,
   onCustomerDueList,
   onAllCustomers,
@@ -47,6 +52,7 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onReceivePavti,
   onPurchases,
   onFinanceCalc,
+  onWarrantyTracker,
 }) => {
   const [openHub, setOpenHub] = useState<'card' | 'sales' | 'customer' | 'finance' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +242,30 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
                     </div>
                   </button>
                 )}
+
+                {onDeliveryChallan && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenHub(null);
+                      onDeliveryChallan();
+                    }}
+                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/40 text-left transition cursor-pointer group border-t border-slate-100 dark:border-slate-800 pt-2"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center justify-between">
+                        <span>🚚 बक्षीस वितरण चलन</span>
+                        <span className="text-[9px] bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded font-bold">New</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        योजना पूर्ण/लकी ड्रॉ बक्षीस पावती व सही
+                      </p>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -364,6 +394,30 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
                       </div>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                         सप्लायर माल खरेदी बिल व स्टॉक आवक
+                      </p>
+                    </div>
+                  </button>
+                )}
+
+                {onWarrantyTracker && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenHub(null);
+                      onWarrantyTracker();
+                    }}
+                    className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-left transition cursor-pointer group border-t border-slate-100 dark:border-slate-800 pt-2"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center justify-between">
+                        <span>🛡️ वॉरंटी व सर्विस ट्रॅकर</span>
+                        <span className="text-[9px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-bold">New</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        टीव्ही, फ्रिज, कुलर वॉरंटी मुदत व अलर्ट
                       </p>
                     </div>
                   </button>

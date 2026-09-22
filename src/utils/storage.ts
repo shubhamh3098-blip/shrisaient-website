@@ -29,16 +29,16 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   addressHindi: 'मातोश्री सभागृह समोर आर्वी रोड पंजाब कॉलनी वर्धा ,442001',
   invoicePrefix: 'INV-2026-',
   currency: '₹',
-  tagline: 'Electronics, Home Appliances, Wires & Hardware Trading',
+  tagline: 'Electronics & Furniture Superstore, Wardha',
   deliveryRates: {
     freeDeliveryMinAmount: 3000,
     localDeliveryFee: 100,
     outerDeliveryFee: 250,
     estimatedDeliveryTime: 'Same Day / 24 Hours',
     deliveryAreas: 'Wardha City, Arvi, and All Surrounding Villages (50 km)',
-    deliveryNote: 'Free home delivery on orders above ₹3,000 and all Card Scheme major appliances (TV, Refrigerator, Cooler, Washing Machine).',
+    deliveryNote: 'Free home delivery on all major Electronics & Furniture items (Smart TVs, Fridges, Coolers, Washing Machines, Sofa Sets, Beds).',
   },
-  shopNotice: 'श्री साई इंटरप्राइजेस: ३०-महिने साप्ताहिक बचत कार्ड योजना बुकिंग चालू आहे • सर्व मोठ्या वस्तूंवर फ्री होम डिलिव्हरी!',
+  shopNotice: 'Shri Sai Enterprises: 30-Month Weekly Savings Card Scheme Booking Open • Free Home Delivery on all major items!',
   whatsappOrderNumber: '8766486915',
   whatsappSecondaryNumber: '8600122798',
   bankDetails: {
@@ -48,6 +48,9 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
     branch: 'OPP.BANK OF MAHARASHTRA WARDHA 442001',
   },
   warrantyDisclaimer: 'दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस कंपनीच्या सर्व्हिस सेण्टरचा मोबाईल नंबर घ्यावा.',
+  upiId: '8766486915@ybl',
+  upiPayeeName: 'Shri Sai Enterprises',
+  whatsappGroupLink: 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4',
   adminPassword: 'admin',
   staffPassword: 'staff',
 };
@@ -196,56 +199,43 @@ export const INITIAL_STOCK: StockItem[] = [
     description: '7.5 Kg Capacity, Powerful Spin Dryer, Rust-Proof Polypropylene Body & 5 Years Motor Warranty',
   },
   {
-    id: 'stk-fan',
-    name: 'Ceiling Fan 1200mm High Speed Copper (Pack of 2)',
-    code: 'FAN-1200-HS',
-    category: 'Electricals',
-    quantity: 32,
-    unit: 'Pack',
-    sellingPrice: 3200,
-    purchasePrice: 2400,
-    minStockLevel: 8,
-    imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=600&q=80',
-    description: '100% Pure Copper Winding, 400 RPM High Air Delivery, Double Ball Bearing',
+    id: 'stk-tv55',
+    name: 'Smart QLED TV 55" 4K Ultra HD Frameless',
+    code: 'TV-55-QLED',
+    category: 'Electronics',
+    quantity: 6,
+    unit: 'Unit',
+    sellingPrice: 34990,
+    purchasePrice: 28500,
+    minStockLevel: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=600&q=80',
+    description: '55-Inch 4K Ultra HD Smart Google TV with Dolby Vision Atmos, Hands-Free Voice Control & 3 Years Warranty',
   },
   {
-    id: 'stk-1',
-    name: 'Copper Electric Wire 1.5 sq mm (90m Roll)',
-    code: 'STK-CW15',
-    category: 'Electricals',
-    quantity: 48,
-    unit: 'Roll',
-    sellingPrice: 1850,
-    purchasePrice: 1450,
-    minStockLevel: 10,
-    imageUrl: 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=600&q=80',
-    description: 'Flame Retardant (FR) PVC Insulated Multi-strand Copper Industrial Cable (90 Meters)',
-  },
-  {
-    id: 'stk-2',
-    name: 'LED Tube Light 20W (Pack of 5)',
-    code: 'STK-LED20',
-    category: 'Electricals',
-    quantity: 65,
-    unit: 'Pack',
-    sellingPrice: 950,
-    purchasePrice: 680,
-    minStockLevel: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=600&q=80',
-    description: '20W Cool Day White Light, Surge Protection 4kV, Glare-Free Polycarbonate Batten',
-  },
-  {
-    id: 'stk-6',
-    name: 'Submersible Pump Starter Panel 1.5 HP',
-    code: 'STK-PNL15',
-    category: 'Industrial',
+    id: 'stk-split-ac',
+    name: '1.5 Ton 5-Star Inverter Split Air Conditioner',
+    code: 'AC-15T-5S',
+    category: 'Electronics',
     quantity: 5,
     unit: 'Unit',
-    sellingPrice: 3400,
-    purchasePrice: 2750,
-    minStockLevel: 4,
-    imageUrl: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=600&q=80',
-    description: 'Heavy Duty Contactor, Overload Thermal Relay, Voltmeter & Ammeter Dual Gauges',
+    sellingPrice: 32500,
+    purchasePrice: 26800,
+    minStockLevel: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
+    description: '100% Copper Condenser, Dual Inverter Compressor, HD Anti-Bacterial Filter & Super Fast Cooling up to 54°C',
+  },
+  {
+    id: 'stk-wm-front',
+    name: 'Front Load Washing Machine 8.0 Kg Inverter Direct Drive',
+    code: 'WM-80-FL',
+    category: 'Electronics',
+    quantity: 4,
+    unit: 'Unit',
+    sellingPrice: 28500,
+    purchasePrice: 23200,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
+    description: '8 Kg Fully Automatic Front Load, Steam Wash, Built-in Heater, Inverter Direct Drive Motor & 10-Year Motor Warranty',
   },
   {
     id: 'stk-sofa',
@@ -431,26 +421,32 @@ export function loadDatabase(): AppDatabase {
         ? { ...DEFAULT_SETTINGS, ...rawSettings, ...DEFAULT_SETTINGS }
         : { ...DEFAULT_SETTINGS, ...rawSettings };
 
-      // Ensure active 30-month scheme notice and dual WhatsApp numbers
-      if (!mergedSettings.shopNotice || mergedSettings.shopNotice.includes('13-महीने') || mergedSettings.shopNotice.includes('13-महिने')) {
-        mergedSettings.shopNotice = 'श्री साई इंटरप्राइजेस: ३०-महिने साप्ताहिक बचत कार्ड योजना बुकिंग चालू आहे • सर्व मोठ्या वस्तूंवर फ्री होम डिलिव्हरी!';
+      // Ensure active 30-month scheme notice in English and dual WhatsApp numbers
+      if (!mergedSettings.shopNotice || mergedSettings.shopNotice.includes('13-महीने') || mergedSettings.shopNotice.includes('13-महिने') || mergedSettings.shopNotice.includes('श्री साई इंटरप्राइजेस')) {
+        mergedSettings.shopNotice = 'Shri Sai Enterprises: 30-Month Weekly Savings Card Scheme Booking Open • Free Home Delivery on all major items!';
       }
+      mergedSettings.tagline = 'Electronics & Furniture Superstore, Wardha';
       mergedSettings.whatsappOrderNumber = '8766486915';
       mergedSettings.whatsappSecondaryNumber = '8600122798';
       if (!mergedSettings.additionalPhones || mergedSettings.additionalPhones.includes('8600122978')) {
         mergedSettings.additionalPhones = ['8600122798', '9175534365', '7822859073'];
       }
+      if (!mergedSettings.whatsappGroupLink || mergedSettings.whatsappGroupLink.includes('/invite')) {
+        mergedSettings.whatsappGroupLink = 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4';
+      }
 
       const rawStockList: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
-        ? parsed.stock.map((item: StockItem) => {
-            if (!item.imageUrl) {
-              const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
-              if (matched?.imageUrl) {
-                return { ...item, imageUrl: matched.imageUrl, description: item.description || matched.description };
+        ? parsed.stock
+            .filter((item: StockItem) => item.category !== 'Electricals' && item.category !== 'Industrial' && item.id !== 'stk-1' && item.id !== 'stk-2' && item.id !== 'stk-6')
+            .map((item: StockItem) => {
+              if (!item.imageUrl) {
+                const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
+                if (matched?.imageUrl) {
+                  return { ...item, imageUrl: matched.imageUrl, description: item.description || matched.description };
+                }
               }
-            }
-            return item;
-          })
+              return item;
+            })
         : INITIAL_STOCK;
 
       const loadedStock = deduplicateStock(rawStockList);

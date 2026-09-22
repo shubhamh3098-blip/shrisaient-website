@@ -26,8 +26,22 @@ export function getDistinctAgents(
   return merged.sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Returns distinct list of villages from card members.
+ */
+export function getDistinctVillages(cardMembers: CardMember[] = []): string[] {
+  const villages = new Set<string>();
+  cardMembers.forEach((m) => {
+    if (m.village && m.village.trim().length > 0) {
+      villages.add(m.village.trim());
+    }
+  });
+  return Array.from(villages).sort((a, b) => a.localeCompare(b));
+}
+
 export interface AgentPeriodStats {
   agentName: string;
+  villageName?: string;
   periodLabel: string;
   totalCollection: number;
   collectionCount: number;
@@ -44,24 +58,52 @@ export interface AgentPeriodStats {
   advances: AgentAdvanceEntry[];
 }
 
+export interface VillageSummary {
+  village: string;
+  totalMembers: number;
+  activeCards: number;
+  totalCollection: number;
+  collectionCount: number;
+  commission: number;
+  newCardsCount: number;
+  agentBreakdown: { agentName: string; count: number; amount: number }[];
+}
+
 /**
- * Compute stats for a specific date (or range) and agent.
+ * Compute stats for a specific date (or range), agent, and optional village.
  */
 export function getAgentDailyStats(
   agentName: string, // 'all' or specific name
   dateStr: string, // 'YYYY-MM-DD'
   cardTransactions: CardTransaction[] = [],
   cardMembers: CardMember[] = [],
-  agentAdvances: AgentAdvanceEntry[] = []
+  agentAdvances: AgentAdvanceEntry[] = [],
+  villageFilter: string = 'all' // 'all' or specific village name
 ): AgentPeriodStats {
-  const isAll = !agentName || agentName === 'all';
+  const isAllAgent = !agentName || agentName === 'all';
+  const isAllVillage = !villageFilter || villageFilter === 'all';
+
+  // Build member lookup map for village matching on transactions
+  const memberMap = new Map<number, CardMember>();
+  cardMembers.forEach((m) => {
+    memberMap.set(m.cardNumber, m);
+  });
 
   // Filter transactions
   const txs = cardTransactions.filter((tx) => {
     const matchesDate = tx.date === dateStr;
-    const matchesAgent = isAll || (tx.agentName && tx.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+    const matchesAgent = isAllAgent || (tx.agentName && tx.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
     const isCollection = tx.type === 'WeeklyPayment' || !tx.type || tx.type === 'Fee';
-    return matchesDate && matchesAgent && isCollection;
+    
+    // Check village match
+    let matchesVillage = true;
+    if (!isAllVillage) {
+      const member = memberMap.get(tx.cardNumber);
+      const memberVillage = member?.village?.trim().toLowerCase() || '';
+      matchesVillage = memberVillage === villageFilter.trim().toLowerCase();
+    }
+
+    return matchesDate && matchesAgent && isCollection && matchesVillage;
   });
 
   const totalCollection = txs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -71,26 +113,28 @@ export function getAgentDailyStats(
   // Filter new cards opened on that day
   const newCards = cardMembers.filter((m) => {
     const matchesDate = m.joiningDate === dateStr;
-    const matchesAgent = isAll || (m.agentName && m.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
-    return matchesDate && matchesAgent;
+    const matchesAgent = isAllAgent || (m.agentName && m.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+    const matchesVillage = isAllVillage || (m.village && m.village.trim().toLowerCase() === villageFilter.trim().toLowerCase());
+    return matchesDate && matchesAgent && matchesVillage;
   });
 
   const newCardsCount = newCards.length;
   const cardBonusAmount = newCardsCount * CARD_BONUS_RATE;
   const grossEarnings = commissionAmount + cardBonusAmount;
 
-  // Filter advances given on that day
-  const advances = agentAdvances.filter((adv) => {
+  // Filter advances given on that day (advances belong to agent, unaffected by village unless viewing specific village where advances remain at agent level)
+  const advances = isAllVillage ? agentAdvances.filter((adv) => {
     const matchesDate = adv.date === dateStr;
-    const matchesAgent = isAll || (adv.agentName && adv.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+    const matchesAgent = isAllAgent || (adv.agentName && adv.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
     return matchesDate && matchesAgent;
-  });
+  }) : [];
 
   const advancesAmount = advances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
   const netPayable = grossEarnings - advancesAmount;
 
   return {
-    agentName: isAll ? 'All Agents' : agentName,
+    agentName: isAllAgent ? 'All Agents' : agentName,
+    villageName: isAllVillage ? 'All Villages' : villageFilter,
     periodLabel: dateStr,
     totalCollection,
     collectionCount,
@@ -121,17 +165,19 @@ export interface DayRowSummary {
 }
 
 /**
- * Compute monthly summary breakdown with day-by-day rows for an agent.
+ * Compute monthly summary breakdown with day-by-day rows for an agent and optional village.
  */
 export function getAgentMonthlyStats(
   agentName: string,
   yearMonth: string, // 'YYYY-MM'
   cardTransactions: CardTransaction[] = [],
   cardMembers: CardMember[] = [],
-  agentAdvances: AgentAdvanceEntry[] = []
+  agentAdvances: AgentAdvanceEntry[] = [],
+  villageFilter: string = 'all'
 ): {
   monthLabel: string;
   agentName: string;
+  villageName?: string;
   totalCollection: number;
   totalCommission: number;
   totalNewCards: number;
@@ -142,14 +188,26 @@ export function getAgentMonthlyStats(
   dayRows: DayRowSummary[];
   advancesList: AgentAdvanceEntry[];
 } {
-  const isAll = !agentName || agentName === 'all';
+  const isAllAgent = !agentName || agentName === 'all';
+  const isAllVillage = !villageFilter || villageFilter === 'all';
+
+  const memberMap = new Map<number, CardMember>();
+  cardMembers.forEach((m) => {
+    memberMap.set(m.cardNumber, m);
+  });
 
   // Gather all unique dates in that month that have activity
   const datesSet = new Set<string>();
 
   cardTransactions.forEach((t) => {
     if (t.date && t.date.startsWith(yearMonth)) {
-      if (isAll || (t.agentName && t.agentName.trim().toLowerCase() === agentName.trim().toLowerCase())) {
+      const matchesAgent = isAllAgent || (t.agentName && t.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+      let matchesVillage = true;
+      if (!isAllVillage) {
+        const mem = memberMap.get(t.cardNumber);
+        matchesVillage = (mem?.village?.trim().toLowerCase() || '') === villageFilter.trim().toLowerCase();
+      }
+      if (matchesAgent && matchesVillage) {
         datesSet.add(t.date);
       }
     }
@@ -157,24 +215,28 @@ export function getAgentMonthlyStats(
 
   cardMembers.forEach((m) => {
     if (m.joiningDate && m.joiningDate.startsWith(yearMonth)) {
-      if (isAll || (m.agentName && m.agentName.trim().toLowerCase() === agentName.trim().toLowerCase())) {
+      const matchesAgent = isAllAgent || (m.agentName && m.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+      const matchesVillage = isAllVillage || (m.village && m.village.trim().toLowerCase() === villageFilter.trim().toLowerCase());
+      if (matchesAgent && matchesVillage) {
         datesSet.add(m.joiningDate);
       }
     }
   });
 
-  agentAdvances.forEach((a) => {
-    if (a.date && a.date.startsWith(yearMonth)) {
-      if (isAll || (a.agentName && a.agentName.trim().toLowerCase() === agentName.trim().toLowerCase())) {
-        datesSet.add(a.date);
+  if (isAllVillage) {
+    agentAdvances.forEach((a) => {
+      if (a.date && a.date.startsWith(yearMonth)) {
+        if (isAllAgent || (a.agentName && a.agentName.trim().toLowerCase() === agentName.trim().toLowerCase())) {
+          datesSet.add(a.date);
+        }
       }
-    }
-  });
+    });
+  }
 
   const sortedDates = Array.from(datesSet).sort();
 
   const dayRows: DayRowSummary[] = sortedDates.map((dateStr) => {
-    const stats = getAgentDailyStats(agentName, dateStr, cardTransactions, cardMembers, agentAdvances);
+    const stats = getAgentDailyStats(agentName, dateStr, cardTransactions, cardMembers, agentAdvances, villageFilter);
     return {
       date: dateStr,
       collection: stats.totalCollection,
@@ -194,18 +256,21 @@ export function getAgentMonthlyStats(
   const totalCardBonus = dayRows.reduce((sum, r) => sum + r.cardBonus, 0);
   const totalGross = dayRows.reduce((sum, r) => sum + r.gross, 0);
 
-  const advancesList = agentAdvances.filter((a) => {
-    const matchesMonth = a.date && a.date.startsWith(yearMonth);
-    const matchesAgent = isAll || (a.agentName && a.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
-    return matchesMonth && matchesAgent;
-  });
+  const advancesList = isAllVillage
+    ? agentAdvances.filter((a) => {
+        const matchesMonth = a.date && a.date.startsWith(yearMonth);
+        const matchesAgent = isAllAgent || (a.agentName && a.agentName.trim().toLowerCase() === agentName.trim().toLowerCase());
+        return matchesMonth && matchesAgent;
+      })
+    : [];
 
   const totalAdvances = advancesList.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
   const netPayable = totalGross - totalAdvances;
 
   return {
     monthLabel: yearMonth,
-    agentName: isAll ? 'All Agents' : agentName,
+    agentName: isAllAgent ? 'All Agents' : agentName,
+    villageName: isAllVillage ? 'All Villages' : villageFilter,
     totalCollection,
     totalCommission,
     totalNewCards,
@@ -216,6 +281,92 @@ export function getAgentMonthlyStats(
     dayRows,
     advancesList,
   };
+}
+
+/**
+ * Returns village-by-village summaries with members count, collection, commission and agent breakdown.
+ */
+export function getVillageWiseSummaries(
+  cardMembers: CardMember[] = [],
+  cardTransactions: CardTransaction[] = [],
+  dateOrMonthFilter?: { type: 'daily' | 'monthly' | 'all'; value: string }
+): VillageSummary[] {
+  const memberMap = new Map<number, CardMember>();
+  cardMembers.forEach((m) => {
+    memberMap.set(m.cardNumber, m);
+  });
+
+  // Unique villages
+  const distinctVillages = getDistinctVillages(cardMembers);
+  if (distinctVillages.length === 0) {
+    distinctVillages.push('सामान्य / इतर');
+  }
+
+  return distinctVillages.map((villageName) => {
+    const vMembers = cardMembers.filter((m) => (m.village?.trim() || 'सामान्य / इतर') === villageName);
+    const activeCards = vMembers.filter((m) => m.status !== 'Closed').length;
+
+    // Filter transactions for this village
+    const vTxs = cardTransactions.filter((tx) => {
+      const isCollection = tx.type === 'WeeklyPayment' || !tx.type || tx.type === 'Fee';
+      if (!isCollection) return false;
+      const mem = memberMap.get(tx.cardNumber);
+      const memVillage = mem?.village?.trim() || 'सामान्य / इतर';
+      if (memVillage !== villageName) return false;
+
+      if (!dateOrMonthFilter || dateOrMonthFilter.type === 'all') return true;
+      if (dateOrMonthFilter.type === 'daily') {
+        return tx.date === dateOrMonthFilter.value;
+      }
+      if (dateOrMonthFilter.type === 'monthly') {
+        return tx.date && tx.date.startsWith(dateOrMonthFilter.value);
+      }
+      return true;
+    });
+
+    const totalCollection = vTxs.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const collectionCount = vTxs.length;
+    const commission = Math.round(totalCollection * COMMISSION_RATE);
+
+    // Filter new cards in this village during period
+    const newCards = vMembers.filter((m) => {
+      if (!dateOrMonthFilter || dateOrMonthFilter.type === 'all') return true;
+      if (dateOrMonthFilter.type === 'daily') {
+        return m.joiningDate === dateOrMonthFilter.value;
+      }
+      if (dateOrMonthFilter.type === 'monthly') {
+        return m.joiningDate && m.joiningDate.startsWith(dateOrMonthFilter.value);
+      }
+      return true;
+    });
+
+    // Agent breakdown in this village
+    const agentMap = new Map<string, { count: number; amount: number }>();
+    vTxs.forEach((t) => {
+      const ag = t.agentName?.trim() || 'Unknown Agent';
+      const existing = agentMap.get(ag) || { count: 0, amount: 0 };
+      existing.count += 1;
+      existing.amount += Number(t.amount) || 0;
+      agentMap.set(ag, existing);
+    });
+
+    const agentBreakdown = Array.from(agentMap.entries()).map(([agentName, data]) => ({
+      agentName,
+      count: data.count,
+      amount: data.amount,
+    }));
+
+    return {
+      village: villageName,
+      totalMembers: vMembers.length,
+      activeCards,
+      totalCollection,
+      collectionCount,
+      commission,
+      newCardsCount: newCards.length,
+      agentBreakdown,
+    };
+  }).sort((a, b) => b.totalCollection - a.totalCollection);
 }
 
 /**
@@ -247,3 +398,46 @@ export function buildAgentDailyWhatsAppText(
     `_श्री साई इंटरप्राइजेस, वर्धा • रिअल-टाइम सिंक प्रणाली_`
   );
 }
+
+/**
+ * Generate formatted WhatsApp message for customer digital card passbook.
+ */
+export function buildCustomerPassbookWhatsAppText(
+  member: CardMember,
+  txs: CardTransaction[] = [],
+  businessName = 'SHRI SAI ENTERPRISES'
+): string {
+  const totalWeeksExpected = 130; // 30 months ~ 130 weeks
+  const paidWeeks = txs.filter(t => t.type === 'WeeklyPayment').length;
+  const remainingWeeks = Math.max(0, totalWeeksExpected - paidWeeks);
+  const totalPaid = Number(member.totalDeposited) || 0;
+  const recentTxs = txs.slice(-3).reverse();
+
+  let recentText = '';
+  if (recentTxs.length > 0) {
+    recentText = `\n*📜 शेवटचे जमा हप्ते:*\n` + recentTxs.map(t => `• ${t.date}: ₹${t.amount} (पावती #${t.receiptNo})`).join('\n') + `\n`;
+  }
+
+  return encodeURIComponent(
+    `*${businessName}*\n` +
+    `*🌟 डिजिटल बचत कार्ड पासबुक (Savings Card Passbook)*\n` +
+    `--------------------------------\n` +
+    `💳 कार्ड नंबर: *#${member.cardNumber}*\n` +
+    `👤 ग्राहक नाव: *${member.customerName}*\n` +
+    `🏡 गाव/पत्ता: *${member.village || 'Wardha'}*\n` +
+    `📅 सामील तारीख: *${member.joiningDate}*\n` +
+    `👤 एजंट: *${member.agentName || 'Shri Sai Staff'}*\n` +
+    `--------------------------------\n` +
+    `💰 एकूण जमा रक्कम: *₹${totalPaid.toLocaleString()}*\n` +
+    `🗓️ एकूण भरलेले हप्ते: *${paidWeeks} आठवडे*\n` +
+    `⏳ उर्वरित हप्ते: *${remainingWeeks} आठवडे*\n` +
+    `📊 प्रगती (Status): *${member.status === 'Completed' ? '✅ पूर्ण (Completed)' : '🔄 चालू (Active)'}*\n` +
+    `--------------------------------` +
+    recentText +
+    `--------------------------------\n` +
+    `🚚 सर्व मोठ्या इलेक्ट्रॉनिक्स व फर्निचर वस्तूंवर *फ्री होम डिलिव्हरी!*\n` +
+    `📞 संपर्क: 8766486915 / 8600122798\n` +
+    `_श्री साई इंटरप्राइजेस, आर्वी रोड, पंजाब कॉलनी, वर्धा_`
+  );
+}
+

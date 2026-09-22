@@ -42,7 +42,8 @@ import {
   AlertCircle,
   Zap,
   Bookmark,
-  Armchair
+  Armchair,
+  Bell
 } from 'lucide-react';
 import {
   BusinessSettings,
@@ -62,10 +63,17 @@ import { AppLogo } from './AppLogo';
 import { PWAInstallModal } from './PWAInstallModal';
 import { usePWAInstall } from '../utils/usePWAInstall';
 import { ProductEditModal } from './ProductEditModal';
-import { OrderBillModal, OrderBillData } from './OrderBillModal';
+import { OrderBillModal, OrderBillData, OrderFinanceDetails } from './OrderBillModal';
 import { ServicesAndTrustSection } from './ServicesAndTrustSection';
 import { FloatingCallAndWhatsApp } from './FloatingCallAndWhatsApp';
 import { DayNightToggle } from './DayNightToggle';
+import { AmazonHeader } from './AmazonHeader';
+import { AmazonHeroSection } from './AmazonHeroSection';
+import { AmazonDealsCarousel } from './AmazonDealsCarousel';
+import { AmazonProductCard } from './AmazonProductCard';
+import { AmazonFooter } from './AmazonFooter';
+import { CartNotificationToast, CartNotificationItem } from './CartNotificationToast';
+import { CartFinanceSection } from './CartFinanceSection';
 
 interface CartItem {
   item: StockItem;
@@ -107,6 +115,8 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   const [searchQuery, setSearchQuery] = useState(
     initialPassbookCardNo ? String(initialPassbookCardNo) : ''
   );
+  // Search query for products catalog (Amazon search bar)
+  const [productSearchQuery, setProductSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<CardMember | null>(null);
   const [passbookSearchError, setPassbookSearchError] = useState('');
   const [showFullPassbookModal, setShowFullPassbookModal] = useState(false);
@@ -120,6 +130,8 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
+  const [cartNotification, setCartNotification] = useState<CartNotificationItem | null>(null);
+  const [checkoutMode, setCheckoutMode] = useState<'cash' | 'finance'>('cash');
   const [showContactsModal, setShowContactsModal] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const { isInstallable, isInstalled } = usePWAInstall();
@@ -304,11 +316,59 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
     return ['all', ...Array.from(cats)];
   }, [stock]);
 
-  // Filtered stock items
+  // Filtered stock items based on selected category AND product search query
   const filteredStock = useMemo(() => {
-    if (selectedCategory === 'all') return stock;
-    return stock.filter((item) => item.category === selectedCategory);
-  }, [stock, selectedCategory]);
+    let list = stock;
+    if (selectedCategory !== 'all') {
+      list = list.filter((item) => item.category === selectedCategory);
+    }
+    const q = productSearchQuery.trim().toLowerCase();
+    if (!q) return list;
+
+    // Multi-term matching with English & Marathi keyword synonyms
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const marathiSynonyms: Record<string, string[]> = {
+      cooler: ['कुलर', 'कूलर', 'हवा'],
+      fridge: ['फ्रीज', 'फ्रिज', 'रेफ्रिजरेटर', 'godrej', 'lg', 'whirlpool', 'samsung'],
+      refrigerator: ['फ्रीज', 'फ्रिज', 'रेफ्रिजरेटर'],
+      tv: ['टीव्ही', 'दूरदर्शन', 'स्मार्ट टीव्ही', 'led', 'smart tv', '4k'],
+      television: ['टीव्ही', 'दूरदर्शन'],
+      sofa: ['सोफा', 'सिटिंग', 'बेड', 'कौच', 'corner sofa'],
+      bed: ['बेड', 'पलंग', 'गादी', 'king size', 'queen'],
+      almirah: ['कपाट', 'अलमारी', 'अल्मारी', 'wardrobe', 'steel'],
+      cupboard: ['कपाट', 'अलमारी'],
+      wardrobe: ['कपाट', 'अलमारी'],
+      washing: ['वॉशिंग', 'कपडे', 'machine'],
+      machine: ['मशीन', 'वॉशिंग'],
+      furniture: ['फर्निचर', 'सोफा', 'कपाट', 'बेड'],
+      table: ['टेबल', 'डायनिंग'],
+      chair: ['खुर्ची', 'चेअर'],
+    };
+
+    return list.filter((item) => {
+      const name = (item.name || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      const code = (item.code || '').toLowerCase();
+      const unit = (item.unit || '').toLowerCase();
+      const desc = `${name} ${cat} ${code} ${unit}`;
+
+      return tokens.every((token) => {
+        // Direct match
+        if (desc.includes(token)) return true;
+
+        // Synonym matching
+        for (const [key, synonyms] of Object.entries(marathiSynonyms)) {
+          if (token.includes(key) || key.includes(token)) {
+            if (synonyms.some((s) => desc.includes(s))) return true;
+          }
+          if (synonyms.some((s) => token.includes(s) || s.includes(token))) {
+            if (desc.includes(key) || synonyms.some((s) => desc.includes(s))) return true;
+          }
+        }
+        return false;
+      });
+    });
+  }, [stock, selectedCategory, productSearchQuery]);
 
   // Transactions for selected passbook member
   const memberTransactions = useMemo(() => {
@@ -333,7 +393,74 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       }
       return [...prev, { item, quantity: 1 }];
     });
-    setIsCartOpen(true);
+
+    // Gentle audio chime notification
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      }
+    } catch (e) {}
+
+    // Trigger direct instant notification toast to customer outside
+    setCartNotification({
+      item,
+      quantity: 1,
+      timestamp: Date.now(),
+    });
+
+    // Notify admin inside ERP (window event, multi-tab BroadcastChannel, and server SSE)
+    const cartActivityData = {
+      type: 'cart_add',
+      item: {
+        id: item.id,
+        name: item.name,
+        sellingPrice: item.sellingPrice,
+        category: item.category,
+        imageUrl: item.imageUrl,
+      },
+      timestamp: Date.now(),
+    };
+
+    try {
+      window.dispatchEvent(new CustomEvent('shri_sai_cart_updated', { detail: cartActivityData }));
+    } catch (e) {}
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('shri_sai_realtime_channel');
+        bc.postMessage(cartActivityData);
+        bc.close();
+      }
+    } catch (e) {}
+
+    try {
+      fetch('/api/realtime/order-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cart_activity',
+          order: {
+            activityType: 'add_to_cart',
+            itemName: item.name,
+            itemPrice: item.sellingPrice,
+            category: item.category,
+            timestamp: Date.now(),
+          },
+        }),
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
@@ -368,7 +495,7 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   const cartGrandTotal = cartSubtotal + currentDeliveryFee;
 
   // Order Placement & Printed Bill Generation
-  const handlePlaceOrderAndGenerateBill = () => {
+  const handlePlaceOrderAndGenerateBill = (financeDetails?: OrderFinanceDetails) => {
     if (cart.length === 0) return;
     const invNo = `INV-ORD-${Date.now().toString().slice(-6)}`;
     const today = new Date().toLocaleDateString('en-IN', {
@@ -376,6 +503,9 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       month: '2-digit',
       year: 'numeric',
     });
+
+    const isFinance = Boolean(financeDetails);
+    const paymentMode = isFinance ? 'Finance EMI' : 'Cash on Delivery';
 
     const billData: OrderBillData = {
       invoiceNo: invNo,
@@ -394,6 +524,8 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       deliveryFee: currentDeliveryFee,
       grandTotal: cartGrandTotal,
       notes: orderNotes.trim(),
+      paymentMode,
+      financeDetails,
     };
 
     // 1. Record into ERP store transactions if handler provided
@@ -405,10 +537,10 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
         customerName: billData.customerName,
         customerPhone: billData.customerPhone,
         totalAmount: cartGrandTotal,
-        payingNow: 0,
-        dueAmount: cartGrandTotal,
-        paymentMode: 'Cash on Delivery',
-        itemDetails: `Online Store Order: ${summary}`,
+        payingNow: financeDetails ? financeDetails.downPayment : 0,
+        dueAmount: financeDetails ? Math.max(0, cartGrandTotal - financeDetails.downPayment) : cartGrandTotal,
+        paymentMode: isFinance ? `Finance (${financeDetails?.providerName})` : 'Cash on Delivery',
+        itemDetails: `Online Store Order: ${summary}${financeDetails ? ` [${financeDetails.schemeName} | EMI: ₹${financeDetails.monthlyEmi}/mo]` : ''}`,
       });
     }
 
@@ -431,9 +563,19 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       }
     } catch (e) {}
 
-    // 3. Dispatch event for real-time notification alert in ERP
+    // 3. Dispatch event for real-time notification alert in ERP & Server SSE
     try {
       window.dispatchEvent(new CustomEvent('shri_sai_order_placed', { detail: billData }));
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('shri_sai_realtime_channel');
+        bc.postMessage({ type: isFinance ? 'finance_order_placed' : 'order_placed', order: billData });
+        bc.close();
+      }
+      fetch('/api/realtime/order-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: isFinance ? 'finance_order_placed' : 'order_placed', order: billData }),
+      }).catch(() => {});
     } catch (e) {}
 
     // 4. Save to local storage online orders
@@ -448,11 +590,11 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
     setIsCartOpen(false);
 
     // 5. Automatically forward order to owner's WhatsApp so owner gets immediate notification
-    handlePlaceOrderWhatsApp('8766486915');
+    handlePlaceOrderWhatsApp('8766486915', financeDetails);
   };
 
   // WhatsApp Order Submission (Direct forward)
-  const handlePlaceOrderWhatsApp = (targetPhone = '8766486915') => {
+  const handlePlaceOrderWhatsApp = (targetPhone = '8766486915', finance?: OrderFinanceDetails) => {
     if (cart.length === 0) return;
     const itemsList = cart
       .map(
@@ -463,8 +605,22 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       )
       .join('\n');
 
+    let financeMsgSection = '';
+    if (finance) {
+      financeMsgSection =
+        `--------------------------------\n` +
+        `⚡ *फायनान्स अर्ज तपशील (FINANCE SCHEME):*\n` +
+        `*फायनान्स कंपनी:* ${finance.providerName}\n` +
+        `*योजना:* ${finance.schemeName}\n` +
+        `*कालावधी:* ${finance.tenureMonths} महिने\n` +
+        `*मासिक हप्ता (EMI):* ₹${finance.monthlyEmi.toLocaleString()} / महिना\n` +
+        `*डाऊन पेमेंट:* ₹${finance.downPayment.toLocaleString()}\n` +
+        (finance.customerDocNumber ? `*केवायसी/कार्ड नंबर:* ${finance.customerDocNumber}\n` : '') +
+        (finance.employmentType ? `*रोजगार प्रकार:* ${finance.employmentType}\n` : '');
+    }
+
     const message = encodeURIComponent(
-      `🛒 *NEW ONLINE ORDER - SHRI SAI ENTERPRISES*\n` +
+      (finance ? `⚡ *नवीन ०% फायनान्स अर्ज - श्री साई इंटरप्राइजेस*\n` : `🛒 *नवीन ऑनलाइन ऑर्डर - श्री साई इंटरप्राइजेस*\n`) +
       `--------------------------------\n` +
       `*Customer Name:* ${customerName || 'Customer'}\n` +
       `*Contact Phone:* ${customerPhone || 'Not provided'}\n` +
@@ -476,9 +632,12 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
       `*Subtotal:* ₹${cartSubtotal.toLocaleString()}\n` +
       `*Delivery Fee:* ${isFreeDelivery ? 'FREE (Order above ₹3,000)' : `₹${currentDeliveryFee}`}\n` +
       `*Total Payable:* ₹${cartGrandTotal.toLocaleString()}\n` +
+      financeMsgSection +
       (orderNotes ? `*Note:* ${orderNotes}\n` : '') +
       `--------------------------------\n` +
-      `Please confirm availability and dispatch time. Thank you!`
+      (finance
+        ? `कृपया तात्काळ फायनान्स डॉकेट व्हेरिफाय करून ईएमआय मंजुरी द्या. धन्यवाद!`
+        : `Please confirm availability and dispatch time. Thank you!`)
     );
 
     window.open(`https://wa.me/91${targetPhone}?text=${message}`, '_blank');
@@ -516,127 +675,112 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
   return (
     <div className="min-h-screen tactile-canvas text-[var(--tactile-text-main)] flex flex-col selection:bg-[var(--tactile-primary)] selection:text-white">
       {/* Top Announcement Bar */}
-      <div className="bg-[#0B1528] text-amber-300 px-4 py-2 text-xs font-semibold text-center border-b border-white/10 flex items-center justify-center gap-2 no-print">
+      <div className="bg-[#0B1528] text-amber-300 px-3 sm:px-4 py-2 text-xs font-semibold text-center border-b border-white/10 flex items-center justify-center gap-2 no-print overflow-hidden">
         <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-        <span className="text-slate-200">
-          {settings.shopNotice || 'श्री साई इंटरप्राइजेस: ३०-महिने साप्ताहिक बचत कार्ड योजना बुकिंग चालू आहे • WhatsApp: 8766486915 & 8600122798'}
+        <span className="text-slate-100 truncate sm:whitespace-normal">
+          {(!settings.shopNotice || settings.shopNotice.includes('श्री साई'))
+            ? 'Shri Sai Enterprises: 30-Month Weekly Savings Card Scheme Booking Open • Free Home Delivery on all major items!'
+            : settings.shopNotice}
         </span>
         <span className="hidden md:inline text-white/30">•</span>
         <span className="hidden md:inline text-amber-300 font-mono font-bold">
-          GST IN: 27ALOPL0030G2ZC
+          GST: 27ALOPL0030G2ZC
         </span>
       </div>
 
-      {/* Primary Unique Header in Pristine Clean Light & Dark Theme matching Target */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-[#0F172A] text-slate-900 dark:text-slate-100 border-b border-slate-200/80 dark:border-slate-800 shadow-xs no-print transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3 sm:gap-6">
-          {/* Brand Logo & Name */}
-          <div className="flex items-center gap-3 min-w-0">
-            <a href="#top" className="flex items-center gap-3 group min-w-0">
-              <AppLogo size="sm" variant="iconOnly" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg lg:text-xl tracking-tight font-display">
-                    SHRI SAI
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                    Showroom & Schemes
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block truncate">
-                  Contemporary Furniture, Smart Electronics & Passbook Hub
-                </p>
-              </div>
-            </a>
-          </div>
+      {/* Amazon-Style Header */}
+      <AmazonHeader
+        searchQuery={productSearchQuery}
+        onSearchChange={(q) => {
+          setProductSearchQuery(q);
+        }}
+        onSearchSubmit={(e) => {
+          if (e) e.preventDefault();
+          const q = productSearchQuery.trim();
+          if (!q) return;
 
-          {/* Desktop Center Navigation Links */}
-          <nav className="hidden xl:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
-            <a href="#products-catalog" className="hover:text-[#0D5C4D] dark:hover:text-emerald-400 transition">
-              Collections
-            </a>
-            <a href="#passbook-section" className="hover:text-[#0D5C4D] dark:hover:text-emerald-400 transition">
-              Passbook Lookup
-            </a>
-            <a href="#savings-schemes" className="hover:text-[#0D5C4D] dark:hover:text-emerald-400 transition">
-              30-Month Schemes
-            </a>
-            <a href="#services" className="hover:text-[#0D5C4D] dark:hover:text-emerald-400 transition">
-              Services & Trust
-            </a>
-            <a href="#location" className="hover:text-[#0D5C4D] dark:hover:text-emerald-400 transition">
-              Showroom Location
-            </a>
-          </nav>
+          // Check if user is searching for a numeric card number (e.g. 1001-3000) or 10-digit mobile
+          const isCardOrPhone = /^\d{3,10}$/.test(q);
+          if (isCardOrPhone) {
+            const match = cardMembers.find((m) => {
+              const cardStr = String(m.cardNumber);
+              const phoneClean = (m.phone || '').replace(/[^0-9]/g, '');
+              return cardStr === q || phoneClean.endsWith(q);
+            });
+            if (match) {
+              setSelectedMember(match);
+              setSearchQuery(q);
+              const el = document.getElementById('digital-passbook-card') || document.getElementById('passbook-section');
+              el?.scrollIntoView({ behavior: 'smooth' });
+              return;
+            }
+          }
 
-          {/* Header Action Buttons: Day/Night Toggle, Install, Cart, Staff/Admin */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Day / Night Theme Switcher */}
-            <DayNightToggle size="sm" showLabel={false} />
-
-            {/* Install App Button */}
-            <button
-              onClick={() => setShowInstallModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer shadow-2xs"
-              title="Install App on Phone"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              <span className="hidden sm:inline">Install App</span>
-              <span className="sm:hidden font-bold">App</span>
-            </button>
-
-            {/* Shopping Cart Button */}
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="px-3.5 sm:px-4 py-2 rounded-full bg-[#0D5C4D] hover:bg-[#084337] active:scale-95 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
-              title="Open Cart"
-            >
-              <ShoppingCart className="w-3.5 h-3.5 text-white" />
-              <span>Cart</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[10px] font-mono font-black ml-0.5">
-                {cartItemsCount}
-              </span>
-            </button>
-
-            {/* If Admin is logged in, show 'Admin ERP' button; else 'Staff Counter' & Lock */}
-            {isAdminLoggedIn ? (
-              <button
-                onClick={onGoToAdminDashboard}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold transition shadow-xs cursor-pointer"
-                title="Go to Admin Billing ERP"
-              >
-                <ArrowRight className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Admin ERP</span>
-                <span className="sm:hidden font-bold">ERP</span>
-              </button>
-            ) : (
-              <button
-                onClick={onOpenLoginModal}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-amber-50 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-300 text-xs font-bold transition shadow-2xs cursor-pointer"
-                title="Staff Counter Login"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 fill-amber-500" />
-                <span className="hidden sm:inline">Staff Counter</span>
-                <span className="sm:hidden font-extrabold">Staff</span>
-              </button>
-            )}
-
-            {/* Lock / Login Icon */}
-            {!isAdminLoggedIn && (
-              <button
-                onClick={onOpenLoginModal}
-                className="p-2 rounded-full text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                title="Admin & Staff Login"
-              >
-                <Lock className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+          // Otherwise, scroll smoothly to the products catalog
+          const el = document.getElementById('products-catalog');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        selectedCategory={selectedCategory}
+        onSelectCategory={(cat) => {
+          setSelectedCategory(cat);
+          const el = document.getElementById('products-catalog');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        categories={categories}
+        cartCount={cartItemsCount}
+        onOpenCart={() => setIsCartOpen(true)}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onGoToAdminDashboard={onGoToAdminDashboard}
+        onOpenLoginModal={onOpenLoginModal}
+        onScrollToPassbook={() => {
+          const el = document.getElementById('passbook-section');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onScrollToSchemes={() => {
+          const el = document.getElementById('savings-schemes');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onScrollToProducts={() => {
+          const el = document.getElementById('products-catalog');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onScrollToDeals={() => {
+          const el = document.getElementById('todays-deals');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
 
       {/* Main Container */}
-      <main className="flex-1 pb-24 lg:pb-12 overflow-x-hidden">
+      <main className="flex-1 pb-24 lg:pb-12 overflow-x-hidden bg-[#eaeded] dark:bg-[#0b1120] transition-colors">
+        {/* Amazon Hero Banner Carousel & 4-in-1 Quad Bento Cards */}
+        <AmazonHeroSection
+          onSelectCategory={(cat) => {
+            setSelectedCategory(cat);
+            const el = document.getElementById('products-catalog');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onScrollToProducts={() => {
+            const el = document.getElementById('products-catalog');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onScrollToPassbook={() => {
+            const el = document.getElementById('passbook-section');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onScrollToSchemes={() => {
+            const el = document.getElementById('savings-schemes');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          shopPhone={settings.phone || '8766486915'}
+        />
+
+        {/* Amazon Today's Deals Horizontal Scroll Strip */}
+        <AmazonDealsCarousel
+          items={stock}
+          onAddToCart={addToCart}
+          shopPhone={settings.phone || '8766486915'}
+        />
+
         {/* HERO SECTION WITH CLEAN LIGHT & NIGHT THEME & PASSBOOK LOOKUP */}
         <section id="passbook-section" className="bg-gradient-to-b from-white via-slate-50/50 to-white dark:from-[#0F172A] dark:via-[#131F37] dark:to-[#0F172A] text-slate-900 dark:text-slate-100 pt-10 pb-14 px-4 sm:px-6 relative overflow-hidden transition-colors">
           <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
@@ -1130,120 +1274,74 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
             ))}
           </div>
 
-          {/* Stock Items Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredStock.map((item, idx) => (
-              <motion.div
-                key={`${item.id}-${idx}`}
-                whileHover={{ y: -4, transition: { duration: 0.18 } }}
-                className="bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group relative"
+          {/* Active Search Feedback Bar */}
+          {productSearchQuery.trim() && (
+            <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>
+                  <strong>"{productSearchQuery}"</strong> साठी <strong>{filteredStock.length}</strong> उत्पादने सापडली
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProductSearchQuery('')}
+                className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 text-xs font-semibold cursor-pointer"
               >
-                <div>
-                  {/* Product Photo */}
-                  <div className="w-full h-48 rounded-xl overflow-hidden bg-slate-100 dark:bg-[#0F172A] mb-3 relative flex items-center justify-center border border-slate-100 dark:border-slate-800">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={`Shri Sai Enterprises Wardha - ${item.name} (${item.category})`}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-slate-400 gap-1.5 p-4 text-center">
-                        <Tv className="w-10 h-10 text-slate-300 dark:text-slate-600" />
-                        <span className="text-[11px] font-medium text-slate-400">{item.category}</span>
-                      </div>
-                    )}
+                Clear (सर्व उत्पादने पहा)
+              </button>
+            </div>
+          )}
 
-                    {/* Quick Admin Edit Button on Photo Overlay */}
-                    {isAdminMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingStockItem(item);
-                          setIsProductEditModalOpen(true);
-                        }}
-                        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-900 text-amber-300 text-[11px] font-bold backdrop-blur-xs flex items-center gap-1 shadow-md transition cursor-pointer"
-                        title="किंमत व फोटो बदला"
-                      >
-                        <Edit3 className="w-3 h-3 text-amber-400" />
-                        किंमत/फोटो बदला
-                      </button>
-                    )}
-                  </div>
+          {/* Empty Search Result State */}
+          {filteredStock.length === 0 && (
+            <div className="text-center py-12 px-4 bg-white dark:bg-[#1E293B] rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 space-y-3">
+              <Search className="w-10 h-10 text-slate-400 mx-auto" />
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                "{productSearchQuery}" साठी कोणतेही उत्पादन सापडले नाही
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                कृपया शब्दलेखन तपासा किंवा खालील लोकप्रिय उत्पादन श्रेणी निवडा:
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                {['Cooler', 'Refrigerator', 'Smart TV', 'Sofa', 'Almirah'].map((suggest) => (
+                  <button
+                    key={suggest}
+                    type="button"
+                    onClick={() => setProductSearchQuery(suggest)}
+                    className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-amber-100 hover:text-amber-900 transition cursor-pointer"
+                  >
+                    🔍 {suggest}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductSearchQuery('');
+                    setSelectedCategory('all');
+                  }}
+                  className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400 cursor-pointer"
+                >
+                  सर्व उत्पादने दाखवा
+                </button>
+              </div>
+            </div>
+          )}
 
-                  {/* Badges & Code */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-medium">
-                        {item.code}
-                      </span>
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> In Stock ({item.quantity} {item.unit})
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-blue-500 transition leading-snug line-clamp-2">
-                        {item.name}
-                      </h3>
-                      {item.description && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 mt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block font-medium">किंमत (Retail Price):</span>
-                      <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
-                        ₹{item.sellingPrice.toLocaleString()}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/50 dark:border-emerald-800/50 px-2 py-0.5 rounded">
-                      Genuine Warranty
-                    </span>
-                  </div>
-
-                  {/* Admin Direct Price/Photo edit button if in Admin Mode */}
-                  {isAdminMode && (
-                    <button
-                      onClick={() => {
-                        setEditingStockItem(item);
-                        setIsProductEditModalOpen(true);
-                      }}
-                      className="w-full py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                      किंमत व फोटो बदला (Set Price & Photo)
-                    </button>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      onClick={() => addToCart(item)}
-                      className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add to Cart
-                    </button>
-                    <a
-                      href={getDirectWhatsAppItemLink(item, '8766486915')}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                      title="WhatsApp वर चौकशी करा"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      WhatsApp
-                    </a>
-                  </div>
-                </div>
-              </motion.div>
+          {/* Stock Items Grid with Amazon Product Cards & Real Photos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {filteredStock.map((item) => (
+              <AmazonProductCard
+                key={item.id}
+                item={item}
+                onAddToCart={addToCart}
+                isAdminMode={isAdminMode}
+                onEditItem={(it) => {
+                  setEditingStockItem(it);
+                  setIsProductEditModalOpen(true);
+                }}
+                shopPhone={settings.phone || '8766486915'}
+              />
             ))}
           </div>
         </section>
@@ -1399,59 +1497,23 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
         </section>
       </main>
 
-      {/* FOOTER */}
-      <footer className="bg-slate-950 text-slate-400 text-xs py-10 px-4 sm:px-6 border-t border-slate-900 no-print">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-slate-900">
-            <div>
-              <p className="font-bold text-base text-slate-100">
-                Shri Sai Enterprises (श्री साई इंटरप्राइजेस) • Wardha
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - 442001, महाराष्ट्र
-              </p>
-              <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-amber-400 mt-2">
-                <span>GSTIN: <strong>27ALOPL0030G2ZC</strong></span>
-                <span>•</span>
-                <span>Udyam Reg: <strong>UDYAM-MH-33-0012948</strong></span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="tel:8766486915"
-                className="px-3.5 py-2 rounded-xl bg-blue-900/60 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 transition"
-              >
-                <Phone className="w-3.5 h-3.5 text-amber-300" />
-                8766486915
-              </a>
-              <a
-                href="tel:8600122798"
-                className="px-3.5 py-2 rounded-xl bg-blue-900/60 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 transition"
-              >
-                <Phone className="w-3.5 h-3.5 text-amber-300" />
-                8600122798
-              </a>
-              <button
-                onClick={onOpenLoginModal}
-                className="px-3.5 py-2 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-amber-300 transition flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>Staff Portal</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
-            <p>
-              Top Services: Air Cooler Sales, Smart TV, Refrigerators, 30-Month Weekly Savings Card Scheme, Electrical Wiring & Appliance Repairs in Wardha, Arvi, Sevagram, Maharashtra.
-            </p>
-            <p className="shrink-0 font-medium">
-              shrisaient.in © 2026
-            </p>
-          </div>
-        </div>
-      </footer>
+      {/* Amazon Multi-Column Directory Footer with Back to Top */}
+      <AmazonFooter
+        settings={settings}
+        onOpenLoginModal={onOpenLoginModal}
+        onScrollToPassbook={() => {
+          const el = document.getElementById('passbook-section');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onScrollToSchemes={() => {
+          const el = document.getElementById('savings-schemes');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onScrollToProducts={() => {
+          const el = document.getElementById('products-catalog');
+          el?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
 
       {/* CLEAN & MINIMAL SHOPPING CART MODAL */}
       {isCartOpen && (
@@ -1603,8 +1665,21 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                   </div>
                 </div>
 
+                {/* Direct Instant Notification Banner */}
+                <div className="mx-5 my-2.5 p-3 rounded-xl bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-amber-500/10 border border-emerald-500/30 dark:border-emerald-500/20 text-xs flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Bell className="w-3.5 h-3.5 animate-bounce" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-[11px] leading-snug text-slate-700 dark:text-slate-200">
+                    <strong className="text-emerald-700 dark:text-emerald-400 font-bold block">
+                      डायरेक्ट WhatsApp व स्टोअर अलर्ट ॲक्टिव्ह:
+                    </strong>
+                    ऑर्डर किंवा फायनान्स अर्ज देताच श्री साई वर्धा दुकानात (8766486915) व तुमच्या मोबाईलवर थेट इन्स्टंट अलर्ट व डिजिटल बिल पाठवले जाईल.
+                  </div>
+                </div>
+
                 {/* Minimal Customer Form */}
-                <div className="px-5 py-3 space-y-2.5">
+                <div className="px-5 py-2.5 space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <input
                       type="text"
@@ -1630,11 +1705,57 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-amber-400 placeholder:text-slate-400"
                   />
                 </div>
+
+                {/* Payment Option Switcher Tabs */}
+                <div className="px-5 pt-1 pb-2">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    पेमेंट किंवा फायनान्स पर्याय निवडा (Select Payment / Finance):
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutMode('cash')}
+                      className={`py-2.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
+                        checkoutMode === 'cash'
+                          ? 'bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-xs font-black'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>💵 कॅश ऑन डिलिव्हरी / UPI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutMode('finance')}
+                      className={`py-2.5 px-3 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
+                        checkoutMode === 'finance'
+                          ? 'bg-blue-600 text-white shadow-xs font-black ring-2 ring-blue-400/40'
+                          : 'text-blue-700 dark:text-blue-400 hover:text-blue-900'
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                      <span>⚡ बजाज ०% फायनान्स / EMI</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Embedded Finance Section when Finance Mode is active */}
+                {checkoutMode === 'finance' && (
+                  <div className="px-5 pb-5">
+                    <CartFinanceSection
+                      totalAmount={cartGrandTotal}
+                      customerName={customerName}
+                      customerPhone={customerPhone}
+                      customerAddress={customerAddress}
+                      onApplyFinance={(financeDetails) => handlePlaceOrderAndGenerateBill(financeDetails)}
+                      shopPhone="8766486915"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Minimal Summary & Confirm */}
-            {cart.length > 0 && (
+            {/* Minimal Summary & Confirm (Visible in Cash Mode) */}
+            {cart.length > 0 && checkoutMode === 'cash' && (
               <div className="p-5 bg-white dark:bg-[#1E293B] border-t border-slate-100 dark:border-slate-800 space-y-3 shrink-0">
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between text-slate-500 dark:text-slate-400">
@@ -1655,11 +1776,21 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
 
                 {/* Dominant Primary Action Button */}
                 <button
-                  onClick={handlePlaceOrderAndGenerateBill}
+                  onClick={() => handlePlaceOrderAndGenerateBill()}
                   className="w-full py-3 rounded-xl bg-slate-950 dark:bg-amber-400 hover:bg-slate-800 dark:hover:bg-amber-300 text-white dark:text-slate-950 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm cursor-pointer active:scale-[0.99]"
                 >
                   <FileText className="w-4 h-4 text-amber-400 dark:text-slate-950" />
-                  <span>ऑर्डर निश्चित करा व बिल मिळवा (Confirm Order)</span>
+                  <span>कॅश ऑन डिलिव्हरीने ऑर्डर निश्चित करा (Confirm Order)</span>
+                </button>
+
+                {/* Switch to Bajaj Finance CTA */}
+                <button
+                  type="button"
+                  onClick={() => setCheckoutMode('finance')}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>पैसे एकत्र नाहीत? बजाज ०% हप्त्याने (EMI) खरेदी करा</span>
                 </button>
 
                 {/* Direct WhatsApp Option */}
@@ -1685,6 +1816,25 @@ export const ShopLandingView: React.FC<ShopLandingViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* DIRECT INSTANT CART NOTIFICATION TOAST */}
+      <CartNotificationToast
+        notification={cartNotification}
+        cartCount={cartItemsCount}
+        cartTotal={cartGrandTotal}
+        currentQuantity={cart.find((c) => c.item.id === cartNotification?.item.id)?.quantity}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeFromCart}
+        onClose={() => setCartNotification(null)}
+        onOpenCart={() => {
+          setCheckoutMode('cash');
+          setIsCartOpen(true);
+        }}
+        onOpenBajajFinance={() => {
+          setCheckoutMode('finance');
+          setIsCartOpen(true);
+        }}
+      />
 
       {/* SLEEK FLOATING CART PILL WHEN CART HAS ITEMS */}
       {cartItemsCount > 0 && !isCartOpen && (

@@ -20,6 +20,8 @@ import {
   Filter
 } from 'lucide-react';
 import { CardMember, CardTransaction, BusinessSettings, TransactionEntry } from '../types';
+import { DynamicUpiQrCode } from './DynamicUpiQrCode';
+import { ThermalReceiptModal, ThermalReceiptData } from './ThermalReceiptModal';
 
 interface CardPassbookModalProps {
   member: CardMember;
@@ -77,6 +79,7 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
 
   // Print mode (compact 1-page fit vs all pages)
   const [printMode, setPrintMode] = useState<'compact1Page' | 'all'>('compact1Page');
+  const [showThermalSlip, setShowThermalSlip] = useState(false);
 
   useEffect(() => {
     setCurrentMember(member);
@@ -378,6 +381,7 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
       ? `⚖️ *ग्राहकाकडे येणे बाकी (उधारी): ₹${Math.abs(netBalance).toLocaleString()} (बाकी)*`
       : `⚖️ *शिल्लक जमा (ठेव): ₹${netBalance.toLocaleString()} (जमा)*`;
 
+    const groupLink = settings.whatsappGroupLink || 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4';
     const text = encodeURIComponent(
       `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
       `*बँक पासबुक व योजना लेजर (Bank Passbook Statement)*\n` +
@@ -396,7 +400,9 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
       `📋 शेवटचे व्यवहार (Recent Activity):\n` +
       `${lines}\n` +
       `--------------------------------\n` +
-      `📞 संपर्क: ${settings.phone || '8766486915'} • आर्वी रोड, वर्धा`
+      `👉 श्री साई एंटरप्रायझेस अधिकृत व्हॉट्सॲप ग्रुप जॉईन करा:\n${groupLink}\n\n` +
+      `📞 संपर्क: 8766486915 / 8600122798 • आर्वी रोड, वर्धा\n` +
+      `🌐 वेबसाईट: ${settings.domainName || 'shrisaient.in'}`
     );
 
     const phone = currentMember.phone ? currentMember.phone.replace(/[^0-9]/g, '') : '';
@@ -587,13 +593,30 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
           </tfoot>
         </table>
 
-        {/* Footer & Dual Signatures */}
+        {/* Footer & Dual Signatures & UPI Payment QR */}
         <div className="pt-2 border-t border-slate-400 mt-4">
-          <div className="text-[10px] text-slate-600 mb-6 italic">
-            टीप: १. कृपया प्रत्येक हप्ता किंवा वस्तू खरेदीची नोंद पासबुकमध्ये तपासून घ्यावी. २. ही संगणकीय अधिकृत प्रत आहे. काही तफावत असल्यास दुकानात संपर्क साधावा.
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+            <div className="md:col-span-3 text-[10px] text-slate-600 italic">
+              टीप: १. कृपया प्रत्येक हप्ता किंवा वस्तू खरेदीची नोंद पासबुकमध्ये तपासून घ्यावी. २. ही संगणकीय अधिकृत प्रत आहे. काही तफावत असल्यास दुकानात संपर्क साधावा.
+              <div className="mt-2 font-sans not-italic text-slate-800 text-[11px]">
+                <strong>थेट पेमेंट:</strong> थकबाकी किंवा मासिक हप्ता भरण्यासाठी उजवीकडील QR कोड Google Pay / PhonePe ने स्कॅन करा.
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center p-1 bg-white border border-slate-300 rounded-lg">
+              <DynamicUpiQrCode
+                upiId={settings.upiId || '8766486915@ybl'}
+                payeeName={settings.businessName || 'Shri Sai Enterprises'}
+                amount={overdueDue > 0 ? overdueDue : 1000}
+                note={`Passbook #${currentMember.cardNumber}`}
+                size={85}
+                showBadges={false}
+                showAmountPill={true}
+              />
+            </div>
           </div>
 
-          <div className="flex justify-between items-end px-4 text-xs font-bold pt-6">
+          <div className="flex justify-between items-end px-4 text-xs font-bold pt-4">
             <div className="text-center min-w-[160px] border-t border-slate-700 pt-1">
               <span>सभासदाची स्वाक्षरी</span>
               <span className="block text-[10px] font-normal text-slate-500">(Member Signature)</span>
@@ -633,6 +656,15 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
             )}
             <button
               type="button"
+              onClick={() => setShowThermalSlip(true)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs transition"
+              title="थर्मल प्रिंटर पावती (POS)"
+            >
+              <Printer className="w-3.5 h-3.5 text-cyan-400" />
+              <span>थर्मल पावती</span>
+            </button>
+            <button
+              type="button"
               onClick={handleShareWhatsApp}
               className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs transition"
               title="WhatsApp वर पासबुक पाठवा"
@@ -643,7 +675,7 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs transition"
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs transition"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>प्रिंट पासबुक</span>
@@ -674,37 +706,19 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
             
             {/* Left Section: Stylized Authentic QR Code Card + Member Details */}
             <div className="flex items-start sm:items-center gap-4 min-w-0">
-              {/* White QR Card */}
-              <div className="bg-white p-2 rounded-xl text-center shadow-md w-24 sm:w-28 shrink-0 flex flex-col items-center justify-center">
-                <svg viewBox="0 0 100 100" className="w-16 h-16 sm:w-20 sm:h-20">
-                  <rect width="100" height="100" fill="white" />
-                  <rect x="10" y="10" width="26" height="26" fill="black" />
-                  <rect x="14" y="14" width="18" height="18" fill="white" />
-                  <rect x="18" y="18" width="10" height="10" fill="black" />
-
-                  <rect x="64" y="10" width="26" height="26" fill="black" />
-                  <rect x="68" y="14" width="18" height="18" fill="white" />
-                  <rect x="72" y="18" width="10" height="10" fill="black" />
-
-                  <rect x="10" y="64" width="26" height="26" fill="black" />
-                  <rect x="14" y="68" width="18" height="18" fill="white" />
-                  <rect x="18" y="72" width="10" height="10" fill="black" />
-
-                  <rect x="42" y="42" width="16" height="16" rx="3" fill="#eab308" />
-                  <text x="50" y="53" fontSize="8" fontWeight="bold" textAnchor="middle" fill="#0f172a">SSE</text>
-
-                  <rect x="42" y="12" width="6" height="6" fill="black" />
-                  <rect x="52" y="20" width="6" height="6" fill="black" />
-                  <rect x="14" y="44" width="6" height="6" fill="black" />
-                  <rect x="26" y="48" width="6" height="6" fill="black" />
-                  <rect x="44" y="68" width="6" height="6" fill="black" />
-                  <rect x="68" y="52" width="6" height="6" fill="black" />
-                  <rect x="76" y="76" width="6" height="6" fill="black" />
-                  <rect x="84" y="64" width="6" height="6" fill="black" />
-                  <rect x="64" y="84" width="6" height="6" fill="black" />
-                </svg>
+              {/* Dynamic Live UPI Payment QR Card */}
+              <div className="bg-white p-2 rounded-xl text-center shadow-md w-28 sm:w-32 shrink-0 flex flex-col items-center justify-center">
+                <DynamicUpiQrCode
+                  upiId={settings.upiId || '8766486915@ybl'}
+                  payeeName={settings.businessName || 'Shri Sai Enterprises'}
+                  amount={overdueDue > 0 ? overdueDue : 1000}
+                  note={`Card #${currentMember.cardNumber}`}
+                  size={84}
+                  showBadges={false}
+                  showAmountPill={true}
+                />
                 <span className="text-[10px] font-mono font-black text-slate-900 mt-1">CARD #{currentMember.cardNumber}</span>
-                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">SCAN QR</span>
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">SCAN TO PAY</span>
               </div>
 
               {/* Member Details */}
@@ -1171,6 +1185,31 @@ export const CardPassbookModal: React.FC<CardPassbookModalProps> = ({
         </div>
 
       </div>
+
+      {showThermalSlip && (
+        <ThermalReceiptModal
+          isOpen={showThermalSlip}
+          onClose={() => setShowThermalSlip(false)}
+          settings={settings}
+          data={{
+            type: 'card_installment',
+            receiptNo: `REC-${currentMember.cardNumber}-${paidWeeksCount || 1}`,
+            date: new Date().toISOString().split('T')[0],
+            customerName: currentMember.customerName,
+            customerPhone: currentMember.phone,
+            customerVillage: currentMember.village,
+            cardNo: currentMember.cardNumber,
+            installmentNo: paidWeeksCount || 1,
+            totalInstallments: totalTargetWeeks,
+            schemeName: currentMember.schemeName || '30-महिने बचत योजना',
+            paidAmount: currentMember.schemeId === 'scheme3' ? 250 : 1000,
+            totalAmount: totalTargetWeeks * (currentMember.schemeId === 'scheme3' ? 250 : 1000),
+            dueAmount: overdueDue,
+            paymentMode: 'Cash',
+            collectorName: currentMember.agentName || 'Kishor Bawane',
+          }}
+        />
+      )}
     </div>
   );
 

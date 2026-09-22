@@ -7,25 +7,40 @@ import {
   ArrowUpDown,
   Edit2,
   Trash2,
-  Download
+  Download,
+  ShieldCheck,
+  BellRing,
+  CheckCircle2
 } from 'lucide-react';
-import { StockItem } from '../types';
+import { StockItem, TransactionEntry, BusinessSettings } from '../types';
 import { exportStockToCsv } from '../utils/csvExporter';
+import { WarrantyTrackerModal } from './WarrantyTrackerModal';
 
 interface StockViewProps {
   stock: StockItem[];
   onAddStockItem: (item: Omit<StockItem, 'id'>) => void;
   onUpdateStockQty: (id: string, newQty: number) => void;
+  transactions?: TransactionEntry[];
+  settings?: BusinessSettings;
 }
 
 export const StockView: React.FC<StockViewProps> = ({
   stock,
   onAddStockItem,
   onUpdateStockQty,
+  transactions = [],
+  settings = {
+    businessName: 'Shri Sai Enterprises',
+    address: 'Arvi Road, Punjab Colony, Wardha',
+    phone: '8766486915',
+    secondaryPhone: '8600122798',
+  } as any,
 }) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+  const [lowStockFilterOnly, setLowStockFilterOnly] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -39,12 +54,15 @@ export const StockView: React.FC<StockViewProps> = ({
 
   const categories = ['All', ...Array.from(new Set(stock.map((s) => s.category)))];
 
+  const lowStockItems = stock.filter((item) => item.quantity <= item.minStockLevel);
+
   const filtered = stock.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.code.toLowerCase().includes(search.toLowerCase());
     const matchesCat = categoryFilter === 'All' ? true : item.category === categoryFilter;
-    return matchesSearch && matchesCat;
+    const matchesLowStock = lowStockFilterOnly ? item.quantity <= item.minStockLevel : true;
+    return matchesSearch && matchesCat && matchesLowStock;
   });
 
   const totalStockValuation = stock.reduce(
@@ -89,10 +107,18 @@ export const StockView: React.FC<StockViewProps> = ({
             Stock & Inventory
           </h1>
           <p className="text-sm text-slate-500">
-            Real-time stock quantities, pricing, and auto-deduction on sales.
+            Real-time stock quantities, low-stock reorder alerts & warranty tracker.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowWarrantyModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="इलेक्ट्रॉनिक्स व वस्तू वॉरंटी ट्रॅकर उघडा"
+          >
+            <ShieldCheck className="w-4 h-4 text-indigo-600" />
+            <span>🛡️ वॉरंटी ट्रॅकर</span>
+          </button>
           <button
             onClick={() => exportStockToCsv(stock)}
             className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -112,10 +138,34 @@ export const StockView: React.FC<StockViewProps> = ({
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <p className="text-xs text-slate-500 font-medium">Total Products Listed</p>
           <p className="text-xl font-bold text-slate-900 mt-1">{stock.length} Items</p>
+        </div>
+        <div
+          onClick={() => setLowStockFilterOnly(!lowStockFilterOnly)}
+          className={`rounded-xl border p-4 shadow-xs transition cursor-pointer ${
+            lowStockItems.length > 0
+              ? lowStockFilterOnly
+                ? 'bg-rose-500 text-white border-rose-600'
+                : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              : 'bg-white text-slate-900 border-slate-200'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold">
+              {lowStockItems.length > 0 ? '⚠️ Low Stock Alert' : 'Stock Status'}
+            </p>
+            {lowStockItems.length > 0 && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${lowStockFilterOnly ? 'bg-white text-rose-600' : 'bg-amber-200 text-amber-900'}`}>
+                {lowStockFilterOnly ? 'फिल्टर चालू' : 'क्लिक करून पाहा'}
+              </span>
+            )}
+          </div>
+          <p className="text-xl font-black mt-1">
+            {lowStockItems.length} {lowStockItems.length === 1 ? 'Item Low' : 'Items Low'}
+          </p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <p className="text-xs text-slate-500 font-medium">Current Stock Valuation (Cost)</p>
@@ -381,6 +431,16 @@ export const StockView: React.FC<StockViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Warranty Tracker Modal */}
+      {showWarrantyModal && (
+        <WarrantyTrackerModal
+          isOpen={showWarrantyModal}
+          onClose={() => setShowWarrantyModal(false)}
+          transactions={transactions}
+          settings={settings}
+        />
       )}
     </div>
   );

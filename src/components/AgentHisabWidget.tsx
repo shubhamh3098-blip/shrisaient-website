@@ -34,6 +34,7 @@ import {
 } from '../utils/agentCalculator';
 import { AgentAdvanceModal } from './AgentAdvanceModal';
 import { AgentMonthlySettlementModal } from './AgentMonthlySettlementModal';
+import { AgentCollectionSheetModal } from './AgentCollectionSheetModal';
 
 interface AgentHisabWidgetProps {
   cardMembers: CardMember[];
@@ -71,6 +72,7 @@ export const AgentHisabWidget: React.FC<AgentHisabWidgetProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [showAdvanceModal, setShowAdvanceModal] = useState<boolean>(false);
   const [showMonthlyModal, setShowMonthlyModal] = useState<boolean>(false);
+  const [showBeatSheetModal, setShowBeatSheetModal] = useState<boolean>(false);
   const [advanceModalAgent, setAdvanceModalAgent] = useState<string>('');
 
   // Daily statistics for selected agent and date
@@ -167,6 +169,16 @@ export const AgentHisabWidget: React.FC<AgentHisabWidgetProps> = ({
           >
             <Calendar className="w-3.5 h-3.5" />
             मासिक हिशोब (Monthly)
+          </button>
+
+          {/* Daily Beat Sheet */}
+          <button
+            onClick={() => setShowBeatSheetModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="दैनिक हप्ता वसुली पत्रक (Daily Collection Beat Sheet)"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>दैनिक वसुली पत्रक</span>
           </button>
 
           {/* WhatsApp Share */}
@@ -433,6 +445,18 @@ export const AgentHisabWidget: React.FC<AgentHisabWidgetProps> = ({
             setShowMonthlyModal(false);
             handleOpenAdvance(ag);
           }}
+        />
+      )}
+
+      {/* Daily Beat Sheet Modal */}
+      {showBeatSheetModal && (
+        <AgentCollectionSheetModal
+          isOpen={showBeatSheetModal}
+          onClose={() => setShowBeatSheetModal(false)}
+          cardMembers={cardMembers}
+          cardTransactions={cardTransactions}
+          settings={settings}
+          preselectedAgent={selectedAgent === 'all' ? undefined : selectedAgent}
         />
       )}
     </div>

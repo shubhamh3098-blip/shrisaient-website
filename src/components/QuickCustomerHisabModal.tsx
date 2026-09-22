@@ -413,37 +413,38 @@ export const QuickCustomerHisabModal: React.FC<QuickCustomerHisabModalProps> = (
             </div>
           )}
 
-          {/* Action Buttons: Print, WhatsApp, Save */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+          {/* Primary Action: Save to Khata */}
+          {onSaveQuickHisab && (
+            <button
+              type="button"
+              onClick={handleSaveToLedger}
+              className="w-full min-h-[46px] py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-blue-600/20 active:scale-[0.99]"
+            >
+              <FileText className="w-4 h-4 text-white" />
+              <span>खातेवहीत नवीन व्यवहार नोंदवा (Save to Khata)</span>
+            </button>
+          )}
+
+          {/* Secondary Actions: Print, WhatsApp */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
             <button
               type="button"
               onClick={handlePrint}
-              className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-md"
+              className="min-h-[44px] py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
             >
-              <Printer className="w-4 h-4 text-amber-300" />
+              <Printer className="w-4 h-4 text-slate-600 dark:text-slate-300" />
               <span>हिशोब पावती प्रिंट करा (Print A4)</span>
             </button>
 
             <button
               type="button"
               onClick={handleShareWhatsApp}
-              className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-md"
+              className="min-h-[44px] py-2.5 px-4 rounded-xl border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/60 dark:hover:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-4 h-4 text-emerald-600" />
               <span>व्हॉट्सॲपवर हिशोब पाठवा (Send)</span>
             </button>
           </div>
-
-          {onSaveQuickHisab && (
-            <button
-              type="button"
-              onClick={handleSaveToLedger}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-500" />
-              <span>खातेवहीत नवीन व्यवहार नोंदवा (Save to Khata)</span>
-            </button>
-          )}
         </div>
       </div>
     </div>

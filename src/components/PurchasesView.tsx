@@ -112,6 +112,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
   const [paidAmount, setPaidAmount] = useState<number>(19940);
   const [paymentMode, setPaymentMode] = useState<'Cash' | 'Online' | 'Cheque'>('Online');
   const [notes, setNotes] = useState('');
+  const [dueDate, setDueDate] = useState<string>('');
+  const [chequeNo, setChequeNo] = useState<string>('');
+  const [chequeDate, setChequeDate] = useState<string>('');
+  const [chequeStatus, setChequeStatus] = useState<'Pending' | 'Cleared' | 'Bounced'>('Pending');
 
   // Gemini AI OCR State
   const [isScanning, setIsScanning] = useState(false);
@@ -427,6 +431,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
       paidAmount,
       status,
       paymentMode,
+      dueDate: dueDate || undefined,
+      chequeNo: paymentMode === 'Cheque' ? chequeNo.trim() || undefined : undefined,
+      chequeDate: paymentMode === 'Cheque' ? chequeDate || undefined : undefined,
+      chequeStatus: paymentMode === 'Cheque' ? chequeStatus : undefined,
       notes: notes.trim() || undefined,
       transporter: transporter.trim() || undefined,
       ewayBillNo: ewayBillNo.trim() || undefined,
@@ -448,6 +456,10 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
     setBillNo('');
     setPO('');
     setPODate('');
+    setDueDate('');
+    setChequeNo('');
+    setChequeDate('');
+    setChequeStatus('Pending');
     setBankName('');
     setAccountNo('');
     setIfsc('');
@@ -719,7 +731,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold inline-block ${
                           p.status === 'Paid'
                             ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                             : p.status === 'Partial'
@@ -729,6 +741,27 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                       >
                         {p.status}
                       </span>
+                      {p.dueDate && p.status !== 'Paid' && (
+                        <div className="mt-1">
+                          <span
+                            className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                              new Date(p.dueDate) < new Date()
+                                ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300'
+                                : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300'
+                            }`}
+                            title="Payment Due Date"
+                          >
+                            Due: {p.dueDate}
+                          </span>
+                        </div>
+                      )}
+                      {p.paymentMode === 'Cheque' && (
+                        <div className="mt-1">
+                          <span className="text-[9px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1 py-0.2 rounded font-mono block">
+                            Chq: {p.chequeNo || 'PDC'} ({p.chequeStatus || 'Pending'})
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <button
@@ -1194,7 +1227,62 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs"
                   />
                 </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    उधारी देय तारीख (Payment Due Date)
+                  </label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-mono"
+                  />
+                </div>
               </div>
+
+              {/* Conditional Cheque Details */}
+              {paymentMode === 'Cheque' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <div>
+                    <label className="block font-bold text-amber-900 dark:text-amber-200 mb-1">
+                      धनादेश क्रमांक (Cheque No) *
+                    </label>
+                    <input
+                      type="text"
+                      value={chequeNo}
+                      onChange={(e) => setChequeNo(e.target.value)}
+                      placeholder="उदा. 000452"
+                      className="w-full px-3 py-2 border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-amber-900 dark:text-amber-200 mb-1">
+                      धनादेश तारीख (Cheque Date)
+                    </label>
+                    <input
+                      type="date"
+                      value={chequeDate}
+                      onChange={(e) => setChequeDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-amber-900 dark:text-amber-200 mb-1">
+                      धनादेश स्थिती (Status)
+                    </label>
+                    <select
+                      value={chequeStatus}
+                      onChange={(e) => setChequeStatus(e.target.value as any)}
+                      className="w-full px-3 py-2 border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold"
+                    >
+                      <option value="Pending">Pending (प्रलंबित / पोस्ट-डेटेड)</option>
+                      <option value="Cleared">Cleared (वठला / जमा)</option>
+                      <option value="Bounced">Bounced (बाउन्स)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button

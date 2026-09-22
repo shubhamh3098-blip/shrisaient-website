@@ -25,7 +25,11 @@ import {
   Lock,
   Download,
   Award,
-  Calculator
+  Calculator,
+  Coins,
+  Megaphone,
+  ShieldCheck,
+  Save
 } from 'lucide-react';
 import { ActiveTab, BusinessSettings, AuthUser } from '../types';
 import { AppLogo } from './AppLogo';
@@ -44,6 +48,10 @@ interface SidebarProps {
   onLogout?: () => void;
   onViewCustomerShop?: () => void;
   onOpenInstallModal?: () => void;
+  onOpenCashClosing?: () => void;
+  onOpenPromoGenerator?: () => void;
+  onOpenWarrantyTracker?: () => void;
+  onQuickBackup?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -59,6 +67,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onViewCustomerShop,
   onOpenInstallModal,
+  onOpenCashClosing,
+  onOpenPromoGenerator,
+  onOpenWarrantyTracker,
+  onQuickBackup,
 }) => {
   // Grouped Navigation Modules for a clean, non-confusing ERP experience
   const navSections = [
@@ -248,6 +260,86 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                     <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
                       Install
+                    </span>
+                  </button>
+                )}
+
+                {/* 1. Daily Cash Closing */}
+                {onOpenCashClosing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenCashClosing();
+                      setIsOpenMobile(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-amber-800 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer mt-1.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Coins className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span>दिवसाचा गल्ला बंद (Cash)</span>
+                    </div>
+                    <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded font-mono">
+                      हिशोब
+                    </span>
+                  </button>
+                )}
+
+                {/* 2. Promo Generator */}
+                {onOpenPromoGenerator && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenPromoGenerator();
+                      setIsOpenMobile(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-orange-800 dark:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 cursor-pointer mt-1.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Megaphone className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span>सणवार मेसेज (Promo)</span>
+                    </div>
+                    <span className="text-[10px] bg-orange-500/20 px-1.5 py-0.5 rounded font-mono">
+                      WhatsApp
+                    </span>
+                  </button>
+                )}
+
+                {/* 3. Warranty Tracker */}
+                {onOpenWarrantyTracker && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenWarrantyTracker();
+                      setIsOpenMobile(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-blue-800 dark:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 cursor-pointer mt-1.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>वॉरंटी व सर्व्हिस ट्रॅकर</span>
+                    </div>
+                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded font-mono">
+                      Alerts
+                    </span>
+                  </button>
+                )}
+
+                {/* 4. Quick 1-Click Backup */}
+                {onQuickBackup && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onQuickBackup();
+                      setIsOpenMobile(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-indigo-800 dark:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 cursor-pointer mt-1.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Save className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>१-क्लिक स्थानिक बॅकअप</span>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/20 px-1.5 py-0.5 rounded font-mono">
+                      Backup
                     </span>
                   </button>
                 )}

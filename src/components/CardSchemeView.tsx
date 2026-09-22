@@ -29,7 +29,10 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  BookOpen
+  BookOpen,
+  Loader2,
+  PlusCircle,
+  Truck
 } from 'lucide-react';
 import {
   CardMember,
@@ -41,7 +44,12 @@ import {
 } from '../types';
 import { SCHEMES_CONFIG } from '../utils/storage';
 import { CardPassbookModal } from './CardPassbookModal';
+import { AgentCollectionSheetModal } from './AgentCollectionSheetModal';
+import { OverdueRemindersModal } from './OverdueRemindersModal';
+import { WhatsAppGroupInviteModal } from './WhatsAppGroupInviteModal';
+import { DeliveryChallanModal } from './DeliveryChallanModal';
 import { exportSchemeCardsToCsv, exportReceiptsToCsv } from '../utils/csvExporter';
+import { buildCustomerPassbookWhatsAppText } from '../utils/agentCalculator';
 
 interface CardSchemeViewProps {
   cardMembers?: CardMember[];
@@ -58,7 +66,7 @@ interface CardSchemeViewProps {
   onDeleteTransaction?: (txId: string) => void;
   onNavigateCsv?: () => void;
   salesBills?: any;
-  initialAction?: 'payment' | 'add-card' | 'refund' | null;
+  initialAction?: 'payment' | 'add-card' | 'refund' | 'delivery-challan' | null;
   onClearInitialAction?: () => void;
 }
 
@@ -109,12 +117,18 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [selectedVillageFilter, setSelectedVillageFilter] = useState<string>('all');
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [overdueFilterOnly, setOverdueFilterOnly] = useState(false);
 
   // Modals
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [selectedMemberForPassbook, setSelectedMemberForPassbook] = useState<CardMember | null>(null);
+  const [showAgentCollectionModal, setShowAgentCollectionModal] = useState(false);
+  const [showOverdueRemindersModal, setShowOverdueRemindersModal] = useState(false);
+  const [showWhatsAppGroupModal, setShowWhatsAppGroupModal] = useState(false);
+  const [showDeliveryChallanModal, setShowDeliveryChallanModal] = useState(false);
+  const [deliveryChallanInitialMember, setDeliveryChallanInitialMember] = useState<CardMember | null>(null);
 
   // Trigger quick modal actions from top shortcut buttons
   useEffect(() => {
@@ -164,6 +178,13 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [refundMode, setRefundMode] = useState<'Cash' | 'Online'>('Cash');
   const [refundAgentName, setRefundAgentName] = useState(activeAgent);
   const [refundRemarks, setRefundRemarks] = useState('Partial refund / return to customer');
+  const [refundAcknowledgeRule, setRefundAcknowledgeRule] = useState(false);
+
+  // Helper: Card must be Completed (or paid 30 months / 130 weeks >= ₹13,000) for cash refund
+  const isCardFullyCompleted = (member: CardMember | null | undefined): boolean => {
+    if (!member) return false;
+    return member.status === 'Completed' || (Number(member.totalDeposited) || 0) >= 13000;
+  };
 
   // Dedicated Member Edit Modal state
   const [editingMember, setEditingMember] = useState<CardMember | null>(null);
@@ -174,6 +195,46 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const [paymentEditVillage, setPaymentEditVillage] = useState('');
   const [paymentEditSheetNo, setPaymentEditSheetNo] = useState('');
   const [showInlineMemberEdit, setShowInlineMemberEdit] = useState(false);
+
+  // Prevent duplicate weekly payment submissions (Idempotency & Debounce)
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+
+  // Optimistic member deletion
+  const [deletedMemberIds, setDeletedMemberIds] = useState<Set<string>>(new Set());
+
+  // Custom villages management
+  const [customVillages, setCustomVillages] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('shri_sai_custom_villages');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const handleAddNewVillage = (vName: string) => {
+    const trimmed = vName.trim();
+    if (!trimmed) return;
+    if (!customVillages.includes(trimmed)) {
+      const updated = [...customVillages, trimmed];
+      setCustomVillages(updated);
+      try {
+        localStorage.setItem('shri_sai_custom_villages', JSON.stringify(updated));
+      } catch (e) {}
+    }
+    setNewVillage(trimmed);
+    showCardToast(`✓ नवीन गाव "${trimmed}" यशस्वीरित्या जोडले गेले!`, 'success');
+  };
+
+  const handleDeleteMemberOptimistic = (member: CardMember) => {
+    if (confirm(`तुम्हाला नक्की कार्ड #${member.cardNumber} (${member.customerName}) हटवायचे आहे का?\n\nटीप: हे कार्ड हटवल्यास एजंटचे कमिशन व नवीन कार्ड बोनस आपोआप वजा (Rollback) होईल.`)) {
+      setDeletedMemberIds((prev) => new Set(prev).add(member.id));
+      showCardToast(`✓ कार्ड #${member.cardNumber} (${member.customerName}) हटवले आणि कमिशन रोलबॅक केले.`, 'success');
+      if (onDeleteMember) {
+        onDeleteMember(member.id);
+      }
+    }
+  };
 
   // Synchronize inline member fields whenever paymentSelectedCard changes
   useEffect(() => {
@@ -210,6 +271,9 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     } else if (initialAction === 'refund') {
       setShowRefundModal(true);
       onClearInitialAction?.();
+    } else if (initialAction === 'delivery-challan') {
+      setShowDeliveryChallanModal(true);
+      onClearInitialAction?.();
     }
   }, [initialAction, onClearInitialAction]);
 
@@ -226,14 +290,14 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
   const totalNetSchemeBalance = totalSchemeDeposits - totalSchemeRefunds;
   const totalFeeCollected = members.filter((m) => m.registrationFeePaid).length * 50;
 
-  // List of distinct villages
+  // List of distinct villages (including custom added villages)
   const villageList = useMemo(() => {
     const vList = members
       .map((m) => m.village?.trim())
       .filter((v): v is string => Boolean(v && v.length > 0));
-    const defaults = ['Bori', 'Hingni', 'Devnagar', 'Kelhzar', 'Vayfad', 'Khadki'];
-    return Array.from(new Set([...defaults, ...vList])).sort();
-  }, [members]);
+    const defaults = ['Bori', 'Hingni', 'Devnagar', 'Kelhzar', 'Vayfad', 'Khadki', 'Seloo', 'Deoli', 'Pulgaon', 'Wardha'];
+    return Array.from(new Set([...defaults, ...customVillages, ...vList])).sort();
+  }, [members, customVillages]);
 
   // List of distinct agents
   const agentList = useMemo(() => {
@@ -245,28 +309,87 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     return Array.from(new Set([...defaults, ...fromStaff, ...fromMembers])).sort();
   }, [members, staff]);
 
-  // Filtered members list
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
-      const matchesScheme =
-        selectedSchemeFilter === 'all' || m.schemeId === selectedSchemeFilter;
-      const matchesVillage =
-        selectedVillageFilter === 'all' || m.village === selectedVillageFilter;
-      const matchesAgent =
-        selectedAgentFilter === 'all' || m.agentName === selectedAgentFilter;
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        m.cardNumber.toString().includes(q) ||
-        m.customerName.toLowerCase().includes(q) ||
-        (m.phone && m.phone.toLowerCase().includes(q)) ||
-        (m.village && m.village.toLowerCase().includes(q)) ||
-        (m.sheetNo && m.sheetNo.toLowerCase().includes(q)) ||
-        (m.uniqueId && m.uniqueId.toLowerCase().includes(q)) ||
-        (m.agentName && m.agentName.toLowerCase().includes(q));
-      return matchesScheme && matchesVillage && matchesAgent && matchesSearch;
+  // Pre-calculate overdue counts for quick badges and filtering (aligned with OverdueRemindersModal)
+  const overdueMap = useMemo(() => {
+    const txByCard = new Map<number, CardTransaction[]>();
+    transactions.forEach((t) => {
+      const arr = txByCard.get(t.cardNumber) || [];
+      arr.push(t);
+      txByCard.set(t.cardNumber, arr);
     });
-  }, [members, selectedSchemeFilter, selectedVillageFilter, selectedAgentFilter, searchQuery]);
+
+    const map = new Map<string, { overdueCount: number; overdueAmount: number }>();
+    members.forEach((m) => {
+      const mTx = txByCard.get(m.cardNumber) || [];
+      const isWeekly = m.schemeId === 'scheme3' || (m.schemeName && m.schemeName.includes('Week'));
+      const installmentAmount = isWeekly ? 250 : 1000;
+      const totalTargetInstallments = isWeekly ? 52 : 30;
+
+      const weeklyPayments = mTx.filter((t) => t.type === 'WeeklyPayment');
+      const paidInstallments =
+        weeklyPayments.length > 0
+          ? weeklyPayments.length
+          : Math.floor((m.totalDeposited || 0) / installmentAmount);
+
+      let expectedInstallments = 1;
+      if (m.joiningDate) {
+        const join = new Date(m.joiningDate);
+        const now = new Date();
+        if (isWeekly) {
+          const diffTime = Math.abs(now.getTime() - join.getTime());
+          const weeksPassed = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+          expectedInstallments = Math.max(1, Math.min(totalTargetInstallments, weeksPassed));
+        } else {
+          const monthsPassed =
+            (now.getFullYear() - join.getFullYear()) * 12 +
+            (now.getMonth() - join.getMonth()) +
+            1;
+          expectedInstallments = Math.max(1, Math.min(totalTargetInstallments, monthsPassed));
+        }
+      } else {
+        expectedInstallments = 4;
+      }
+
+      const overdueCount = Math.max(0, expectedInstallments - paidInstallments);
+      const overdueAmount = overdueCount * installmentAmount;
+      map.set(m.id, { overdueCount, overdueAmount });
+    });
+    return map;
+  }, [members, transactions]);
+
+  const totalOverdueMembersCount = useMemo(() => {
+    let count = 0;
+    overdueMap.forEach((val) => {
+      if (val.overdueCount >= 2) count++;
+    });
+    return count;
+  }, [overdueMap]);
+
+  // Filtered members list (with optimistic deleted member exclusions)
+  const filteredMembers = useMemo(() => {
+    return members
+      .filter((m) => !deletedMemberIds.has(m.id))
+      .filter((m) => {
+        const matchesScheme =
+          selectedSchemeFilter === 'all' || m.schemeId === selectedSchemeFilter;
+        const matchesVillage =
+          selectedVillageFilter === 'all' || m.village === selectedVillageFilter;
+        const matchesAgent =
+          selectedAgentFilter === 'all' || m.agentName === selectedAgentFilter;
+        const matchesOverdue = overdueFilterOnly ? (overdueMap.get(m.id)?.overdueCount || 0) >= 2 : true;
+        const q = searchQuery.toLowerCase().trim();
+        const matchesSearch =
+          !q ||
+          m.cardNumber.toString().includes(q) ||
+          m.customerName.toLowerCase().includes(q) ||
+          (m.phone && m.phone.toLowerCase().includes(q)) ||
+          (m.village && m.village.toLowerCase().includes(q)) ||
+          (m.sheetNo && m.sheetNo.toLowerCase().includes(q)) ||
+          (m.uniqueId && m.uniqueId.toLowerCase().includes(q)) ||
+          (m.agentName && m.agentName.toLowerCase().includes(q));
+        return matchesScheme && matchesVillage && matchesAgent && matchesOverdue && matchesSearch;
+      });
+  }, [members, deletedMemberIds, selectedSchemeFilter, selectedVillageFilter, selectedAgentFilter, overdueFilterOnly, overdueMap, searchQuery]);
 
   // Pagination for smooth rendering with 1000+ members
   const [currentPage, setCurrentPage] = useState(1);
@@ -391,91 +514,114 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     setShowAddCardModal(false);
   };
 
-  // Handle Weekly Payment Submit
+  // Handle Weekly Payment Submit (Debounced and Idempotent)
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentSelectedCard || paymentAmount <= 0) return;
+    if (!paymentSelectedCard || paymentAmount <= 0 || isSubmittingPayment) return;
 
-    // Check if customer details were updated in the inline editor
-    let activeCard = paymentSelectedCard;
-    const isInfoChanged =
-      (paymentEditCustomerName.trim() && paymentEditCustomerName.trim() !== (paymentSelectedCard.customerName || '').trim()) ||
-      paymentEditPhone.trim() !== (paymentSelectedCard.phone || '').trim() ||
-      paymentEditVillage.trim() !== (paymentSelectedCard.village || '').trim() ||
-      paymentEditSheetNo.trim() !== (paymentSelectedCard.sheetNo || '').trim();
+    setIsSubmittingPayment(true);
 
-    if (onUpdateMember && isInfoChanged) {
-      activeCard = {
-        ...paymentSelectedCard,
-        customerName: paymentEditCustomerName.trim() || paymentSelectedCard.customerName,
-        phone: paymentEditPhone.trim(),
-        village: paymentEditVillage.trim(),
-        sheetNo: paymentEditSheetNo.trim(),
-      };
-      onUpdateMember(activeCard);
+    try {
+      // Check if customer details were updated in the inline editor
+      let activeCard = paymentSelectedCard;
+      const isInfoChanged =
+        (paymentEditCustomerName.trim() && paymentEditCustomerName.trim() !== (paymentSelectedCard.customerName || '').trim()) ||
+        paymentEditPhone.trim() !== (paymentSelectedCard.phone || '').trim() ||
+        paymentEditVillage.trim() !== (paymentSelectedCard.village || '').trim() ||
+        paymentEditSheetNo.trim() !== (paymentSelectedCard.sheetNo || '').trim();
+
+      if (onUpdateMember && isInfoChanged) {
+        activeCard = {
+          ...paymentSelectedCard,
+          customerName: paymentEditCustomerName.trim() || paymentSelectedCard.customerName,
+          phone: paymentEditPhone.trim(),
+          village: paymentEditVillage.trim(),
+          sheetNo: paymentEditSheetNo.trim(),
+        };
+        onUpdateMember(activeCard);
+      }
+
+      const receiptNo = paymentReceiptNo.trim() || `REC-${activeCard.cardNumber}-${Date.now().toString().slice(-4)}`;
+      const newBalance = (activeCard.netBalance || 0) + paymentAmount;
+      const date = new Date().toISOString().split('T')[0];
+      const finalAgent = paymentAgentName.trim() || activeAgent;
+
+      onRecordTransaction({
+        cardId: activeCard.id,
+        cardNumber: activeCard.cardNumber,
+        schemeId: activeCard.schemeId,
+        customerName: activeCard.customerName,
+        customerPhone: activeCard.phone,
+        receiptNo,
+        date,
+        type: 'WeeklyPayment',
+        weekNumber: paymentWeekNo,
+        amount: paymentAmount,
+        paymentMode,
+        agentName: finalAgent,
+        remarks: paymentRemarks || `Week ${paymentWeekNo} Installment collected by ${finalAgent}`,
+        balanceAfter: newBalance,
+      });
+
+      // Auto-send Marathi WhatsApp receipt if customer has mobile number
+      if (sendWhatsAppOnPayment && activeCard.phone && activeCard.phone.trim().length >= 10) {
+        const cleanPhone = activeCard.phone.replace(/[^0-9]/g, '');
+        const groupLink = settings.whatsappGroupLink || 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4';
+        const waMessage = encodeURIComponent(
+          `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
+          `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
+          `--------------------------------\n` +
+          `पावती क्र.: *${receiptNo}*\n` +
+          `तारीख: ${date}\n` +
+          `कार्ड क्र.: *#${activeCard.cardNumber}* (${activeCard.schemeName})\n` +
+          `नाव: *${activeCard.customerName}*\n` +
+          (activeCard.village ? `गाव: ${activeCard.village}\n` : '') +
+          (activeCard.sheetNo ? `शीट क्र.: ${activeCard.sheetNo}\n` : '') +
+          `जमा रक्कम: *₹${(Number(paymentAmount) || 0).toLocaleString()}* (Week ${paymentWeekNo})\n` +
+          `पेमेंट मोड: ${paymentMode} | कलेक्शन एजंट: ${finalAgent}\n` +
+          `खात्यात एकूण शिल्लक जमा: *₹${(Number(newBalance) || 0).toLocaleString()}*\n` +
+          `--------------------------------\n` +
+          `👉 श्री साई एंटरप्रायझेस अधिकृत व्हॉट्सॲप ग्रुप जॉईन करा:\n${groupLink}\n\n` +
+          `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
+          `📞 संपर्क: 8766486915 / 8600122798\n` +
+          `🌐 वेबसाईट: ${settings.domainName || 'shrisaient.in'}`
+        );
+        window.open(`https://wa.me/91${cleanPhone}?text=${waMessage}`, '_blank');
+      }
+
+      // Success flash notification
+      setLastActionMessage({
+        title: `₹${(Number(paymentAmount) || 0).toLocaleString()} साप्ताहिक हप्ता जमा झाला!`,
+        text: `कार्ड #${activeCard.cardNumber} (${activeCard.customerName}) | नवीन शिल्लक: ₹${(Number(newBalance) || 0).toLocaleString()} | एजंट: ${finalAgent}${isInfoChanged ? ' (माहिती अपडेट झाली)' : ''}`,
+        card: { ...activeCard, netBalance: newBalance },
+      });
+
+      // Reset Form, stay on this page
+      setShowPaymentModal(false);
+      setPaymentRemarks('');
+      setPaymentCardSearch('');
+      setPaymentSelectedCard(null);
+    } finally {
+      setTimeout(() => {
+        setIsSubmittingPayment(false);
+      }, 600);
     }
-
-    const receiptNo = paymentReceiptNo.trim() || `REC-${activeCard.cardNumber}-${Date.now().toString().slice(-4)}`;
-    const newBalance = (activeCard.netBalance || 0) + paymentAmount;
-    const date = new Date().toISOString().split('T')[0];
-    const finalAgent = paymentAgentName.trim() || activeAgent;
-
-    onRecordTransaction({
-      cardId: activeCard.id,
-      cardNumber: activeCard.cardNumber,
-      schemeId: activeCard.schemeId,
-      customerName: activeCard.customerName,
-      customerPhone: activeCard.phone,
-      receiptNo,
-      date,
-      type: 'WeeklyPayment',
-      weekNumber: paymentWeekNo,
-      amount: paymentAmount,
-      paymentMode,
-      agentName: finalAgent,
-      remarks: paymentRemarks || `Week ${paymentWeekNo} Installment collected by ${finalAgent}`,
-      balanceAfter: newBalance,
-    });
-
-    // Auto-send WhatsApp receipt if customer has mobile number
-    if (sendWhatsAppOnPayment && activeCard.phone && activeCard.phone.trim().length >= 10) {
-      const cleanPhone = activeCard.phone.replace(/[^0-9]/g, '');
-      const waMessage = encodeURIComponent(
-        `*${settings.businessName || 'SHRI SAI ENTERPRISES'}*\n` +
-        `*साप्ताहिक बचत पावती (Weekly Payment Receipt)*\n` +
-        `--------------------------------\n` +
-        `पावती क्र.: *${receiptNo}*\n` +
-        `तारीख: ${date}\n` +
-        `कार्ड क्र.: *#${activeCard.cardNumber}* (${activeCard.schemeName})\n` +
-        `नाव: *${activeCard.customerName}*\n` +
-        `जमा रक्कम: *₹${(Number(paymentAmount) || 0).toLocaleString()}* (Week ${paymentWeekNo})\n` +
-        `पेमेंट मोड: ${paymentMode} | एजंट: ${finalAgent}\n` +
-        `खात्यात एकूण शिल्लक जमा: *₹${(Number(newBalance) || 0).toLocaleString()}*\n` +
-        `--------------------------------\n` +
-        `धन्यवाद! - श्री साई इंटरप्राइजेस, वर्धा\n` +
-        `📞 संपर्क: ${settings.phone || '8766486915'}`
-      );
-      window.open(`https://wa.me/91${cleanPhone}?text=${waMessage}`, '_blank');
-    }
-
-    // Success flash notification
-    setLastActionMessage({
-      title: `₹${(Number(paymentAmount) || 0).toLocaleString()} Weekly Payment Deposited!`,
-      text: `Card #${activeCard.cardNumber} (${activeCard.customerName}) | New Balance: ₹${(Number(newBalance) || 0).toLocaleString()} | Agent: ${finalAgent}${isInfoChanged ? ' (माहिती अपडेट झाली)' : ''}`,
-      card: { ...activeCard, netBalance: newBalance },
-    });
-
-    // Reset Form, stay on this page
-    setShowPaymentModal(false);
-    setPaymentRemarks('');
-    setPaymentCardSearch('');
-    setPaymentSelectedCard(null);
   };
 
-  // Handle Refund Submit
+  // Handle Refund Submit (Restricted to Completed cards per official shop rule)
   const handleRefundSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!refundSelectedCard || refundAmount <= 0) return;
+
+    // Strict Rule: Cash refund only allowed when card scheme is completed (30 months / full scheme paid)
+    const completed = isCardFullyCompleted(refundSelectedCard);
+    if (!completed && !refundAcknowledgeRule) {
+      showCardToast(
+        `⛔ कॅश रिफंड नियम: हे कार्ड अद्याप पूर्ण भरलेले नाही (Status: ${refundSelectedCard.status}). नियमानुसार कॅश रिफंड फक्त ३० महिने योजना पूर्ण भरल्यावरच मिळतो! चालू कार्डवर मधेच रोख परतावा मिळत नाही.`,
+        'error'
+      );
+      return;
+    }
 
     if (refundAmount > refundSelectedCard.netBalance) {
       showCardToast(
@@ -519,27 +665,10 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
     setRefundSelectedCard(null);
   };
 
-  // WhatsApp share for member
+  // Marathi WhatsApp share for member passbook
   const handleShareWhatsApp = (member: CardMember) => {
-    const text = encodeURIComponent(
-      `*${settings.businessName}*\n` +
-      `*Card Scheme Account Passbook*\n` +
-      `--------------------------------\n` +
-      `Card No: *#${member.cardNumber}* (${member.schemeName})\n` +
-      `Member: *${member.customerName}*\n` +
-      (member.uniqueId ? `Unique ID: ${member.uniqueId}\n` : '') +
-      (member.village ? `Village: ${member.village}\n` : '') +
-      (member.sheetNo ? `Sheet No: ${member.sheetNo}\n` : '') +
-      (member.agentName ? `Agent: ${member.agentName}\n` : '') +
-      `Card Fee: ₹50 (Paid)\n` +
-      `--------------------------------\n` +
-      `Total Deposited: ₹${(member.totalDeposited ?? 0).toLocaleString()}\n` +
-      `Total Refunded/Withdrawn: ₹${(member.totalRefunded ?? 0).toLocaleString()}\n` +
-      `*Current Net Balance: ₹${(member.netBalance ?? 0).toLocaleString()}*\n` +
-      `--------------------------------\n` +
-      `Date: ${new Date().toISOString().split('T')[0]}\n` +
-      `Visit: ${settings.domainName}`
-    );
+    const memberTxs = transactions.filter((t) => t.cardNumber === member.cardNumber);
+    const text = buildCustomerPassbookWhatsAppText(member, memberTxs, settings.businessName || 'SHRI SAI ENTERPRISES, WARDHA');
     const phone = member.phone ? member.phone.replace(/[^0-9]/g, '') : '';
     const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
@@ -616,6 +745,49 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               CSV Import
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setShowAgentCollectionModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-300 text-blue-900 text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="दैनिक हप्ता वसुली पत्रक (Daily Agent Beat Sheet Report)"
+          >
+            <Printer className="w-4 h-4 text-blue-600" />
+            <span>📄 वसुली अहवाल (Beat Sheet)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowOverdueRemindersModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold hover:bg-amber-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="प्रलंबित हप्ते WhatsApp स्मरणपत्र (2+ Overdue Reminders)"
+          >
+            <Clock className="w-4 h-4 text-amber-600" />
+            <span>🔔 हप्ता आठवण (Overdue)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDeliveryChallanInitialMember(null);
+              setShowDeliveryChallanModal(true);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-orange-50 border border-orange-300 text-orange-950 text-xs font-bold hover:bg-orange-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="३० महिने योजना पूर्ण झाल्यावर किंवा लकी ड्रॉ विजेत्याला वस्तू देताना अधिकृत डिलिव्हरी पावती व चलन"
+          >
+            <Truck className="w-4 h-4 text-orange-600" />
+            <span>🚚 बक्षीस वितरण चलन (Challan)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowWhatsAppGroupModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="कार्ड ग्राहकांसाठी WhatsApp ग्रुप लिंक व QR कोड"
+          >
+            <Share2 className="w-4 h-4 text-emerald-600" />
+            <span>💬 WhatsApp ग्रुप</span>
+          </button>
 
           <button
             onClick={() => {
@@ -827,7 +999,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       )}
 
       {/* KPI Stats Ribbon */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-500">Total Issued Cards</span>
@@ -852,7 +1024,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Total Refunded / Returned</span>
+            <span className="text-xs font-medium text-slate-500">Total Refunded</span>
             <span className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
               <ArrowDownLeft className="w-4 h-4" />
             </span>
@@ -870,6 +1042,31 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
           </div>
           <p className="text-2xl font-bold text-indigo-600 mt-2">₹{(totalNetSchemeBalance ?? 0).toLocaleString()}</p>
           <p className="text-[11px] text-indigo-700/80 mt-1">Held customer deposits</p>
+        </div>
+
+        <div
+          onClick={() => setOverdueFilterOnly(!overdueFilterOnly)}
+          className={`rounded-2xl border p-4 shadow-2xs transition cursor-pointer ${
+            totalOverdueMembersCount > 0
+              ? overdueFilterOnly
+                ? 'bg-amber-600 text-white border-amber-700'
+                : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              : 'bg-white text-slate-900 border-slate-200'
+          }`}
+          title="प्रलंबित हप्ते (२+ हप्ते बाकी असलेले सभासद)"
+        >
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-bold ${overdueFilterOnly ? 'text-white' : 'text-amber-800'}`}>
+              ⚠️ Overdue Defaulters
+            </span>
+            <span className={`p-1 rounded-lg ${overdueFilterOnly ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-700'}`}>
+              <Clock className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <p className="text-2xl font-black mt-2">{totalOverdueMembersCount}</p>
+          <p className={`text-[11px] mt-1 font-semibold ${overdueFilterOnly ? 'text-amber-100' : 'text-amber-700'}`}>
+            {overdueFilterOnly ? '✓ फिल्टर चालू (Clear)' : '२+ हप्ते थकबाकी (Filter)'}
+          </p>
         </div>
       </div>
 
@@ -1113,8 +1310,18 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     </span>
                   </td>
 
-                  <td className="py-3 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400 font-mono-num text-base sm:text-xs">
-                    ₹{(member.totalDeposited ?? 0).toLocaleString()}
+                  <td className="py-3 px-4 text-right font-bold font-mono-num text-base sm:text-xs">
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      ₹{(member.totalDeposited ?? 0).toLocaleString()}
+                    </span>
+                    {overdueMap.get(member.id)?.overdueCount && (overdueMap.get(member.id)!.overdueCount >= 2) ? (
+                      <span
+                        className="block text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded px-1 py-0.5 mt-0.5 text-right w-fit ml-auto"
+                        title={`${overdueMap.get(member.id)!.overdueCount} हप्ते प्रलंबित आहेत (थकबाकी: ₹${overdueMap.get(member.id)!.overdueAmount.toLocaleString()})`}
+                      >
+                        ⚠️ {overdueMap.get(member.id)!.overdueCount} हप्ते बाकी
+                      </span>
+                    ) : null}
                   </td>
 
                   <td className="py-3 px-4 text-right font-semibold text-rose-600 dark:text-rose-400 font-mono-num text-base sm:text-xs">
@@ -1127,14 +1334,14 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     </span>
                   </td>
 
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
+                  <td className="py-3 px-4 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => setSelectedMemberForPassbook(member)}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5 shrink-0"
+                        className="min-h-[44px] px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5 shrink-0"
                         title="बँक पासबुक उघडा (View Full Bank Passbook & Account Details)"
                       >
-                        <BookOpen className="w-3.5 h-3.5" />
+                        <BookOpen className="w-4 h-4" />
                         <span>📖 पासबुक</span>
                       </button>
 
@@ -1144,10 +1351,11 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           setPaymentAgentName(activeAgent);
                           setShowPaymentModal(true);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                        title="Deposit Weekly Payment"
+                        className="min-h-[44px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1.5 shrink-0"
+                        title="हप्ता जमा करा (Deposit Weekly Payment)"
                       >
-                        + Pay
+                        <PlusCircle className="w-4 h-4" />
+                        <span>+ हप्ता जमा</span>
                       </button>
 
                       <button
@@ -1156,27 +1364,52 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                           setRefundAgentName(activeAgent);
                           setShowRefundModal(true);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer border border-rose-200 dark:border-rose-800"
-                        title="Refund / Return"
+                        className="min-h-[44px] px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer border border-rose-200 dark:border-rose-800 flex items-center gap-1 shrink-0"
+                        title="रक्कम परतावा (Refund / Return)"
                       >
-                        Refund
+                        <span>रक्कम परतावा</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setEditingMember(member)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 font-bold text-xs transition cursor-pointer border border-amber-200 dark:border-amber-800"
+                        className="min-h-[44px] px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-300 font-bold text-xs transition cursor-pointer border border-amber-200 dark:border-amber-800 flex items-center gap-1.5 shrink-0"
                         title="माहिती दुरुस्त करा (Edit Name, Phone, Village)"
                       >
-                        ✏️ एडिट
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>✏️ एडिट</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMemberOptimistic(member)}
+                        className="min-h-[44px] px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-bold text-xs transition cursor-pointer border border-rose-200 dark:border-rose-800 flex items-center gap-1.5 shrink-0"
+                        title="कार्ड मेंबर हटवा (Delete Card Member & Rollback Commission)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>🗑️ हटवा</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeliveryChallanInitialMember(member);
+                          setShowDeliveryChallanModal(true);
+                        }}
+                        className="min-h-[44px] px-3 py-2 text-orange-700 dark:text-orange-300 hover:text-orange-800 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 rounded-xl transition cursor-pointer border border-orange-200 dark:border-orange-800 flex items-center gap-1.5 shrink-0 font-bold text-xs"
+                        title="बक्षीस / वस्तू वितरण चलन पावती (Delivery Challan)"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-orange-600" />
+                        <span>🚚 चलन</span>
                       </button>
 
                       <button
                         onClick={() => handleShareWhatsApp(member)}
-                        className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
-                        title="Share on WhatsApp"
+                        className="min-h-[44px] px-3 py-2 text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 rounded-xl transition cursor-pointer border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5 shrink-0 font-bold text-xs"
+                        title="Share Passbook on WhatsApp"
                       >
                         <Share2 className="w-3.5 h-3.5" />
+                        <span>💬 WhatsApp</span>
                       </button>
                     </div>
                   </td>
@@ -1359,9 +1592,24 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               {/* Village & Sheet No */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Village (गांव) *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Village (गाव) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const entered = prompt('नवीन गावाचे नाव टाका (उदा. Deoli, Seloo, Pulgaon, Nachangaon):');
+                        if (entered && entered.trim()) {
+                          handleAddNewVillage(entered.trim());
+                        }
+                      }}
+                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ नवीन गाव जोडा</span>
+                    </button>
+                  </div>
                   <select
                     value={newVillage}
                     onChange={(e) => setNewVillage(e.target.value)}
@@ -1372,18 +1620,32 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                         📍 {v}
                       </option>
                     ))}
-                    <option value="other">+ Type Other Village...</option>
+                    <option value="other">+ इतर गाव टाईप करा (Type Other Village)...</option>
                   </select>
 
                   {newVillage === 'other' && (
-                    <input
-                      type="text"
-                      required
-                      value={newCustomVillage}
-                      onChange={(e) => setNewCustomVillage(e.target.value)}
-                      placeholder="Enter village name..."
-                      className="w-full mt-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
-                    />
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <input
+                        type="text"
+                        required
+                        value={newCustomVillage}
+                        onChange={(e) => setNewCustomVillage(e.target.value)}
+                        placeholder="गावाचे नाव टाईप करा..."
+                        className="flex-1 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newCustomVillage.trim()) {
+                            handleAddNewVillage(newCustomVillage.trim());
+                            setNewCustomVillage('');
+                          }
+                        }}
+                        className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer"
+                      >
+                        जोडा
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1766,19 +2028,30 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={() => setShowPaymentModal(false)}
-                      className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                      className="min-h-[44px] px-5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition"
                     >
-                      Cancel
+                      रद्द करा (Cancel)
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
+                      disabled={isSubmittingPayment || paymentAmount <= 0}
+                      className="min-h-[44px] px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition flex items-center gap-2"
                     >
-                      Save Weekly Payment (₹{paymentAmount})
+                      {isSubmittingPayment ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>हप्ता जमा होत आहे...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>हप्ता जमा करा (₹{(paymentAmount || 0).toLocaleString()})</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </>
@@ -1793,12 +2066,12 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
       {/* ========================================================================= */}
       {showRefundModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-auto border border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base">Return / Refund to Card Member</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Deduct from card deposits (e.g. ₹10,000 me se ₹5,000 wapas दिए)
+                  ३० महिने योजना पूर्ण झाल्यावर ठेवीचा परतावा (Cash Refund)
                 </p>
               </div>
               <button
@@ -1809,12 +2082,28 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
               </button>
             </div>
 
+            {/* Official Refund Rule Banner */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl space-y-1 text-xs text-amber-950 dark:text-amber-200">
+              <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>अधिकृत कॅश रिफंड नियम (Official Refund Policy):</span>
+              </div>
+              <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                कॅश रिफंड (रोख परतावा) <strong>फक्त योजना पूर्ण भरल्यावरच (३० महिने पूर्ण)</strong> केला जाऊ शकतो. चालू/अपूर्ण कार्डवर मधेच कॅश रिफंड दिला जाणार नाही. (अपूर्ण कार्डवर ग्राहक किमान ५०% डाऊन पेमेंटसह वस्तू खरेदी करू शकतात).
+              </p>
+            </div>
+
             <form onSubmit={handleRefundSubmit} className="space-y-4">
               {!refundSelectedCard ? (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Select Member Card *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Select Member Card *
+                    </label>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      (पूर्ण झालेले कार्ड प्राधान्याने निवडा)
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={refundCardSearch}
@@ -1822,7 +2111,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     placeholder="Search Card # or Name..."
                     className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm mb-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                  <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                     {members
                       .filter(
                         (m) =>
@@ -1831,26 +2120,41 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                             m.customerName.toLowerCase().includes(refundCardSearch.toLowerCase()) ||
                             (m.village && m.village.toLowerCase().includes(refundCardSearch.toLowerCase())))
                       )
-                      .slice(0, 15)
-                      .map((m) => (
-                        <div
-                          key={m.id}
-                          onClick={() => {
-                            setRefundSelectedCard(m);
-                            setRefundAmount(Math.min(5000, m.netBalance));
-                          }}
-                          className="p-2.5 text-xs hover:bg-rose-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition"
-                        >
-                          <div>
-                            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">#{m.cardNumber}</span> -{' '}
-                            <span className="font-bold text-slate-800 dark:text-slate-200">{m.customerName}</span>
-                            <span className="text-slate-500 dark:text-slate-400 text-[11px] block">
-                              {m.village ? `📍 ${m.village}` : ''}
-                            </span>
+                      .slice(0, 20)
+                      .map((m) => {
+                        const isCompleted = isCardFullyCompleted(m);
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              setRefundSelectedCard(m);
+                              setRefundAmount(Math.min(5000, m.netBalance));
+                              setRefundAcknowledgeRule(false);
+                            }}
+                            className="p-2.5 text-xs hover:bg-rose-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between transition"
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">#{m.cardNumber}</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{m.customerName}</span>
+                                {isCompleted ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold">
+                                    ✓ पूर्ण (पात्र)
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-medium">
+                                    ⏳ अपूर्ण (चालू)
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-slate-500 dark:text-slate-400 text-[11px] block mt-0.5">
+                                {m.village ? `📍 ${m.village}` : ''} • जमा: ₹{(m.totalDeposited || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <span className="font-bold text-slate-900 dark:text-white">Balance: ₹{m.netBalance.toLocaleString()}</span>
                           </div>
-                          <span className="font-bold text-slate-900 dark:text-white">Balance: ₹{m.netBalance}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               ) : (
@@ -1862,13 +2166,27 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setRefundSelectedCard(null)}
+                        onClick={() => {
+                          setRefundSelectedCard(null);
+                          setRefundAcknowledgeRule(false);
+                        }}
                         className="text-[11px] text-rose-600 dark:text-rose-400 underline font-medium cursor-pointer"
                       >
                         Change Card
                       </button>
                     </div>
-                    <p className="font-bold text-slate-900 dark:text-white text-sm">{refundSelectedCard.customerName}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-slate-900 dark:text-white text-sm">{refundSelectedCard.customerName}</p>
+                      {isCardFullyCompleted(refundSelectedCard) ? (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 font-bold">
+                          ✓ योजना पूर्ण (Completed)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-800 font-bold">
+                          ⏳ योजना अपूर्ण (Active)
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-600 dark:text-slate-400">
                       Current Deposited Balance:{' '}
                       <strong className="text-rose-700 dark:text-rose-300 font-bold">
@@ -1876,6 +2194,45 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       </strong>
                     </p>
                   </div>
+
+                  {/* Warning if card is not completed */}
+                  {!isCardFullyCompleted(refundSelectedCard) && (
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-xl space-y-2 text-xs text-rose-950 dark:text-rose-200">
+                      <div className="flex items-center gap-1.5 font-bold text-rose-800 dark:text-rose-300">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>चेतावणी: हे कार्ड अद्याप पूर्ण भरलेले नाही!</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                        दुकान नियमानुसार कॅश रिफंड फक्त योजना पूर्ण भरल्यावरच (३० महिने पूर्ण) दिला जातो. चालू कार्डवर मधेच रोख परतावा दिला जात नाही.
+                      </p>
+                      {onUpdateMember && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...refundSelectedCard, status: 'Completed' as const };
+                            onUpdateMember(updated);
+                            setRefundSelectedCard(updated);
+                            showCardToast(`✓ कार्ड #${refundSelectedCard.cardNumber} चे स्टेटस 'Completed' केले!`, 'success');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer transition shadow-xs flex items-center gap-1"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          ग्राहकाचे ३० महिने पूर्ण झाले आहेत (Mark as Completed)
+                        </button>
+                      )}
+                      <label className="flex items-start gap-2 pt-1 font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={refundAcknowledgeRule}
+                          onChange={(e) => setRefundAcknowledgeRule(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 accent-rose-600 rounded"
+                        />
+                        <span className="text-[11px] leading-tight text-rose-900 dark:text-rose-300">
+                          मी पडताळणी केली आहे, ३० महिने योजना पूर्ण भरली असल्याने कॅश रिफंड देण्यास मान्यता देत आहे.
+                        </span>
+                      </label>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -1932,7 +2289,7 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                       type="text"
                       value={refundRemarks}
                       onChange={(e) => setRefundRemarks(e.target.value)}
-                      placeholder="e.g. ₹5,000 returned to member upon request"
+                      placeholder="e.g. ३० महिने योजना पूर्ण झाल्यानंतर ठेव परतावा (Cash refund after 30 months completed)"
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
@@ -1947,7 +2304,17 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
+                      disabled={!isCardFullyCompleted(refundSelectedCard) && !refundAcknowledgeRule}
+                      className={`px-5 py-2 rounded-lg text-xs font-semibold shadow-xs transition ${
+                        !isCardFullyCompleted(refundSelectedCard) && !refundAcknowledgeRule
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                      }`}
+                      title={
+                        !isCardFullyCompleted(refundSelectedCard) && !refundAcknowledgeRule
+                          ? 'कॅश रिफंडसाठी कार्ड पूर्ण असणे किंवा पडताळणी संमती आवश्यक आहे.'
+                          : ''
+                      }
                     >
                       Confirm Refund (₹{refundAmount})
                     </button>
@@ -2192,6 +2559,53 @@ export const CardSchemeView: React.FC<CardSchemeViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Agent Collection Sheet Modal */}
+      {showAgentCollectionModal && (
+        <AgentCollectionSheetModal
+          isOpen={showAgentCollectionModal}
+          onClose={() => setShowAgentCollectionModal(false)}
+          cardMembers={members}
+          cardTransactions={transactions}
+          settings={settings}
+          preselectedAgent={activeAgent}
+        />
+      )}
+
+      {/* Overdue Payment Reminders Modal */}
+      {showOverdueRemindersModal && (
+        <OverdueRemindersModal
+          isOpen={showOverdueRemindersModal}
+          onClose={() => setShowOverdueRemindersModal(false)}
+          cardMembers={members}
+          cardTransactions={transactions}
+          settings={settings}
+        />
+      )}
+
+      {/* WhatsApp Group Invite Modal */}
+      {showWhatsAppGroupModal && (
+        <WhatsAppGroupInviteModal
+          isOpen={showWhatsAppGroupModal}
+          onClose={() => setShowWhatsAppGroupModal(false)}
+          cardMembers={members}
+          settings={settings}
+        />
+      )}
+
+      {/* Delivery & Prize Challan Modal */}
+      {showDeliveryChallanModal && (
+        <DeliveryChallanModal
+          isOpen={showDeliveryChallanModal}
+          onClose={() => {
+            setShowDeliveryChallanModal(false);
+            setDeliveryChallanInitialMember(null);
+          }}
+          cardMembers={members}
+          settings={settings}
+          initialMember={deliveryChallanInitialMember}
+        />
       )}
     </div>
   );

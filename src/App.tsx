@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, Globe, Store, PlusCircle, Cloud, RefreshCw, CheckCircle2, Crown, UserCheck, LogOut, Lock, Download, Search, CreditCard } from 'lucide-react';
+import { Menu, Globe, Store, PlusCircle, Cloud, RefreshCw, CheckCircle2, Crown, UserCheck, LogOut, Lock, Download, Search, CreditCard, Coins, Megaphone, ShieldCheck, Save, Edit3 } from 'lucide-react';
 import {
   ActiveTab,
   BusinessSettings,
@@ -72,13 +72,18 @@ import { DayNightToggle } from './components/DayNightToggle';
 import { QuickActionBar } from './components/QuickActionBar';
 import { QuickPavtiModal } from './components/QuickPavtiModal';
 import { FinanceCalculatorModal, FinanceDetailsPayload } from './components/FinanceCalculatorModal';
+import { CashClosingModal } from './components/CashClosingModal';
+import { PromoGeneratorModal } from './components/PromoGeneratorModal';
+import { WarrantyTrackerModal } from './components/WarrantyTrackerModal';
+import { AdminNotificationDropdown, AdminNotification } from './components/AdminNotificationDropdown';
+import { NotificationEditModal } from './components/NotificationEditModal';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(() => loadDatabase());
   const [activeTab, setActiveTab] = useState<ActiveTab>('add-entry'); // matches the user's screenshot where "Add Entry" is active
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<TransactionEntry | null>(null);
-  const [cardSchemeInitialAction, setCardSchemeInitialAction] = useState<'payment' | 'add-card' | 'refund' | null>(null);
+  const [cardSchemeInitialAction, setCardSchemeInitialAction] = useState<'payment' | 'add-card' | 'refund' | 'delivery-challan' | null>(null);
   const [editingEntry, setEditingEntry] = useState<TransactionEntry | null>(null);
   const [financePrefill, setFinancePrefill] = useState<FinanceDetailsPayload | null>(null);
   const [showQuickPavtiModal, setShowQuickPavtiModal] = useState<boolean>(false);
@@ -86,6 +91,21 @@ export default function App() {
   const [quickPavtiBillNo, setQuickPavtiBillNo] = useState<string | undefined>(undefined);
   const [quickPavtiAmount, setQuickPavtiAmount] = useState<number | undefined>(undefined);
   const [showFinanceModal, setShowFinanceModal] = useState<boolean>(false);
+
+  // New High-Value Smart Tools States
+  const [showCashClosingModal, setShowCashClosingModal] = useState<boolean>(false);
+  const [showPromoModal, setShowPromoModal] = useState<boolean>(false);
+  const [showWarrantyModal, setShowWarrantyModal] = useState<boolean>(false);
+  const [showBackupReminder, setShowBackupReminder] = useState<boolean>(() => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const lastBackup = localStorage.getItem('shri_sai_last_backup_date');
+      const hours = new Date().getHours();
+      return hours >= 17 && lastBackup !== today;
+    } catch (e) {
+      return false;
+    }
+  });
 
   const handleApplyFinanceToBill = (details: FinanceDetailsPayload) => {
     setFinancePrefill(details);
@@ -157,7 +177,120 @@ export default function App() {
     invoiceNo: string;
     date: string;
     itemsSummary?: string;
+    isFinance?: boolean;
+    providerName?: string;
+    schemeName?: string;
+    monthlyEmi?: number;
+    downPayment?: number;
   } | null>(null);
+
+  // Live Admin Notifications list (Cart activities, online orders, finance applications)
+  const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem('shri_sai_admin_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('shri_sai_sound_muted') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const toggleAudioMuted = () => {
+    setIsAudioMuted((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('shri_sai_sound_muted', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    setAdminNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      try {
+        localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleClearAllNotifications = () => {
+    setAdminNotifications([]);
+    try {
+      localStorage.removeItem('shri_sai_admin_notifications');
+    } catch (e) {}
+  };
+
+  const [selectedNotificationToEdit, setSelectedNotificationToEdit] = useState<AdminNotification | null>(null);
+
+  const handleSaveNotification = (updated: AdminNotification) => {
+    setAdminNotifications((prev) => {
+      const exists = prev.some((n) => n.id === updated.id);
+      const list = exists
+        ? prev.map((n) => (n.id === updated.id ? updated : n))
+        : [updated, ...prev];
+      try {
+        localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(list));
+      } catch (e) {}
+      return list;
+    });
+    showToast('✓ सूचनेतील बदल यशस्वीरित्या सेव्ह केले!', 'success');
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    setAdminNotifications((prev) => {
+      const list = prev.filter((n) => n.id !== id);
+      try {
+        localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(list));
+      } catch (e) {}
+      return list;
+    });
+    showToast('नोंद यशस्वीरित्या हटवली.', 'info');
+  };
+
+  const handleCreateBillFromNotification = (notif: AdminNotification) => {
+    const totalAmt = Number(notif.amount) || 0;
+    const isFin = notif.type === 'finance_order_placed' || Boolean(notif.providerName);
+
+    const draftEntry: TransactionEntry = {
+      id: `INV-${Date.now().toString().slice(-6)}`,
+      invoiceNo: `BILL-${Date.now().toString().slice(-4)}`,
+      date: new Date().toISOString().split('T')[0],
+      customerName: notif.customerName || (notif.type === 'cart_add' ? 'काउंटर ग्राहक' : 'ऑनलाइन ग्राहक'),
+      customerPhone: notif.customerPhone || '',
+      village: notif.customerAddress || 'वर्धा',
+      itemDetails: notif.itemName || notif.title || 'इलेक्ट्रॉनिक्स / फर्निचर',
+      category: 'electronics',
+      totalAmount: totalAmt,
+      payingNow: isFin ? 0 : totalAmt,
+      dueAmount: isFin ? totalAmt : 0,
+      paymentMode: isFin ? 'Online' : 'Cash',
+      entryType: 'Bill',
+      notes: notif.notes || (notif.providerName ? `फायनान्स: ${notif.providerName} (${notif.schemeName || '0% EMI'})` : 'वेबसाईट कार्टमधून तयार केलेले बिल'),
+      createdAt: new Date().toISOString(),
+    };
+
+    setEditingEntry(draftEntry);
+    setAdminNotifications((prev) => {
+      const list = prev.map((n) => (n.id === notif.id ? { ...n, status: 'converted_to_bill' as const, read: true } : n));
+      try {
+        localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(list));
+      } catch (e) {}
+      return list;
+    });
+    setAppMode('erp');
+    setActiveTab('add-entry');
+    showToast(`✓ ग्राहक ${draftEntry.customerName} ची माहिती नवीन बिल फॉर्ममध्ये भरली आहे!`, 'success');
+  };
+
   const [toastBanner, setToastBanner] = useState<{
     text: string;
     type?: 'success' | 'info' | 'error';
@@ -181,6 +314,7 @@ export default function App() {
 
   // Play audio chime when customer places an order
   const playOrderSound = () => {
+    if (isAudioMuted) return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
@@ -190,12 +324,34 @@ export default function App() {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.5);
+      }
+    } catch (e) {}
+  };
+
+  // Play gentle ping chime when customer adds item to cart
+  const playCartSound = () => {
+    if (isAudioMuted) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
       }
     } catch (e) {}
   };
@@ -219,32 +375,181 @@ export default function App() {
     }
   };
 
-  // Real-time listener for orders placed in shop mode or other tabs
+  // Real-time listener for orders and cart activity across tabs and server SSE
   useEffect(() => {
-    const handleOnlineOrder = (e: any) => {
-      const order = e.detail;
-      if (order) {
-        playOrderSound();
-        triggerBrowserNotification(
-          `🛍️ नवीन ऑर्डर प्राप्त! ₹${order.grandTotal || order.totalAmount}`,
-          `ग्राहक: ${order.customerName} (${order.customerPhone || 'Wardha'})`
-        );
-        setNewOrderAlert({
-          customerName: order.customerName,
-          customerPhone: order.customerPhone,
-          totalAmount: Number(order.grandTotal ?? order.totalAmount ?? 0),
-          invoiceNo: order.invoiceNo,
-          date: order.date,
-          itemsSummary: order.items ? order.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ') : '',
-        });
+    const handleCartActivity = (detail: any) => {
+      if (!detail) return;
+      playCartSound();
+      const itemName = detail.item?.name || detail.itemName || 'वस्तू';
+      const itemPrice = detail.item?.sellingPrice || detail.itemPrice || 0;
+
+      const notif: AdminNotification = {
+        id: `cart_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+        type: 'cart_add',
+        title: 'ग्राहकाने कार्टमध्ये वस्तू जोडली',
+        subtitle: `${itemName} (किंमत: ₹${itemPrice.toLocaleString()})`,
+        itemName,
+        amount: itemPrice,
+        timestamp: Date.now(),
+        read: false,
+      };
+
+      setAdminNotifications((prev) => {
+        const updated = [notif, ...prev.slice(0, 49)];
+        try {
+          localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      if (appMode === 'erp') {
+        showToast(`🛒 ग्राहकाने कार्टमध्ये वस्तू जोडली: ${itemName}`, 'info');
       }
     };
 
-    window.addEventListener('shri_sai_order_placed', handleOnlineOrder);
-    return () => {
-      window.removeEventListener('shri_sai_order_placed', handleOnlineOrder);
+    const handleOrderPlaced = (order: any, isFinanceEvent = false) => {
+      if (!order) return;
+      playOrderSound();
+
+      const isFinance = isFinanceEvent || Boolean(order.financeDetails) || order.paymentMode?.includes('Finance');
+      const totalAmt = Number(order.grandTotal ?? order.totalAmount ?? 0);
+      const custName = order.customerName || 'ग्राहक';
+      const custPhone = order.customerPhone || '';
+      const schemeName = order.financeDetails?.schemeName;
+      const providerName = order.financeDetails?.providerName;
+
+      triggerBrowserNotification(
+        isFinance ? `⚡ नवीन ०% फायनान्स अर्ज! ₹${totalAmt}` : `🛍️ नवीन ऑर्डर प्राप्त! ₹${totalAmt}`,
+        `ग्राहक: ${custName} (${custPhone || 'Wardha'})${schemeName ? ` • ${schemeName}` : ''}`
+      );
+
+      setNewOrderAlert({
+        customerName: custName,
+        customerPhone: custPhone,
+        totalAmount: totalAmt,
+        invoiceNo: order.invoiceNo || `ORD-${Date.now().toString().slice(-4)}`,
+        date: order.date || new Date().toLocaleDateString('en-IN'),
+        itemsSummary: order.items ? order.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ') : (order.itemDetails || ''),
+        isFinance,
+        providerName,
+        schemeName,
+        monthlyEmi: order.financeDetails?.monthlyEmi,
+        downPayment: order.financeDetails?.downPayment,
+      });
+
+      const notif: AdminNotification = {
+        id: `ord_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+        type: isFinance ? 'finance_order_placed' : 'order_placed',
+        title: isFinance ? '⚡ नवीन ०% फायनान्स अर्ज' : '🛍️ नवीन ग्राहक ऑनलाइन ऑर्डर',
+        subtitle: `${custName} (${custPhone || 'वर्धा'})${schemeName ? ` • ${providerName || 'Bajaj'} (${schemeName})` : ' • COD/UPI'}`,
+        amount: totalAmt,
+        customerName: custName,
+        customerPhone: custPhone,
+        providerName,
+        schemeName,
+        timestamp: Date.now(),
+        read: false,
+      };
+
+      setAdminNotifications((prev) => {
+        const updated = [notif, ...prev.slice(0, 49)];
+        try {
+          localStorage.setItem('shri_sai_admin_notifications', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
     };
-  }, []);
+
+    // 1. Local window listeners
+    const onWindowOrder = (e: any) => handleOrderPlaced(e.detail);
+    const onWindowCart = (e: any) => handleCartActivity(e.detail);
+    window.addEventListener('shri_sai_order_placed', onWindowOrder);
+    window.addEventListener('shri_sai_cart_updated', onWindowCart);
+
+    // 2. BroadcastChannel for instant cross-tab sync
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('shri_sai_realtime_channel');
+        bc.onmessage = (event) => {
+          const msg = event.data;
+          if (!msg) return;
+          if (msg.type === 'cart_add') {
+            handleCartActivity(msg);
+          } else if (msg.type === 'order_placed' || msg.type === 'finance_order_placed') {
+            handleOrderPlaced(msg.order, msg.type === 'finance_order_placed');
+          }
+        };
+      }
+    } catch (e) {}
+
+    // 3. Real-Time Server-Sent Events (SSE) connection to /api/realtime/events
+    let eventSource: EventSource | null = null;
+    let pollInterval: any = null;
+    let lastKnownEventId = '';
+
+    try {
+      if (typeof EventSource !== 'undefined') {
+        eventSource = new EventSource('/api/realtime/events');
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && data.id && data.id !== lastKnownEventId) {
+              lastKnownEventId = data.id;
+              if (data.type === 'cart_activity') {
+                handleCartActivity(data.data || data.order);
+              } else if (data.type === 'order_placed' || data.type === 'finance_order_placed') {
+                handleOrderPlaced(data.data || data.order, data.type === 'finance_order_placed');
+              }
+            }
+          } catch (err) {
+            // Ignore parse errors on heartbeat
+          }
+        };
+
+        eventSource.onerror = () => {
+          // SSE reconnects automatically
+        };
+      }
+    } catch (e) {
+      console.warn('SSE not supported or failed to initialize, relying on polling', e);
+    }
+
+    // 4. Fallback polling every 8 seconds for multi-device sync
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/realtime/recent-orders');
+        if (res.ok) {
+          const result = await res.json();
+          const events = result.events || (Array.isArray(result) ? result : []);
+          if (Array.isArray(events) && events.length > 0) {
+            const latest = events[0];
+            const evtId = latest.id || `${latest.type}-${latest.timestamp}`;
+            if (lastKnownEventId && evtId !== lastKnownEventId) {
+              lastKnownEventId = evtId;
+              if (latest.type === 'cart_activity') {
+                handleCartActivity(latest.data || latest.order);
+              } else if (latest.type === 'order_placed' || latest.type === 'finance_order_placed') {
+                handleOrderPlaced(latest.data || latest.order, latest.type === 'finance_order_placed');
+              }
+            } else if (!lastKnownEventId) {
+              lastKnownEventId = evtId;
+            }
+          }
+        }
+      } catch (err) {
+        // Network offline or endpoint unavailable
+      }
+    }, 8000);
+
+    return () => {
+      window.removeEventListener('shri_sai_order_placed', onWindowOrder);
+      window.removeEventListener('shri_sai_cart_updated', onWindowCart);
+      if (bc) bc.close();
+      if (eventSource) eventSource.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [appMode, isAudioMuted]);
 
   // Clear demo data handler - resets customers, transactions, card members to a clean slate
   const handleClearAllDemoData = async () => {
@@ -1851,6 +2156,33 @@ export default function App() {
     showToast('कर्मचारी हटवण्यात आला.', 'info');
   };
 
+  const handleUpdateStaff = (updatedMember: StaffMember) => {
+    setDb((prev) => {
+      const updatedStaff = (prev.staff || []).map((s) =>
+        s.id === updatedMember.id ? updatedMember : s
+      );
+      const nextDb = { ...prev, staff: updatedStaff };
+      saveDatabase(nextDb);
+      syncDatabaseToCloud(nextDb, setCloudStatus, true, true);
+      return nextDb;
+    });
+
+    // If current logged in user is this staff member, sync session
+    if (currentUser && currentUser.id === updatedMember.id) {
+      setCurrentUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updatedMember.name,
+              phone: updatedMember.phone,
+              email: updatedMember.email || prev.email,
+            }
+          : null
+      );
+    }
+    showToast(`✓ कर्मचारी माहिती यशस्वीरित्या अपडेट केली: ${updatedMember.name}`, 'success');
+  };
+
   const handleUpdateAttendance = (
     id: string,
     status: 'Present' | 'Absent' | 'Half Day'
@@ -2137,22 +2469,32 @@ export default function App() {
         {/* Real-time New Order Floating Notification Banner */}
         {newOrderAlert && (
           <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-4 no-print animate-fade-in">
-            <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 p-3 rounded-2xl shadow-2xl border-2 border-amber-300 flex items-center justify-between gap-3">
+            <div className={`p-3 rounded-2xl shadow-2xl border-2 flex items-center justify-between gap-3 text-slate-950 ${
+              newOrderAlert.isFinance
+                ? 'bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-300 border-blue-400'
+                : 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 border-amber-300'
+            }`}>
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="w-8 h-8 rounded-full bg-slate-950 text-amber-300 flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                  🔔
+                  {newOrderAlert.isFinance ? '⚡' : '🔔'}
                 </span>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-extrabold text-xs sm:text-sm text-slate-950">
-                      नवीन कस्टमर ऑर्डर प्राप्त!
+                      {newOrderAlert.isFinance ? 'नवीन ०% फायनान्स अर्ज प्राप्त!' : 'नवीन कस्टमर ऑर्डर प्राप्त!'}
                     </span>
                     <span className="bg-slate-900 text-amber-300 text-[11px] font-mono font-bold px-2 py-0.2 rounded-full">
                       ₹{(Number(newOrderAlert.totalAmount) || 0).toLocaleString()}
                     </span>
+                    {newOrderAlert.providerName && (
+                      <span className="bg-blue-900 text-white text-[10px] font-bold px-2 py-0.2 rounded-full">
+                        {newOrderAlert.providerName}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] font-semibold text-slate-800 truncate">
                     ग्राहक: {newOrderAlert.customerName} {newOrderAlert.customerPhone ? `• ${newOrderAlert.customerPhone}` : ''}
+                    {newOrderAlert.monthlyEmi ? ` • हप्ता: ₹${newOrderAlert.monthlyEmi.toLocaleString()}/महिना` : ''}
                   </p>
                 </div>
               </div>
@@ -2161,7 +2503,9 @@ export default function App() {
                 {newOrderAlert.customerPhone && (
                   <a
                     href={`https://wa.me/91${newOrderAlert.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                      `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेसमध्ये आपली ऑनलाइन ऑर्डर प्राप्त झाली आहे.`
+                      newOrderAlert.isFinance
+                        ? `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेस वर्धाकडून आपला ${newOrderAlert.providerName || 'बजाज'} ०% फायनान्स अर्ज (₹${newOrderAlert.totalAmount}) प्राप्त झाला आहे.`
+                        : `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेसमध्ये आपली ऑनलाइन ऑर्डर प्राप्त झाली आहे.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -2173,13 +2517,27 @@ export default function App() {
                 {currentUser && (
                   <button
                     onClick={() => {
-                      setAppMode('erp');
-                      setActiveTab('all-entries');
+                      setSelectedNotificationToEdit({
+                        id: `alert_${Date.now()}`,
+                        type: newOrderAlert.isFinance ? 'finance_order_placed' : 'order_placed',
+                        title: newOrderAlert.isFinance ? '०% फायनान्स अर्ज' : 'नवीन ग्राहक ऑर्डर',
+                        subtitle: `${newOrderAlert.customerName} • ₹${newOrderAlert.totalAmount}`,
+                        customerName: newOrderAlert.customerName,
+                        customerPhone: newOrderAlert.customerPhone,
+                        itemName: newOrderAlert.itemsSummary || 'इलेक्ट्रॉनिक्स/फर्निचर',
+                        amount: newOrderAlert.totalAmount,
+                        providerName: newOrderAlert.providerName,
+                        schemeName: newOrderAlert.schemeName,
+                        timestamp: Date.now(),
+                        read: true,
+                        status: 'pending',
+                      });
                       setNewOrderAlert(null);
                     }}
-                    className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                    className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
                   >
-                    नोंदी पहा
+                    <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                    <span>एडिट / बिल बनवा</span>
                   </button>
                 )}
                 <button
@@ -2296,6 +2654,10 @@ export default function App() {
         currentUser={currentUser}
         onViewCustomerShop={() => setAppMode('shop')}
         onOpenInstallModal={() => setShowInstallModal(true)}
+        onOpenCashClosing={() => setShowCashClosingModal(true)}
+        onOpenPromoGenerator={() => setShowPromoModal(true)}
+        onOpenWarrantyTracker={() => setShowWarrantyModal(true)}
+        onQuickBackup={handleExportData}
         onLogout={() => {
           setCurrentUser(null);
           localStorage.removeItem('shri_sai_auth_user');
@@ -2307,21 +2669,35 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto pb-20 lg:pb-0">
         {/* Real-time Online Order Banner in ERP */}
         {newOrderAlert && (
-          <div className="bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 px-4 py-2.5 shadow-md flex items-center justify-between gap-3 border-b-2 border-amber-300 no-print animate-fade-in">
+          <div className={`px-4 py-2.5 shadow-md flex items-center justify-between gap-3 border-b-2 text-slate-950 no-print animate-fade-in ${
+            newOrderAlert.isFinance
+              ? 'bg-gradient-to-r from-blue-300 via-indigo-200 to-amber-300 border-blue-400'
+              : 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 border-amber-300'
+          }`}>
             <div className="flex items-center gap-2 text-xs sm:text-sm font-bold min-w-0">
-              <span className="text-base">🔔</span>
-              <span>नवीन ग्राहक ऑर्डर प्राप्त:</span>
+              <span className="text-base">{newOrderAlert.isFinance ? '⚡' : '🔔'}</span>
+              <span>{newOrderAlert.isFinance ? 'नवीन ०% फायनान्स अर्ज प्राप्त:' : 'नवीन ग्राहक ऑर्डर प्राप्त:'}</span>
               <span className="bg-slate-950 text-amber-300 text-xs px-2 py-0.5 rounded-full font-mono font-bold">
                 ₹{(Number(newOrderAlert.totalAmount) || 0).toLocaleString()}
               </span>
+              {newOrderAlert.providerName && (
+                <span className="bg-blue-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {newOrderAlert.providerName}
+                </span>
+              )}
               <span className="hidden sm:inline font-semibold text-slate-900 truncate">
                 {newOrderAlert.customerName} ({newOrderAlert.customerPhone || 'Wardha'})
+                {newOrderAlert.monthlyEmi ? ` • हप्ता: ₹${newOrderAlert.monthlyEmi.toLocaleString()}/महिना` : ''}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0 text-xs">
               {newOrderAlert.customerPhone && (
                 <a
-                  href={`https://wa.me/91${newOrderAlert.customerPhone.replace(/\D/g, '')}`}
+                  href={`https://wa.me/91${newOrderAlert.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                    newOrderAlert.isFinance
+                      ? `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेस वर्धाकडून आपला ${newOrderAlert.providerName || 'बजाज'} ०% फायनान्स अर्ज (₹${newOrderAlert.totalAmount}) प्राप्त झाला आहे. आम्ही तात्काळ मंजुरी प्रक्रिया सुरू करत आहोत.`
+                      : `नमस्ते ${newOrderAlert.customerName}, श्री साई इंटरप्राइजेसमध्ये आपली ऑनलाइन ऑर्डर प्राप्त झाली आहे.`
+                  )}`}
                   target="_blank"
                   rel="noreferrer"
                   className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow-xs"
@@ -2331,12 +2707,27 @@ export default function App() {
               )}
               <button
                 onClick={() => {
-                  setActiveTab('all-entries');
+                  setSelectedNotificationToEdit({
+                    id: `alert_${Date.now()}`,
+                    type: newOrderAlert.isFinance ? 'finance_order_placed' : 'order_placed',
+                    title: newOrderAlert.isFinance ? '०% फायनान्स अर्ज' : 'नवीन ग्राहक ऑर्डर',
+                    subtitle: `${newOrderAlert.customerName} • ₹${newOrderAlert.totalAmount}`,
+                    customerName: newOrderAlert.customerName,
+                    customerPhone: newOrderAlert.customerPhone,
+                    itemName: newOrderAlert.itemsSummary || 'इलेक्ट्रॉनिक्स/फर्निचर',
+                    amount: newOrderAlert.totalAmount,
+                    providerName: newOrderAlert.providerName,
+                    schemeName: newOrderAlert.schemeName,
+                    timestamp: Date.now(),
+                    read: true,
+                    status: 'pending',
+                  });
                   setNewOrderAlert(null);
                 }}
-                className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-white rounded-lg font-bold transition shadow-xs"
+                className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-white rounded-lg font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
               >
-                नोंदी पहा
+                <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                <span>एडिट / बिल बनवा</span>
               </button>
               <button
                 onClick={() => setNewOrderAlert(null)}
@@ -2399,17 +2790,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap justify-end">
-            {/* 1. Install Mobile App button */}
+          <div className="flex items-center gap-1 sm:gap-2 justify-end">
+            {/* 1. Install Mobile App button (Desktop/Tablet) */}
             <button
               type="button"
               onClick={() => setShowInstallModal(true)}
               title="Install Official Mobile App"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs"
             >
               <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden md:inline">मोबाईल ॲप</span>
-              <span className="md:hidden">ॲप</span>
+              <span>मोबाईल ॲप</span>
             </button>
 
             {/* 2. View Customer Website button */}
@@ -2417,19 +2807,30 @@ export default function App() {
               type="button"
               onClick={() => setAppMode('shop')}
               title="View Customer Website & Public Passbook Portal"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+              className="flex items-center gap-1 px-2 py-1.5 sm:px-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold transition cursor-pointer shadow-2xs"
             >
               <Store className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">Customer Website</span>
+              <span className="hidden sm:inline">Website</span>
               <span className="sm:hidden">Shop</span>
             </button>
 
-            {/* 3. Real-time Google Cloud Sync Status Badge */}
+            {/* 3. Live Customer Cart & Online Orders Notification Bell */}
+            <AdminNotificationDropdown
+              notifications={adminNotifications}
+              onMarkAllRead={handleMarkAllNotificationsRead}
+              onClearAll={handleClearAllNotifications}
+              onEditNotification={setSelectedNotificationToEdit}
+              onDeleteNotification={handleDeleteNotification}
+              isMuted={isAudioMuted}
+              onToggleMute={toggleAudioMuted}
+            />
+
+            {/* 4. Real-time Google Cloud Sync Status Badge */}
             <button
               type="button"
               onClick={handleManualCloudSync}
               title="Real-time Google Cloud database sync. Click to force sync."
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer ${
+              className={`flex items-center gap-1 px-2 py-1.5 sm:px-2.5 rounded-lg border text-xs font-medium transition cursor-pointer ${
                 cloudStatus === 'connected'
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                   : cloudStatus === 'syncing'
@@ -2457,38 +2858,43 @@ export default function App() {
                 )}
               </span>
               <Cloud className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {cloudStatus === 'connected' && 'Cloud Synced'}
+              <span className="hidden md:inline">
+                {cloudStatus === 'connected' && 'Synced'}
                 {cloudStatus === 'syncing' && 'Syncing...'}
-                {cloudStatus === 'quota-exceeded' && 'Local (Quota Full)'}
+                {cloudStatus === 'quota-exceeded' && 'Quota Full'}
                 {cloudStatus === 'offline' && 'Offline'}
-                {cloudStatus === 'error' && 'Sync Error'}
+                {cloudStatus === 'error' && 'Error'}
               </span>
             </button>
 
-            {/* 4. Global Data Search Shortcut */}
+            {/* 5. Global Data Search Shortcut (Desktop) */}
             <button
               type="button"
               onClick={() => setActiveTab('uploaded-data')}
               title="Search uploaded Excel data and all system records"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold transition cursor-pointer shadow-2xs"
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold transition cursor-pointer shadow-2xs"
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">सर्व डेटा शोधा</span>
+              <span>सर्व डेटा शोधा</span>
             </button>
 
-            {/* 5. Active Day / Night Theme Toggle */}
+            {/* 6. Active Day / Night Theme Toggle */}
             <DayNightToggle id="erp-header-daynight" size="sm" showLabel={false} />
 
-            {/* 6. Counter Fast Billing Shortcut */}
+            {/* Quick backup button (Desktop/Tablet) */}
             <button
               type="button"
-              onClick={() => setActiveTab('add-entry')}
-              title="Fast Counter Billing"
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 text-xs font-semibold transition cursor-pointer shadow-2xs"
+              onClick={() => {
+                handleExportData();
+                localStorage.setItem('shri_sai_last_backup_date', new Date().toISOString().split('T')[0]);
+                setShowBackupReminder(false);
+                showToast('✓ आजचा संपूर्ण डेटा बॅकअप यशस्वीरित्या तुमच्या डिव्हाइसवर सुरक्षित सेव्ह झाला!', 'success');
+              }}
+              title="1-Click Instant Device Backup"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 text-xs font-bold transition cursor-pointer shadow-2xs"
             >
-              <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-              <span>काउंटर</span>
+              <Save className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>बॅकअप</span>
             </button>
 
             {/* 7. New Bill / Entry Shortcut */}
@@ -2496,20 +2902,21 @@ export default function App() {
               type="button"
               onClick={() => setActiveTab('add-entry')}
               title="Create New Bill / Entry"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">New Entry</span>
+              <span className="hidden sm:inline">New Entry</span>
+              <span className="sm:hidden">+ बिल</span>
             </button>
 
             {/* 8. User Role Badge & Auth Switcher */}
             {currentUser ? (
-              <div className="flex items-center gap-1.5 pl-1">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setShowLoginModal(true)}
                   title="Role Switch / Change Account"
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
                     currentUser.role === 'admin'
                       ? 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200'
                       : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200'
@@ -2520,10 +2927,7 @@ export default function App() {
                   ) : (
                     <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   )}
-                  <span>{currentUser.role === 'admin' ? 'Admin' : 'Staff'}</span>
-                  <span className="hidden md:inline text-[11px] font-normal text-slate-500 font-mono">
-                    ({currentUser.email.split('@')[0]})
-                  </span>
+                  <span className="hidden sm:inline">{currentUser.role === 'admin' ? 'Admin' : 'Staff'}</span>
                 </button>
 
                 <button
@@ -2546,11 +2950,51 @@ export default function App() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>Login (Gmail OTP)</span>
+                <span>Login</span>
               </button>
             )}
           </div>
         </header>
+
+        {/* Daily Auto-Backup Reminder Banner (Item 7) */}
+        {showBackupReminder && (
+          <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white px-4 py-2.5 shadow-md flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm no-print border-b border-blue-500/30">
+            <div className="flex items-center gap-2.5 font-medium">
+              <span className="text-lg">💾</span>
+              <div>
+                <strong>दैनिक डेटा बॅकअप स्मरणपत्र (Daily Backup Reminder):</strong>
+                <span className="opacity-90 ml-1.5 hidden sm:inline">
+                  दुकान बंद करण्यापूर्वी आजचा संपूर्ण व्यवहार, ग्राहक, स्टॉक व कार्ड डेटा १-क्लिकमध्ये सुरक्षित डाऊनलोड करा.
+                </span>
+                <span className="opacity-90 ml-1.5 sm:hidden">
+                  आजचा डेटा सुरक्षित डाऊनलोड करा.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportData();
+                  localStorage.setItem('shri_sai_last_backup_date', new Date().toISOString().split('T')[0]);
+                  setShowBackupReminder(false);
+                  showToast('✓ आजचा संपूर्ण डेटा बॅकअप यशस्वीरित्या डाऊनलोड झाला!', 'success');
+                }}
+                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold transition shadow-xs flex items-center gap-1.5 text-xs cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>१-क्लिक बॅकअप घ्या</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBackupReminder(false)}
+                className="px-2 py-1 text-white/80 hover:text-white hover:bg-white/10 rounded-lg text-xs cursor-pointer font-medium"
+              >
+                नंतर
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Pending Staff Verification Alert for Admin */}
         {currentUser?.role === 'admin' && (db.staff || []).some((s) => s.status === 'pending_approval') && (
@@ -2588,6 +3032,10 @@ export default function App() {
             setActiveTab('card-scheme');
             setCardSchemeInitialAction('refund');
           }}
+          onDeliveryChallan={() => {
+            setActiveTab('card-scheme');
+            setCardSchemeInitialAction('delivery-challan');
+          }}
           onCustomerLedger={() => {
             setActiveTab('customers');
           }}
@@ -2612,6 +3060,9 @@ export default function App() {
           onFinanceCalc={() => {
             setShowFinanceModal(true);
           }}
+          onWarrantyTracker={() => {
+            setShowWarrantyModal(true);
+          }}
         />
 
         {/* View Switcher */}
@@ -2627,9 +3078,12 @@ export default function App() {
               agentAdvances={db.agentAdvances || []}
               staff={db.staff || []}
               currentUser={currentUser}
+              adminNotifications={adminNotifications}
+              onOpenStorefront={() => setAppMode('shop')}
               onNavigate={setActiveTab}
               onOpenInvoiceModal={setSelectedInvoice}
               onSaveAdvance={handleSaveAgentAdvance}
+              onEditNotification={setSelectedNotificationToEdit}
             />
           )}
 
@@ -2822,6 +3276,8 @@ export default function App() {
               stock={db.stock}
               onAddStockItem={handleAddStockItem}
               onUpdateStockQty={handleUpdateStockQty}
+              transactions={db.transactions || []}
+              settings={db.settings}
             />
           )}
 
@@ -2842,6 +3298,7 @@ export default function App() {
             <StaffView
               staff={db.staff || []}
               onAddStaff={handleAddStaff}
+              onUpdateStaff={handleUpdateStaff}
               onUpdateAttendance={handleUpdateAttendance}
               onRecordAdvance={handleRecordAdvance}
               onApproveStaff={handleApproveStaff}
@@ -2978,6 +3435,51 @@ export default function App() {
           preselectedAmount={quickPavtiAmount}
         />
       )}
+
+      {/* Daily Cash Closing Modal */}
+      {showCashClosingModal && (
+        <CashClosingModal
+          isOpen={showCashClosingModal}
+          onClose={() => setShowCashClosingModal(false)}
+          settings={db.settings}
+          transactions={db.transactions || []}
+          cardTransactions={db.cardTransactions || []}
+          expenses={db.expenses || []}
+          dealerPayments={db.dealerPayments || []}
+          staff={db.staff || []}
+          activeUserName={currentUser?.name || db.settings.ownerName || 'Admin'}
+          onShowToast={showToast}
+        />
+      )}
+
+      {/* Festival / Weekly Scheme Promo Generator Modal */}
+      {showPromoModal && (
+        <PromoGeneratorModal
+          isOpen={showPromoModal}
+          onClose={() => setShowPromoModal(false)}
+          settings={db.settings}
+        />
+      )}
+
+      {/* Warranty & Free Service Expiry Tracker Modal */}
+      {showWarrantyModal && (
+        <WarrantyTrackerModal
+          isOpen={showWarrantyModal}
+          onClose={() => setShowWarrantyModal(false)}
+          settings={db.settings}
+          transactions={db.transactions || []}
+        />
+      )}
+
+      {/* Interactive Cart / Order / Finance Notification Edit Modal */}
+      <NotificationEditModal
+        notification={selectedNotificationToEdit}
+        isOpen={Boolean(selectedNotificationToEdit)}
+        onClose={() => setSelectedNotificationToEdit(null)}
+        onSave={handleSaveNotification}
+        onDelete={handleDeleteNotification}
+        onConvertToBill={handleCreateBillFromNotification}
+      />
 
       {/* Native Mobile Bottom Navigation Bar (for phones/tablets) */}
       <MobileBottomNav

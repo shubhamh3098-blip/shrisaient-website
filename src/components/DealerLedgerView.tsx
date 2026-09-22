@@ -38,6 +38,7 @@ import {
 } from '../types';
 import { CardPassbookModal } from './CardPassbookModal';
 import { CustomerLedgerModal } from './CustomerLedgerModal';
+import { StatementReviewModal, StatementParsedRow } from './StatementReviewModal';
 
 interface DealerLedgerViewProps {
   dealers: Dealer[];
@@ -92,6 +93,46 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   const [showAddDealerModal, setShowAddDealerModal] = useState(false);
   const [showAddBillModal, setShowAddBillModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showStatementModal, setShowStatementModal] = useState(false);
+
+  // Handle Automated Statement Parser confirmation
+  const handleImportStatementEntries = (
+    dealerId: string,
+    dealerName: string,
+    entries: StatementParsedRow[]
+  ) => {
+    let importedPurchases = 0;
+    let importedPayments = 0;
+
+    entries.forEach((row, idx) => {
+      if (row.debit > 0) {
+        onAddPurchase({
+          billNo: row.vchNo || `STMT-PUR-${Date.now().toString().slice(-4)}-${idx + 1}`,
+          date: row.date || new Date().toISOString().split('T')[0],
+          supplierName: dealerName,
+          items: row.particulars || 'सामान खरेदी (Statement)',
+          totalAmount: row.debit,
+          paidAmount: 0,
+          status: 'Pending',
+          paymentMode: 'Online',
+        });
+        importedPurchases++;
+      } else if (row.credit > 0) {
+        onRecordDealerPayment({
+          dealerId,
+          dealerName,
+          date: row.date || new Date().toISOString().split('T')[0],
+          amount: row.credit,
+          paymentMode: 'Online',
+          voucherNo: row.vchNo || `VCH-STMT-${Date.now().toString().slice(-4)}-${idx + 1}`,
+          notes: row.particulars || 'Payment via Statement Import',
+        });
+        importedPayments++;
+      }
+    });
+
+    setSelectedDealerId(dealerId);
+  };
 
   // New Dealer state
   const [newDealerName, setNewDealerName] = useState('');
@@ -392,6 +433,14 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
               >
                 <Plus className="w-3.5 h-3.5" />
                 + New Dealer
+              </button>
+              <button
+                onClick={() => setShowStatementModal(true)}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                title="डीलर / होलसेलर स्टेटमेंट अपलोड करा (PDF & PNG OCR)"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>📄 स्टेटमेंट अपलोड (OCR)</span>
               </button>
               {selectedDealer && (
                 <button
@@ -1801,6 +1850,15 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Automated Party Statement Parser Modal */}
+      <StatementReviewModal
+        isOpen={showStatementModal}
+        onClose={() => setShowStatementModal(false)}
+        dealers={dealers}
+        onAddDealer={onAddDealer}
+        onImportStatementEntries={handleImportStatementEntries}
+      />
     </div>
   );
 };

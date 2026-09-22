@@ -1,6 +1,7 @@
 import React from 'react';
 import { TransactionEntry, BusinessSettings, InvoiceLineItem } from '../types';
 import { numberToIndianWords } from '../utils/numberToWords';
+import { DynamicUpiQrCode } from './DynamicUpiQrCode';
 
 export interface DispatchDetails {
   deliveryNote?: string;
@@ -418,11 +419,11 @@ export const ProfessionalGstInvoice: React.FC<ProfessionalGstInvoiceProps> = ({
         </table>
       </div>
 
-      {/* 6. Bank Details, Declaration & Signatory */}
-      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-900">
+      {/* 6. Bank Details, UPI QR, Declaration & Signatory */}
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-900">
         {/* Left: Bank & Declaration */}
-        <div className="p-3 text-[11px] space-y-2">
-          <div className="space-y-0.5">
+        <div className="p-3 text-[11px] space-y-2 col-span-1 md:col-span-2 flex flex-col md:flex-row items-start justify-between gap-3">
+          <div className="flex-1 space-y-1">
             <p className="font-bold text-slate-950">Our Bank : {bankName}</p>
             <p className="text-slate-900">
               Account Number : <span className="font-mono font-bold text-slate-950">{accountNumber}</span>
@@ -430,20 +431,37 @@ export const ProfessionalGstInvoice: React.FC<ProfessionalGstInvoiceProps> = ({
             <p className="text-slate-900">
               IFSC Code : <span className="font-mono font-bold text-slate-950">{ifscCode}</span>
             </p>
+            <p className="text-slate-900">
+              UPI ID : <span className="font-mono font-bold text-slate-950">{settings.upiId || '8766486915@ybl'}</span>
+            </p>
+
+            <div className="pt-1.5 border-t border-slate-300">
+              <span className="font-bold text-slate-950 block mb-0.5 text-[10px] uppercase">
+                Declaration:
+              </span>
+              <p className="text-[10px] text-slate-700 leading-normal">
+                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+              </p>
+              {isQuotation && validityDays && (
+                <p className="text-[10.5px] font-bold text-amber-900 mt-1">
+                  Quotation Validity: {validityDays}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="pt-1.5 border-t border-slate-300">
-            <span className="font-bold text-slate-950 block mb-0.5 text-[10px] uppercase">
-              Declaration:
-            </span>
-            <p className="text-[10px] text-slate-700 leading-normal">
-              We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
-            </p>
-            {isQuotation && validityDays && (
-              <p className="text-[10.5px] font-bold text-amber-900 mt-1">
-                Quotation Validity: {validityDays}
-              </p>
-            )}
+          {/* Dynamic UPI Payment QR Code */}
+          <div className="shrink-0 flex items-center justify-center p-1">
+            <DynamicUpiQrCode
+              upiId={settings.upiId || '8766486915@ybl'}
+              payeeName={settings.businessName || 'Shri Sai Enterprises'}
+              amount={Number(entry.dueAmount) > 0 ? Number(entry.dueAmount) : finalTotalAmount}
+              note={`Inv ${entry.invoiceNo || ''}`}
+              size={95}
+              showBadges={true}
+              showAmountPill={true}
+              className="border border-slate-300 bg-white"
+            />
           </div>
         </div>
 

@@ -115,11 +115,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // Master approval codes accepted for on-the-spot verification
   const isValidAdminKey = (key: string): boolean => {
     const clean = key.trim().toLowerCase();
-    const validKeys = [
-      (adminPassword || 'admin').toLowerCase(),
-      '8766486915'
-    ];
-    return validKeys.includes(clean);
+    const activeAdminPass = (adminPassword || 'admin').trim().toLowerCase();
+    return clean === activeAdminPass;
   };
 
   // 1. Password Login Handler
