@@ -1,461 +1,369 @@
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
+import express from 'express';
+import http from 'http';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+// Safe directory resolution compatible with both ESM (tsx dev) and CommonJS (esbuild dist/server.cjs)
+const getAppDirname = (): string => {
+  try {
+    if (typeof __dirname !== 'undefined' && __dirname) {
+      return __dirname;
+    }
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch (e) {
+    // Fallback if environment doesn't provide URL
+  }
+  return process.cwd();
+};
+
+const appDirname = getAppDirname();
 
 dotenv.config();
-
-const PORT = 3000;
-
-// Lazy initialize GoogleGenAI client to avoid crash if GEMINI_API_KEY is unset
-let aiClient: GoogleGenAI | null = null;
-function getGenAI(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
-  if (!aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  }
-  return aiClient;
-}
 
 async function startServer() {
   const app = express();
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+  // Increase payload limit for base64 bill photos (supports high-res images)
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // API Health check
-  app.get("/api/health", (_req, res) => {
-    res.json({
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
-    });
-  });
+  // API & Container Health checks (for Cloud Run startup/liveness probes & internal monitoring)
+  const healthCheckHandler = (req: express.Request, res: express.Response) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  };
+  app.get('/api/health', healthCheckHandler);
+  app.get('/health', healthCheckHandler);
+  app.get('/healthz', healthCheckHandler);
 
-  // API endpoint: Gemini AI Purchase Bill OCR Scanner
-  app.post("/api/scan-purchase-bill", async (req, res) => {
+  // API: Scan Purchase Invoice / Bill via Gemini AI Multimodal Vision
+  app.post('/api/scan-purchase-invoice', async (req, res) => {
     try {
       const { imageBase64, mimeType } = req.body;
-
       if (!imageBase64) {
-        return res.status(400).json({
-          error: "Missing imageBase64 in request body",
-        });
+        return res.status(400).json({ success: false, error: 'Image data is required' });
       }
 
-      const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z+]+;base64,/, "");
-      const resolvedMime = mimeType || "image/jpeg";
-
-      const ai = getGenAI();
-      if (!ai) {
-        // Graceful fallback when API key is missing
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
         return res.status(503).json({
-          error: "GEMINI_API_KEY is not configured in server environment.",
-          fallback: true,
+          success: false,
+          error: 'GEMINI_API_KEY is not configured in server environment.',
+          needKey: true,
         });
       }
 
-      const systemPrompt = `You are an expert Indian GST invoice OCR parser for Shri Sai Enterprises (Electronics and Furniture showroom, Wardha).
-Analyze this purchase invoice / bill image and extract all details in strictly valid JSON format.
-Extract:
-- supplierName: Wholesaler or dealer name (e.g. MANISHA ENTERPRISES, LG ELECTRONICS, etc.)
-- supplierPhone: Phone/mobile if available
-- supplierAddress: Supplier address with city/pincode
-- supplierGstin: 15-digit GSTIN (e.g. 27ABDPB8956C1ZS)
-- billNo: Invoice / bill number (e.g. CS/2526/01677)
-- date: Invoice date in YYYY-MM-DD format
-- poNo: Purchase order number if present
-- poDate: PO date in YYYY-MM-DD format if present
-- transporter: Transport company name
-- ewayBillNo: E-Way bill number if present
-- bankName: Supplier bank name if listed
-- accountNo: Bank account number if listed
-- ifsc: Bank IFSC code if listed
-- items: Array of line items:
-    - description: Product / item name with brand (e.g. LG Refrigerator GL-D201AELU)
-    - modelNo: Model number or code (e.g. GL-D201AELU)
-    - serialNumbers: Array of individual serial numbers if printed on bill
-    - hsn: HSN code (e.g. 84182100)
-    - quantity: number
-    - rate: Unit purchase rate without tax
-    - discount: Discount per item or line
-    - taxRate: Total GST percentage (e.g. 18 or 28)
-    - taxableAmount: Total taxable amount for this line
-    - cgstAmount: CGST amount
-    - sgstAmount: SGST amount
-    - totalAmount: Total line amount including taxes
-- taxableAmount: Grand taxable amount
-- cgstAmount: Total CGST amount
-- sgstAmount: Total SGST amount
-- totalAmount: Grand total invoice amount (Gross amount)
-- paidAmount: Amount paid (if indicated as paid, else 0)
-- paymentMode: 'Cash' | 'Online' | 'Cheque'
-- notes: Any notes, IRN number, or remarks printed on invoice.
+      let cleanBase64 = imageBase64;
+      let detectedMime = mimeType || 'image/jpeg';
+      if (imageBase64.includes(';base64,')) {
+        const parts = imageBase64.split(';base64,');
+        detectedMime = parts[0].replace('data:', '') || detectedMime;
+        cleanBase64 = parts[1];
+      }
 
-Respond with ONLY valid JSON matching this schema.`;
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const prompt = `You are an expert OCR and retail invoice data extraction specialist for electronics, home appliances, and furniture store purchase bills (खरेदी बीजक / Tax Invoice).
+Your task is to analyze the attached purchase bill/invoice image, accurately read English, Hindi, and Marathi text, and extract all supplier, bill, product items, serial numbers, taxes, and billing totals.
+
+Return strictly valid JSON with this exact schema:
+{
+  "supplierName": "Name of supplier/distributor/company (e.g. MANISHA ENTERPRISES, LG ELECTRONICS, SAMSUNG, GODREJ, etc.)",
+  "supplierAddress": "Address of supplier or empty string",
+  "supplierPhone": "Phone or mobile number if present, else empty string",
+  "supplierGstin": "15-character GSTIN number if present, else empty string",
+  "supplierState": "MAHARASHTRA",
+  "buyerName": "Buyer name (e.g. SHRI SAI ENTERPRISES) if printed, else empty string",
+  "buyerGstin": "Buyer GSTIN if printed, else empty string",
+  "buyerAddress": "Buyer address if printed, else empty string",
+  "billNo": "Invoice/Bill number as printed on bill",
+  "date": "Invoice date in YYYY-MM-DD format (convert DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD)",
+  "poNo": "Purchase order / PO number if mentioned, else empty string",
+  "poDate": "PO date in YYYY-MM-DD or empty string",
+  "location": "Location / Warehouse / Distribution branch if shown, else 'DISTRIBUTION WAREHOUSE'",
+  "salesConsultant": "Sales person or consultant name if shown, else empty string",
+  "approvedBy": "Approved by name if shown, else empty string",
+  "transporter": "Transporter name if mentioned, else 'GENERAL TRANSPORT'",
+  "vehicleNo": "Vehicle number if mentioned, else empty string",
+  "items": [
+    {
+      "description": "Clear product description with brand and model (e.g. 'LG GLT2216WYRI Refrigerator 240L', 'Samsung 43 Inch Smart LED TV', etc.)",
+      "hsn": "HSN code (e.g. '84182100', '84501100', '85287200', etc.) or empty string",
+      "qty": 1,
+      "rate": 20000,
+      "discount": 0,
+      "taxRate": 18,
+      "taxableAmount": 20000,
+      "taxAmount": 3600,
+      "totalAmount": 23600,
+      "serialNumbers": ["602NRZX294301", "602NRQV293652"]
+    }
+  ],
+  "subtotal": 20000,
+  "cgstAmount": 1800,
+  "sgstAmount": 1800,
+  "igstAmount": 0,
+  "totalTax": 3600,
+  "totalAmount": 23600,
+  "paidAmount": 0,
+  "paymentMode": "Online",
+  "supplierBank": {
+    "accountName": "Supplier bank account name if mentioned",
+    "accountNo": "Bank account number if mentioned",
+    "ifscCode": "IFSC code if mentioned",
+    "bankName": "Bank name",
+    "branch": "Branch name"
+  },
+  "notes": "Any special notes, scheme discounts, or delivery details mentioned on bill"
+}
+
+Important Instructions:
+1. Extract every individual item line row in the bill.
+2. Carefully look for Serial Numbers, IMEI numbers, Barcodes, or Unit Numbers printed on the bill (often in a dedicated column, below the item name, or in a serial list at the bottom). Put each individual serial into the 'serialNumbers' array.
+3. Ensure all numbers (qty, rate, discount, taxRate, taxableAmount, taxAmount, totalAmount, subtotal, cgstAmount, sgstAmount, igstAmount, totalTax) are numbers, NOT strings.
+4. If rate is per unit, ensure line totalAmount = taxableAmount + taxAmount.
+5. If payment status or paid amount is marked on the bill, extract it; otherwise default paidAmount to 0.
+6. Return ONLY the JSON object. Do not include extra conversational text or formatting outside the JSON.`;
+
+      const imagePart = {
+        inlineData: {
+          mimeType: detectedMime,
+          data: cleanBase64,
+        },
+      };
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: 'gemini-3.8-flash',
         contents: [
           {
-            role: "user",
             parts: [
-              {
-                inlineData: {
-                  mimeType: resolvedMime,
-                  data: cleanBase64,
-                },
-              },
-              {
-                text: systemPrompt,
-              },
+              imagePart,
+              { text: prompt },
             ],
           },
         ],
         config: {
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
+          temperature: 0.1,
         },
       });
 
-      const responseText = response.text || "{}";
-      let parsedData;
-      try {
-        parsedData = JSON.parse(responseText);
-      } catch (parseError) {
-        // Attempt cleanup if markdown ticks remain
-        const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
-        parsedData = JSON.parse(cleaned);
-      }
+      let responseText = response.text || '{}';
+      responseText = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsedData = JSON.parse(responseText);
 
       return res.json({
         success: true,
         data: parsedData,
       });
     } catch (err: any) {
-      console.error("Error in /api/scan-purchase-bill:", err);
+      console.error('Error processing invoice with Gemini Vision:', err);
       return res.status(500).json({
-        error: err?.message || "Failed to parse purchase bill image with Gemini AI",
+        success: false,
+        error: err.message || 'Failed to parse invoice with AI Vision',
       });
     }
   });
 
-  // API endpoint: Automated Party Statement Parser (PDF & PNG OCR)
-  app.post("/api/parse-party-statement", async (req, res) => {
+  // API: Scan Dealer / Supplier Ledger Statement & Invoices (PDF or Image)
+  app.post('/api/scan-dealer-statement', async (req, res) => {
     try {
-      const { fileBase64, mimeType, fileName } = req.body;
-
-      if (!fileBase64) {
-        return res.status(400).json({
-          error: "Missing fileBase64 in request body",
-        });
+      const { fileBase64, imageBase64, mimeType } = req.body;
+      const rawBase64 = fileBase64 || imageBase64;
+      if (!rawBase64) {
+        return res.status(400).json({ success: false, error: 'Document or image data is required' });
       }
 
-      const cleanBase64 = fileBase64.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, "");
-      const resolvedMime = mimeType || (fileName?.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
-
-      const ai = getGenAI();
-      if (!ai) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
         return res.status(503).json({
-          error: "GEMINI_API_KEY is not configured in server environment.",
-          fallback: true,
+          success: false,
+          error: 'GEMINI_API_KEY is not configured in server environment.',
+          needKey: true,
         });
       }
 
-      const statementPrompt = `You are an expert accountant and OCR parser for Indian business party statements, dealer ledger sheets, and financial accounts for Shri Sai Enterprises.
-Analyze this financial statement / ledger (PDF or image) and extract the financial ledger table in strictly valid JSON format matching this schema:
+      let cleanBase64 = rawBase64;
+      let detectedMime = mimeType || 'application/pdf';
+      if (rawBase64.includes(';base64,')) {
+        const parts = rawBase64.split(';base64,');
+        detectedMime = parts[0].replace('data:', '') || detectedMime;
+        cleanBase64 = parts[1];
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const statementPrompt = `You are an expert financial auditor and retail ledger reconciliation specialist for electronics, home appliances, and furniture dealerships.
+Your task is to analyze the attached supplier/dealer account statement or purchase invoice (PDF or image).
+Suppliers include companies like MANISHA ENTERPRISES, LG ELECTRONICS, SAMSUNG, GODREJ, VOLTAS, BAJAJ, or local distributors.
+The buyer is SHRI SAI ENTERPRISES (श्री साई एंटरप्रायझेस, वर्धा).
+
+Carefully extract:
+1. Supplier / Dealer identity: Name, phone, address, GSTIN.
+2. Document type: Determine whether this is a "STATEMENT" (account statement/ledger covering multiple dates/invoices/payments) or a single "INVOICE" (purchase bill).
+3. If statement: Extract statement date range, opening balance, closing balance, total debits, total credits.
+4. Extract every transaction row in chronological order:
+   - date: formatted as YYYY-MM-DD
+   - type: "INVOICE" (when goods were billed/debit to buyer) or "PAYMENT" (when buyer paid via NEFT/RTGS/UPI/Cheque/Cash credit)
+   - refNo: Invoice number (e.g. CS/2526/0842, INV-9812) or Payment reference (e.g. UTR, Cheque No, Bank Ref)
+   - particulars: Brief item summary (e.g. "LG 240L Fridge 2 Nos", "Payment via NEFT", etc.)
+   - debit: Amount billed for goods (number, 0 if payment)
+   - credit: Amount paid to supplier (number, 0 if invoice)
+   - balance: Running balance if shown (number)
+
+Return strictly valid JSON with this exact schema:
 {
-  "partyName": "Wholesaler or Dealer Name (e.g. Manisha Enterprises, LG Electronics, Godrej, etc.)",
+  "documentType": "STATEMENT" or "INVOICE",
+  "dealerName": "Supplier / Dealer Name",
+  "dealerPhone": "Supplier Phone or mobile",
+  "dealerAddress": "Supplier Address",
+  "dealerGstin": "Supplier GSTIN",
+  "statementPeriod": "e.g. 01/04/2025 to 31/03/2026",
   "openingBalance": 0,
-  "closingBalance": 0,
-  "statementPeriod": "Date range if mentioned",
-  "rows": [
+  "closingBalance": 45000,
+  "totalDebits": 125000,
+  "totalCredits": 80000,
+  "summaryNotes": "Brief 1-line note summarizing statement status",
+  "transactions": [
     {
       "date": "YYYY-MM-DD",
-      "particulars": "Description, Invoice or Voucher details",
-      "vchType": "Purchase | Payment | Journal | Receipt",
-      "vchNo": "Bill or Voucher Number",
-      "debit": 0,
+      "type": "INVOICE",
+      "refNo": "INV-1029",
+      "particulars": "LG Refrigerators & LED TV",
+      "debit": 45000,
       "credit": 0,
-      "balance": 0
+      "balance": 45000
+    },
+    {
+      "date": "YYYY-MM-DD",
+      "type": "PAYMENT",
+      "refNo": "UTR-ICICI90214",
+      "particulars": "NEFT Payment from SBI A/c",
+      "debit": 0,
+      "credit": 30000,
+      "balance": 15000
     }
   ]
 }
-Ensure:
-1. Every ledger row has date (YYYY-MM-DD), particulars, debit (purchase/bill amount), credit (payment amount), and running balance.
-2. Numeric values must be numbers, not strings with commas.
-3. Respond with strictly valid JSON only.`;
+
+Important Instructions:
+- Ensure all numbers (debit, credit, balance, openingBalance, closingBalance, totalDebits, totalCredits) are numeric numbers, NOT strings.
+- Dates must be in YYYY-MM-DD format.
+- Return ONLY the JSON object. Do not wrap in conversational text.`;
+
+      const filePart = {
+        inlineData: {
+          mimeType: detectedMime,
+          data: cleanBase64,
+        },
+      };
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: 'gemini-3.8-flash',
         contents: [
           {
-            role: "user",
             parts: [
-              {
-                inlineData: {
-                  mimeType: resolvedMime,
-                  data: cleanBase64,
-                },
-              },
-              {
-                text: statementPrompt,
-              },
+              filePart,
+              { text: statementPrompt },
             ],
           },
         ],
         config: {
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
+          temperature: 0.1,
         },
       });
 
-      const responseText = response.text || "{}";
-      let parsedData;
-      try {
-        parsedData = JSON.parse(responseText);
-      } catch (parseError) {
-        const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
-        parsedData = JSON.parse(cleaned);
-      }
+      let responseText = response.text || '{}';
+      responseText = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsedData = JSON.parse(responseText);
 
       return res.json({
         success: true,
         data: parsedData,
       });
     } catch (err: any) {
-      console.error("Error in /api/parse-party-statement:", err);
+      console.error('Error processing dealer statement with Gemini Vision:', err);
       return res.status(500).json({
-        error: err?.message || "Failed to parse party statement with AI",
+        success: false,
+        error: err.message || 'Failed to parse dealer statement with AI Vision',
       });
     }
   });
 
-  // Real-time Order & Sales Broadcast System (SSE + Polling)
-  interface RealtimeEvent {
-    id: string;
-    type: 'order_placed' | 'cart_updated' | 'collection_recorded';
-    data: any;
-    timestamp: number;
-  }
+  // Serve production build if NODE_ENV is production
+  const distCandidates = [
+    path.resolve(process.cwd(), 'dist'),
+    path.resolve(appDirname),
+    path.resolve(appDirname, 'dist'),
+  ];
+  const distPath = distCandidates.find((dir) => {
+    return fs.existsSync(path.join(dir, 'index.html')) && fs.existsSync(path.join(dir, 'assets'));
+  }) || path.resolve(process.cwd(), 'dist');
+  const indexHtmlPath = path.join(distPath, 'index.html');
+  const isProduction = process.env.NODE_ENV === 'production' || 
+                       (typeof __filename !== 'undefined' && __filename.endsWith('server.cjs')) ||
+                       (Boolean(process.env.K_SERVICE) && !process.env.K_SERVICE.startsWith('ais-dev-'));
 
-  const recentRealtimeEvents: RealtimeEvent[] = [];
-  const sseClients = new Set<express.Response>();
-
-  // SSE Stream Endpoint
-  app.get("/api/realtime/events", (req, res) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    // Send welcome / connected heartbeat
-    res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
-
-    sseClients.add(res);
-
-    // Keep connection alive with periodic heartbeat comment
-    const heartbeatTimer = setInterval(() => {
-      res.write(": heartbeat\n\n");
-    }, 25000);
-
-    req.on("close", () => {
-      clearInterval(heartbeatTimer);
-      sseClients.delete(res);
-    });
-  });
-
-  // Broadcast new order notification
-  app.post("/api/realtime/order-notification", (req, res) => {
-    const { type = 'order_placed', order } = req.body;
-    if (!order) {
-      return res.status(400).json({ error: "Missing order data" });
-    }
-
-    const event: RealtimeEvent = {
-      id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type,
-      data: order,
-      timestamp: Date.now(),
-    };
-
-    recentRealtimeEvents.unshift(event);
-    if (recentRealtimeEvents.length > 50) {
-      recentRealtimeEvents.pop();
-    }
-
-    // Broadcast to all active SSE subscribers
-    const payload = `data: ${JSON.stringify(event)}\n\n`;
-    for (const client of sseClients) {
-      try {
-        client.write(payload);
-      } catch (err) {
-        sseClients.delete(client);
-      }
-    }
-
-    return res.json({
-      success: true,
-      broadcastCount: sseClients.size,
-      eventId: event.id,
-    });
-  });
-
-  // Polling fallback endpoint for clients behind strict proxies or mobile webviews
-  app.get("/api/realtime/recent-orders", (req, res) => {
-    const since = Number(req.query.since) || 0;
-    const events = recentRealtimeEvents.filter((e) => e.timestamp > since);
-    res.json({
-      events,
-      serverTime: Date.now(),
-      activeListeners: sseClients.size,
-    });
-  });
-
-  // API endpoint: Gemini AI Zero-Watermark Festival & Scheme Promo Generator
-  app.post("/api/generate-promo", async (req, res) => {
+  if (!isProduction) {
     try {
-      const {
-        occasion = "गुढीपाडवा विशेष",
-        product = "इलेक्ट्रॉनिक्स व फर्निचर",
-        offer = "भरघोस डिस्काउंट व सुलभ फायनान्स",
-        gift = "प्रत्येक खरेदीवर खात्रीशीर भेट",
-        customNotes = "",
-        businessName = "श्री साई एंटरप्रायझेस (SHRI SAI ENTERPRISES)",
-        phone = "8766486915 / 8600122798",
-        address = "मातोश्री सभागृह समोर, आर्वी रोड, वर्धा",
-        whatsappGroupLink = "https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4",
-      } = req.body;
-
-      const prompt = `तुम्ही 'श्री साई एंटरप्रायझेस, वर्धा' (इलेक्ट्रॉनिक्स, फर्निचर, कुलर, फ्रीज, सोफा, आणि ३०-महिन्यांची साप्ताहिक बचत योजना) साठी व्यावसायिक मराठी कॉपीरायटर आहात.
-खालील मुद्द्यांवर आधारित ग्राहकांना आकर्षित करणारा, अत्यंत सुंदर, वाचायला सोपा आणि मराठी सणासुदीचा व्हॉट्सॲप मेसेज (WhatsApp Promo Message) तयार करा:
-
-- सण / प्रसंग: ${occasion}
-- वस्तू / ऑफर: ${product}
-- सूट / फायनान्स: ${offer}
-- मोफत भेट: ${gift}
-${customNotes ? `- विशेष माहिती: ${customNotes}\n` : ''}- दुकान नाव: ${businessName}
-- पत्ता: ${address}
-- संपर्क नंबर: ${phone}
-- व्हॉट्सॲप ग्रुप: ${whatsappGroupLink}
-
-महत्त्वाचे नियम:
-1. मेसेज संपूर्ण मराठीत (किंवा सोप्या मराठी-इंग्रजी मिश्रित) व आकर्षक इमोजीसह (🎉, 🌸, 💥, 🎁, 📞, 📍) असावा.
-2. कोणत्याही प्रकारचे AI वॉटरमार्क, AI स्वाक्षरी, किंवा मेटा-कमेंट्स (उदा. "Here is your message:", "Generated by Gemini", "AI disclaimer") मुळीच देऊ नका.
-3. थेट कॉपी-पेस्ट करून ग्राहकांना पाठवता येईल असाच शुद्ध मेसेज द्या.`;
-
-      const ai = getGenAI();
-      if (ai) {
-        try {
-          const response = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: prompt,
-            config: {
-              systemInstruction: "You are an expert Marathi retail marketing copywriter for Shri Sai Enterprises. Output strictly the clean, beautiful WhatsApp promo text with emojis. Never include any AI signatures, watermarks, intro greetings, or metadata.",
-              temperature: 0.7,
-            },
-          });
-
-          const message = response.text?.trim();
-          if (message) {
-            return res.json({
-              success: true,
-              message,
-              provider: "gemini",
-            });
-          }
-        } catch (geminiErr) {
-          console.warn("Gemini promo generation error, falling back to clean template:", geminiErr);
-        }
-      }
-
-      // Zero-Watermark High-Converting Fallback Generator
-      const cleanMessage = `🎉 *${occasion.toUpperCase()} महाधमाका ऑफर!* 🎉
-*${businessName}* कडून सर्व ग्राहकांना सस्नेह नमस्कार! 🙏✨
-
-घर सजवा आणि आनंद द्विगुणीत करा! आमच्या शोरूममध्ये खास सणानिमित्त सुरू आहे भव्य सेल:
-
-✨ *ऑफरचे मुख्य आकर्षण:*
-━━━━━━━━━━━━━━━━━
-🛍️ *वस्तू:* ${product}
-💰 *खास सवलत:* ${offer}
-🎁 *मोफत भेट:* ${gift}
-${customNotes ? `⭐ *विशेष:* ${customNotes}\n` : ''}━━━━━━━━━━━━━━━━━
-
-💳 *बजाज / टीव्हीएस / एचडीबी फायनान्सवर ०% व्याजावर सुलभ हप्ते उपलब्ध!*
-🤝 *३०-महिन्यांची साप्ताहिक बचत कार्ड योजना सुरू (कमी हप्त्यात मोठी बचत)!*
-
-👉 *अधिकृत व्हॉट्सॲप ग्रुप जॉईन करा व रोजच्या ऑफर्स मिळवा:*
-${whatsappGroupLink}
-
-📍 *पत्ता:* ${address}
-📞 *संपर्क / ऑर्डर:* ${phone}
-
-_आजच भेट द्या आणि आपल्या पसंतीचे सामान घेऊन जा!_ ✨`;
-
-      return res.json({
-        success: true,
-        message: cleanMessage,
-        provider: "template",
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: false,
+        },
+        appType: 'spa',
       });
-    } catch (err: any) {
-      console.error("Error generating promo:", err);
-      return res.status(500).json({ error: "Failed to generate promo message" });
-    }
-  });
-
-  // Vite middleware for development vs static build in production
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-
-    // Cleanly suppress Vite HMR websocket unhandled rejection in AI Studio preview (DISABLE_HMR=true)
-    app.use((req, res, next) => {
-      if (req.url && req.url.startsWith('/@vite/client')) {
-        const originalWrite = res.write;
-        const originalEnd = res.end;
-        const chunks: Buffer[] = [];
-
-        res.write = function(chunk: any, ...args: any[]) {
-          if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          return true;
-        } as any;
-
-        res.end = function(chunk: any, ...args: any[]) {
-          if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          let body = Buffer.concat(chunks).toString('utf8');
-
-          body = body.replace('throw e;', '/* HMR unhandled rejection suppressed in AI Studio */');
-          body = body.replace(/console\.error\(`\[vite\] failed to connect to websocket/g, 'console.debug(`[vite] failed to connect to websocket');
-          body = body.replace('error: (err) => console.error("[vite]", err)', 'error: (err) => console.debug("[vite]", err)');
-
-          res.setHeader('Content-Length', Buffer.byteLength(body));
-          return (originalEnd as any).call(this, body, ...args);
-        } as any;
+      app.use(vite.middlewares);
+      console.log('Vite middleware successfully initialized and mounted');
+    } catch (viteError: any) {
+      console.warn('Vite dev server failed to initialize, falling back to static build:', viteError.message);
+      if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (req, res) => {
+          if (fs.existsSync(indexHtmlPath)) {
+            res.sendFile(indexHtmlPath);
+          } else {
+            res.status(200).send('API Server is ready');
+          }
+        });
       }
-      next();
-    });
-
-    app.use(vite.middlewares);
+    }
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.get('*', (req, res) => {
+      if (fs.existsSync(indexHtmlPath)) {
+        res.sendFile(indexHtmlPath);
+      } else {
+        res.status(200).send('API Server is ready');
+      }
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Shri Sai Enterprises ERP server running on http://0.0.0.0:${PORT}`);
+  // AI Studio Dev Container and Cloud Run require binding to port 3000 on 0.0.0.0
+  // Nginx proxies incoming traffic from port 8080 ($PORT) to internal port 3000.
+  const PORT = 3000;
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server actively running on http://0.0.0.0:${PORT}`);
   });
 }
 
