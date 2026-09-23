@@ -15,7 +15,6 @@ import {
   CreditCard,
   Building2,
   FileSpreadsheet,
-  Database,
   Cloud,
   RefreshCw,
   CheckCircle2,
@@ -24,16 +23,22 @@ import {
   LogOut,
   Lock,
   Download,
+  Database,
+  Sun,
+  Moon,
   Award,
+  Receipt,
   Calculator,
-  Coins,
-  Megaphone,
-  ShieldCheck,
-  Save
+  BookOpen,
+  Hammer,
+  FileCheck,
+  ClipboardList,
+  MapPin
 } from 'lucide-react';
 import { ActiveTab, BusinessSettings, AuthUser } from '../types';
 import { AppLogo } from './AppLogo';
-import { DayNightToggle } from './DayNightToggle';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggle } from './ThemeToggle';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -41,17 +46,14 @@ interface SidebarProps {
   settings: BusinessSettings;
   isOpenMobile: boolean;
   setIsOpenMobile: (open: boolean) => void;
-  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error' | 'quota-exceeded';
+  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
   lastSyncedTime?: string;
   onManualSync?: () => void;
   currentUser?: AuthUser | null;
   onLogout?: () => void;
   onViewCustomerShop?: () => void;
   onOpenInstallModal?: () => void;
-  onOpenCashClosing?: () => void;
-  onOpenPromoGenerator?: () => void;
-  onOpenWarrantyTracker?: () => void;
-  onQuickBackup?: () => void;
+  onOpenCsvExport?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -67,52 +69,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onViewCustomerShop,
   onOpenInstallModal,
-  onOpenCashClosing,
-  onOpenPromoGenerator,
-  onOpenWarrantyTracker,
-  onQuickBackup,
+  onOpenCsvExport,
 }) => {
-  // Grouped Navigation Modules for a clean, non-confusing ERP experience
+  const { theme, toggleTheme } = useTheme();
+
   const navSections = [
     {
-      title: 'डॅशबोर्ड (OVERVIEW)',
+      title: 'विक्री व व्यवहार (Sales)',
       items: [
-        { id: 'dashboard' as ActiveTab, label: 'Dashboard', mrLabel: 'डॅशबोर्ड', icon: LayoutDashboard },
+        { id: 'dashboard' as ActiveTab, title: 'Dashboard', marathi: 'डॅशबोर्ड', icon: LayoutDashboard },
+        { id: 'online-orders' as ActiveTab, title: 'Cart Orders', marathi: 'ऑनलाईन ऑर्डर्स', icon: ShoppingCart, badge: 'नवीन' },
+        { id: 'add-entry' as ActiveTab, title: 'New Bill / Entry', marathi: 'नवीन बिल / पावती', icon: PlusCircle, hasDot: true },
+        { id: 'all-entries' as ActiveTab, title: 'All Transactions', marathi: 'सर्व व्यवहार', icon: Clock },
+        { id: 'bill-receipts' as ActiveTab, title: 'Bill Receipts', marathi: 'बिलाच्या जमा पावत्या', icon: Receipt, badge: '#1079' },
+        { id: 'daily-collection-log' as ActiveTab, title: 'Collection Register', marathi: 'दैनिक वसुली रजिस्टर', icon: ClipboardList, badge: 'प्रिंट' },
       ],
     },
     {
-      title: 'विक्री व ग्राहक (SALES & BILLING)',
+      title: 'साप्ताहिक योजना व फायनान्स',
       items: [
-        { id: 'add-entry' as ActiveTab, label: 'New Bill / POS', mrLabel: 'नवीन बिल / पावती', icon: PlusCircle, hasDot: true },
-        { id: 'all-entries' as ActiveTab, label: 'All Transactions', mrLabel: 'सर्व व्यवहार व बिले', icon: Clock },
-        { id: 'customers' as ActiveTab, label: 'Customer Khata', mrLabel: 'ग्राहक खातेवही', icon: Users },
-        { id: 'finance-calc' as ActiveTab, label: 'Finance EMI Calc', mrLabel: 'Bajaj / TVS / HDB / IDBI', icon: Calculator, badge: 'Bajaj/TVS' },
+        { id: 'card-scheme' as ActiveTab, title: '30-Month Scheme', marathi: 'साप्ताहिक बचत योजना', icon: CreditCard, badge: '30-Mo' },
+        { id: 'card-passbook' as ActiveTab, title: 'Card Passbook', marathi: 'डिजिटल पासबुक', icon: BookOpen, badge: 'बँक लेजर' },
+        { id: 'finance-calc' as ActiveTab, title: 'Finance Calculator', marathi: 'फायनान्स ईएमआय', icon: Calculator, badge: 'Bajaj/TVS' },
+        { id: 'finance-do' as ActiveTab, title: 'Finance DO Register', marathi: 'बजाज/TVS फायनान्स DO', icon: FileCheck, badge: 'DO' },
       ],
     },
     {
-      title: 'कार्ड बचत योजना (CARD SCHEME)',
+      title: 'खातेवही व खरेदी (Accounts)',
       items: [
-        { id: 'card-scheme' as ActiveTab, label: '30-Mo Card Scheme', mrLabel: 'सभासद यादी व पासबुक', icon: CreditCard, badge: '30-Mo' },
-        { id: 'agent-hisab' as ActiveTab, label: 'Agent Hisab & 4%', mrLabel: 'एजंट हिशोब व कमिशन', icon: Award, badge: '4%+₹50' },
+        { id: 'village-khata' as ActiveTab, title: 'Village Khata / Route', marathi: 'गाववार उधारी व कार्ड', icon: MapPin, badge: 'गाववार' },
+        { id: 'customers' as ActiveTab, title: 'Customer Khata', marathi: 'ग्राहक खातेवही', icon: Users },
+        { id: 'stock' as ActiveTab, title: 'Stock & Inventory', marathi: 'स्टॉक व साहित्य', icon: Package },
+        { id: 'furniture-jobs' as ActiveTab, title: 'Furniture Job Cards', marathi: 'सागवान फर्निचर जॉब्स', icon: Hammer, badge: 'Teak' },
+        { id: 'purchases' as ActiveTab, title: 'Purchases', marathi: 'खरेदी नोंदी', icon: ShoppingCart },
+        { id: 'dealer-ledger' as ActiveTab, title: 'Dealer Ledgers', marathi: 'डीलर खातेवही', icon: Building2, badge: 'Khata' },
       ],
     },
     {
-      title: 'स्टॉक व खरेदी (INVENTORY & DEALERS)',
+      title: 'व्यवस्थापन व टूल्स (Tools)',
       items: [
-        { id: 'stock' as ActiveTab, label: 'Stock & Inventory', mrLabel: 'स्टॉक व साहित्य', icon: Package },
-        { id: 'purchases' as ActiveTab, label: 'Purchases', mrLabel: 'खरेदी नोंदी', icon: ShoppingCart },
-        { id: 'dealer-ledger' as ActiveTab, label: 'Dealer Ledgers', mrLabel: 'डीलर खातेवही', icon: Building2, badge: 'Khata' },
+        { id: 'staff' as ActiveTab, title: 'Staff & Agents', marathi: 'कर्मचारी व एजंट', icon: UserCheck },
+        { id: 'agent-commission' as ActiveTab, title: 'Agent Commission', marathi: 'एजंट कमिशन व पगार', icon: Award, badge: '4%' },
+        { id: 'expenses' as ActiveTab, title: 'Shop Expenses', marathi: 'दुकान खर्च', icon: ReceiptIndianRupee },
+        { id: 'uploaded-data' as ActiveTab, title: 'Master Search', marathi: 'सर्व डेटा शोध', icon: Database, badge: 'Search' },
+        { id: 'csv-import' as ActiveTab, title: 'Excel Import', marathi: 'डेटा आयात', icon: FileSpreadsheet },
       ],
     },
-    {
-      title: 'डेटा व व्यवस्थापन (ADMIN & DATA)',
-      items: [
-        { id: 'uploaded-data' as ActiveTab, label: 'Master Search', mrLabel: 'सर्व डेटा शोध', icon: Database, badge: 'Search' },
-        { id: 'csv-import' as ActiveTab, label: 'Excel Import', mrLabel: 'डेटा आयात', icon: FileSpreadsheet },
-        { id: 'staff' as ActiveTab, label: 'Staff & Agents', mrLabel: 'कर्मचारी व एजंट', icon: UserCheck },
-        { id: 'expenses' as ActiveTab, label: 'Shop Expenses', mrLabel: 'दुकान खर्च', icon: ReceiptIndianRupee },
-        { id: 'settings' as ActiveTab, label: 'Business Settings', mrLabel: 'दुकान सेटिंग्ज', icon: Settings, badge: currentUser?.role === 'staff' ? 'Admin' : undefined },
-      ],
+  ];
+
+  const accountNav = [
+    { 
+      id: 'settings' as ActiveTab, 
+      title: 'Settings', 
+      marathi: 'सेटिंग्ज व बॅकअप', 
+      icon: Settings,
+      badge: currentUser?.role === 'staff' ? 'Admin' : undefined 
     },
   ];
 
@@ -133,36 +144,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside
         id="app-sidebar"
-        className={`fixed lg:static top-0 left-0 bottom-0 z-50 w-64 tactile-card rounded-none border-y-0 border-l-0 border-r border-[var(--tactile-border)] flex flex-col justify-between transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 left-0 bottom-0 z-50 w-64 bg-white dark:bg-[#0A1124] text-slate-700 dark:text-slate-300 flex flex-col justify-between transition-colors duration-300 ease-in-out border-r border-slate-200 dark:border-slate-800/60 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Top brand header with Authentic App Logo */}
         <div>
-          <div className="px-4 py-4 border-b border-[var(--tactile-border-subtle)] flex items-center justify-between">
+          <div className="px-4 py-4 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-transparent flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <AppLogo size="sm" variant="iconOnly" />
               <div className="overflow-hidden">
-                <h1 className="font-extrabold text-[var(--tactile-text-heading)] text-sm tracking-tight truncate leading-snug uppercase" style={{ fontFamily: "'Cinzel', 'Playfair Display', serif" }}>
+                <h1 className="font-extrabold text-slate-900 dark:text-white text-sm tracking-tight truncate leading-snug uppercase" style={{ fontFamily: "'Cinzel', 'Playfair Display', serif" }}>
                   Shri Sai Ent
                 </h1>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <p className="text-[10px] text-[var(--tactile-primary)] font-mono tracking-tight font-bold truncate">
-                    Official ERP & Khata
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-mono tracking-tight truncate font-semibold">
+                    Official Mobile App
                   </p>
                 </div>
               </div>
             </div>
+
+            {/* Day / Night Theme Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'} Mode`}
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-300 transition-colors border border-slate-200 dark:border-slate-700/60 cursor-pointer flex items-center justify-center shrink-0"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-300 animate-spin-slow" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-700" />
+              )}
+            </button>
           </div>
 
-          {/* Grouped Navigation Links */}
-          <div className="px-3 py-3 space-y-4 overflow-y-auto max-h-[calc(100vh-210px)]">
-            {navSections.map((section, sIdx) => (
-              <div key={sIdx}>
-                <p className="px-3 mb-1.5 text-[9px] font-black text-[var(--tactile-text-dim)] uppercase tracking-wider">
+          {/* Navigation links */}
+          <div className="px-3 py-3 space-y-4 overflow-y-auto max-h-[calc(100vh-170px)]">
+            {/* Categorized ERP Sections */}
+            {navSections.map((section, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider font-mono">
                   {section.title}
-                </p>
+                </div>
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const Icon = item.icon;
@@ -172,35 +198,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         key={item.id}
                         id={`nav-btn-${item.id}`}
                         onClick={() => handleSelect(item.id)}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-left transition-all cursor-pointer active:scale-98 ${
                           isActive
-                            ? 'tactile-btn-primary font-bold shadow-md'
-                            : 'text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] hover:bg-[var(--tactile-surface-inset)]'
+                            ? 'bg-[#00523f] text-white shadow-[0_4px_14px_rgba(0,82,63,0.35)]'
+                            : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 truncate">
                           <Icon
                             className={`w-4 h-4 shrink-0 ${
-                              isActive ? 'text-white' : 'text-[var(--tactile-text-muted)]'
+                              isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'
                             }`}
                           />
-                          <div className="flex flex-col items-start text-left min-w-0">
-                            <span className="text-xs font-semibold leading-tight truncate">{item.label}</span>
-                            <span className={`text-[10px] font-medium leading-tight truncate ${isActive ? 'text-white/85' : 'text-[var(--tactile-text-dim)]'}`}>
-                              {item.mrLabel}
+                          <div className="truncate leading-tight">
+                            <span className={`font-bold text-xs block ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>
+                              {item.title}
+                            </span>
+                            <span className={`text-[10px] block font-normal ${isActive ? 'text-emerald-100 dark:text-emerald-200' : 'text-slate-500 dark:text-slate-400'}`}>
+                              {item.marathi}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {item.badge && (
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                              isActive ? 'bg-white/20 text-white' : 'bg-[var(--tactile-surface-inset)] text-[var(--tactile-text-muted)] border border-[var(--tactile-border-subtle)]'
-                            }`}>
+                          {isActive && item.hasDot && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-300 shadow-xs"></span>
+                          )}
+                          {!isActive && item.badge && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                               {item.badge}
                             </span>
-                          )}
-                          {isActive && (item as any).hasDot && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs"></span>
                           )}
                         </div>
                       </button>
@@ -210,20 +236,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             ))}
 
-            {/* Day / Night Theme Toggle in Sidebar */}
-            <div className="pt-2">
-              <div className="px-3 py-2 rounded-xl tactile-inset flex items-center justify-between">
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-semibold text-[var(--tactile-text-main)]">
-                    Theme Mode
-                  </span>
-                  <span className="text-[10px] text-[var(--tactile-text-dim)]">
-                    दिवस / रात्र मोड
-                  </span>
-                </div>
-                <DayNightToggle id="sidebar-daynight-toggle" size="sm" showLabel={false} />
-              </div>
-            </div>
+            {/* ACCOUNT section */}
+            <div>
+              <p className="px-3 mb-2 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                SYSTEM
+              </p>
+              <div className="space-y-1">
+                {accountNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      id={`nav-btn-${item.id}`}
+                      onClick={() => handleSelect(item.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-left transition-all cursor-pointer active:scale-98 ${
+                        isActive
+                          ? 'bg-[#00523f] text-white shadow-[0_4px_14px_rgba(0,82,63,0.35)]'
+                          : 'text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <Icon
+                          className={`w-4 h-4 shrink-0 ${
+                            isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'
+                          }`}
+                        />
+                        <div className="truncate leading-tight">
+                          <span className={`font-bold text-xs block ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>
+                            {item.title}
+                          </span>
+                          <span className={`text-[10px] block font-normal ${isActive ? 'text-emerald-100 dark:text-emerald-200' : 'text-slate-500 dark:text-slate-400'}`}>
+                            {item.marathi}
+                          </span>
+                        </div>
+                      </div>
+                      {item.badge && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
 
                 {onViewCustomerShop && (
                   <button
@@ -232,19 +287,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onViewCustomerShop();
                       setIsOpenMobile(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-amber-600 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30 cursor-pointer mt-2"
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-xs font-bold transition-all text-amber-700 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-400/10 border border-amber-300 dark:border-amber-400/20 cursor-pointer mt-1"
                   >
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-4 h-4 text-amber-500" />
-                      <span>Customer Website</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <Globe className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="truncate">ग्राहक स्टोअर (Live Shop)</span>
                     </div>
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-500/20 text-amber-600 dark:text-amber-300">
-                      Live Shop
+                    <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+                      Live
                     </span>
                   </button>
                 )}
 
-                {/* In-app Mobile PWA Install */}
+                {/* In-app PC & Mobile PWA Install */}
                 {onOpenInstallModal && (
                   <button
                     id="sidebar-install-app-btn"
@@ -252,103 +307,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onOpenInstallModal();
                       setIsOpenMobile(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/30 cursor-pointer mt-1.5"
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60 dark:hover:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 cursor-pointer mt-1"
                   >
-                    <div className="flex items-center gap-3">
-                      <Download className="w-4 h-4 text-emerald-500" />
-                      <span>मोबाईल ॲप (App)</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span className="truncate">PC व मोबाईल ॲप (App)</span>
                     </div>
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                    <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 shrink-0">
                       Install
                     </span>
                   </button>
                 )}
 
-                {/* 1. Daily Cash Closing */}
-                {onOpenCashClosing && (
+                {/* CSV Data Export Modal Launcher */}
+                {onOpenCsvExport && (
                   <button
+                    id="sidebar-csv-export-btn"
                     type="button"
                     onClick={() => {
-                      onOpenCashClosing();
+                      onOpenCsvExport();
                       setIsOpenMobile(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-amber-800 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer mt-1.5"
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300/80 dark:border-emerald-700/60 cursor-pointer mt-1 shadow-2xs"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Coins className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span>दिवसाचा गल्ला बंद (Cash)</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="truncate text-left leading-tight">
+                        <span className="block truncate">CSV डेटा एक्सपोर्ट</span>
+                        <span className="text-[9px] text-emerald-700/80 dark:text-emerald-400/80 block font-medium">
+                          योजना, बिले, खरेदी व लेजर
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded font-mono">
-                      हिशोब
-                    </span>
-                  </button>
-                )}
-
-                {/* 2. Promo Generator */}
-                {onOpenPromoGenerator && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenPromoGenerator();
-                      setIsOpenMobile(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-orange-800 dark:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 cursor-pointer mt-1.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Megaphone className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                      <span>सणवार मेसेज (Promo)</span>
-                    </div>
-                    <span className="text-[10px] bg-orange-500/20 px-1.5 py-0.5 rounded font-mono">
-                      WhatsApp
-                    </span>
-                  </button>
-                )}
-
-                {/* 3. Warranty Tracker */}
-                {onOpenWarrantyTracker && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenWarrantyTracker();
-                      setIsOpenMobile(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-blue-800 dark:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 cursor-pointer mt-1.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <span>वॉरंटी व सर्व्हिस ट्रॅकर</span>
-                    </div>
-                    <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded font-mono">
-                      Alerts
-                    </span>
-                  </button>
-                )}
-
-                {/* 4. Quick 1-Click Backup */}
-                {onQuickBackup && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onQuickBackup();
-                      setIsOpenMobile(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-indigo-800 dark:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 cursor-pointer mt-1.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Save className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      <span>१-क्लिक स्थानिक बॅकअप</span>
-                    </div>
-                    <span className="text-[10px] bg-indigo-500/20 px-1.5 py-0.5 rounded font-mono">
-                      Backup
+                    <span className="px-2 py-0.5 text-[9px] font-bold rounded-md bg-emerald-600 text-white shrink-0 shadow-2xs">
+                      Excel
                     </span>
                   </button>
                 )}
               </div>
             </div>
+          </div>
+        </div>
 
         {/* Cloud Sync Status Indicator */}
-        <div className="px-3 py-2 border-t border-[var(--tactile-border-subtle)]">
-          <div className="flex items-center justify-between p-2 rounded-xl tactile-inset text-xs">
+        <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-[#070c1a]">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
               <span className="relative flex h-2 w-2 shrink-0">
                 {cloudStatus === 'connected' && (
@@ -360,24 +363,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {cloudStatus === 'syncing' && (
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse"></span>
                 )}
-                {cloudStatus === 'quota-exceeded' && (
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
-                )}
                 {(cloudStatus === 'offline' || cloudStatus === 'error') && (
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                 )}
               </span>
               <div className="truncate">
-                <p className="text-[11px] font-semibold text-[var(--tactile-text-main)] truncate flex items-center gap-1">
-                  <Cloud className="w-3 h-3 text-[var(--tactile-primary)]" />
-                  {cloudStatus === 'connected' && 'Cloud Synced'}
+                <p className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1">
+                  <Cloud className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                  {cloudStatus === 'connected' && 'Cloud Synced (Live)'}
                   {cloudStatus === 'syncing' && 'Syncing Live...'}
-                  {cloudStatus === 'quota-exceeded' && 'Local Safe (Daily Quota)'}
                   {cloudStatus === 'offline' && 'Offline (Local)'}
                   {cloudStatus === 'error' && 'Sync Paused'}
                 </p>
-                <p className="text-[9px] text-[var(--tactile-text-muted)] truncate">
-                  {cloudStatus === 'quota-exceeded' ? '100% saved locally • Resets daily' : `Google Firestore • ${lastSyncedTime ? `Synced ${lastSyncedTime}` : 'Real-time'}`}
+                <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate">
+                  Firestore Blaze Cloud • {lastSyncedTime ? `Synced ${lastSyncedTime}` : 'Real-time'}
                 </p>
               </div>
             </div>
@@ -386,17 +385,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onManualSync}
                 title="Sync now with Cloud"
-                className="p-1 rounded text-[var(--tactile-text-muted)] hover:text-[var(--tactile-text-main)] transition cursor-pointer"
+                className="p-1 rounded text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
-                <RefreshCw className={`w-3 h-3 ${cloudStatus === 'syncing' ? 'animate-spin text-[var(--tactile-primary)]' : ''}`} />
+                <RefreshCw className={`w-3 h-3 ${cloudStatus === 'syncing' ? 'animate-spin text-blue-500' : ''}`} />
               </button>
             )}
           </div>
         </div>
 
+        {/* Day / Night Tactile Switcher */}
+        <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800/80 bg-slate-100/60 dark:bg-[#0a1224] flex items-center justify-between">
+          <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 font-marathi">थीम (Day / Night)</span>
+          <ThemeToggle size="sm" showLabel={true} />
+        </div>
+
         {/* User profile footer with Role & Logout */}
-        <div className="p-3 border-t border-[var(--tactile-border-subtle)]">
-          <div className="flex items-center justify-between p-2 rounded-xl tactile-card border border-[var(--tactile-border)]">
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#080d1c]">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80">
             <div 
               onClick={() => {
                 if (currentUser?.role !== 'staff') {
@@ -405,23 +410,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow text-white shrink-0 tactile-btn-primary">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shadow text-white shrink-0 ${
+                currentUser?.role === 'staff' 
+                  ? 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                  : 'bg-gradient-to-tr from-blue-600 to-indigo-600'
+              }`}>
                 {currentUser?.name ? currentUser.name[0].toUpperCase() : (settings.ownerName ? settings.ownerName[0].toUpperCase() : 'S')}
               </div>
               <div className="truncate">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-semibold text-[var(--tactile-text-main)] tracking-wide truncate">
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white tracking-wide truncate">
                     {currentUser?.name || settings.ownerName}
                   </p>
                   <span className={`px-1.5 py-0.2 text-[9px] font-bold rounded uppercase ${
                     currentUser?.role === 'staff'
-                      ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
-                      : 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                      : 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30'
                   }`}>
                     {currentUser?.role === 'staff' ? 'Staff' : 'Admin'}
                   </span>
                 </div>
-                <p className="text-[10px] text-[var(--tactile-text-muted)] font-mono truncate">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   {currentUser?.email || settings.email || 'shrisaient.in'}
                 </p>
               </div>
@@ -432,7 +441,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onLogout}
                 title="Log out (लॉगआउट)"
-                className="p-1.5 rounded-lg text-[var(--tactile-text-muted)] hover:text-rose-500 transition cursor-pointer shrink-0 ml-1"
+                className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition cursor-pointer shrink-0 ml-1"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>

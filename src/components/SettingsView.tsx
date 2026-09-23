@@ -18,60 +18,36 @@ import {
   Sparkles,
   KeyRound,
   Lock,
-  Shield,
-  MessageSquare,
-  FileSpreadsheet,
-  Layers,
-  ShoppingBag,
-  Receipt,
-  Users,
-  Building,
-  AlertTriangle,
-  X
+  FileSpreadsheet
 } from 'lucide-react';
 import { BusinessSettings, DeliveryRatesConfig } from '../types';
-import { CloudSyncStatus } from '../lib/firebase';
-import { AppDatabase } from '../utils/storage';
-import {
-  exportSchemeCardsToCsv,
-  exportSalesToCsv,
-  exportReceiptsToCsv,
-  exportCustomersToCsv,
-  exportPurchasesToCsv,
-  exportStockToCsv,
-  exportDealersToCsv,
-} from '../utils/csvExporter';
 
 interface SettingsViewProps {
   settings: BusinessSettings;
-  db?: AppDatabase;
   onUpdateSettings: (newSettings: BusinessSettings) => void;
   onExportData: () => void;
   onImportData: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetData: () => void;
   onClearAllDemoData?: () => void;
-  onClearCardsData?: () => void;
-  onClearBillsData?: () => void;
-  cloudStatus?: CloudSyncStatus;
+  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
   lastSyncedTime?: string;
   onManualCloudSync?: () => void;
   userRole?: 'admin' | 'staff';
+  onOpenCsvExport?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
-  db,
   onUpdateSettings,
   onExportData,
   onImportData,
   onResetData,
   onClearAllDemoData,
-  onClearCardsData,
-  onClearBillsData,
   cloudStatus = 'connected',
   lastSyncedTime,
   onManualCloudSync,
   userRole = 'admin',
+  onOpenCsvExport,
 }) => {
   const [formData, setFormData] = useState<BusinessSettings>({
     ...settings,
@@ -86,12 +62,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     shopNotice: settings.shopNotice || 'धमाका ऑफर: ३०-महिने कार्ड स्कीम बुकिंग चालू आहे • सर्व मोठ्या वस्तूंवर फ्री होम डिलिव्हरी!',
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [cleanConfirmModal, setCleanConfirmModal] = useState<{
-    type: 'all' | 'cards' | 'bills' | 'reset';
-    title: string;
-    description: string;
-    action: () => void;
-  } | null>(null);
 
   const handleChange = (field: keyof BusinessSettings, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -115,7 +85,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -156,7 +126,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.businessName || ''}
+                    value={formData.businessName}
                     onChange={(e) => handleChange('businessName', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -167,7 +137,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.domainName || ''}
+                    value={formData.domainName}
                     onChange={(e) => handleChange('domainName', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
                   />
@@ -181,7 +151,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.ownerName || ''}
+                    value={formData.ownerName}
                     onChange={(e) => handleChange('ownerName', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -192,7 +162,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.role || ''}
+                    value={formData.role}
                     onChange={(e) => handleChange('role', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -206,7 +176,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.phone || ''}
+                    value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -217,7 +187,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="email"
-                    value={formData.email || ''}
+                    value={formData.email}
                     onChange={(e) => handleChange('email', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -228,7 +198,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.gstin || ''}
+                    value={formData.gstin}
                     onChange={(e) => handleChange('gstin', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
                   />
@@ -241,7 +211,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </label>
                 <textarea
                   rows={2}
-                  value={formData.address || ''}
+                  value={formData.address}
                   onChange={(e) => handleChange('address', e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none"
                 />
@@ -254,7 +224,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.invoicePrefix || ''}
+                    value={formData.invoicePrefix}
                     onChange={(e) => handleChange('invoicePrefix', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
                   />
@@ -265,7 +235,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={formData.tagline || ''}
+                    value={formData.tagline}
                     onChange={(e) => handleChange('tagline', e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                   />
@@ -387,27 +357,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   सुरक्षा व लॉगिन पासवर्ड (Security & Passwords)
                 </h3>
                 <p className="text-xs text-slate-500">
-                  येथून तुम्ही ॲडमिन (मालक) व कर्मचाऱ्यांसाठीचे ईआरपी (ERP) लॉगिन पासवर्ड बदलू शकता.
+                  हा पासवर्ड टाकून ॲडमिन थेट संपूर्ण बिझनेस अकाउंटिंग आणि सर्व खाती एका सेकंदात उघडू शकतात.
                 </p>
-
-                {/* Real-time Zero-Trust Security Guarantee Box */}
-                <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs space-y-2">
-                  <div className="font-bold text-blue-950 dark:text-blue-200 flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                    <span>ईआरपी सुरक्षा हमी (ERP Zero-Trust Security):</span>
-                  </div>
-                  <ul className="space-y-1 text-[11px] text-blue-900 dark:text-blue-300 leading-relaxed list-disc list-inside">
-                    <li>
-                      <strong>स्टाफ पासवर्ड बदलल्यास:</strong> जुन्या पासवर्डने कोणीही ईआरपी उघडू शकत नाही. नवीन पासवर्ड त्वरित लागू होतो.
-                    </li>
-                    <li>
-                      <strong>दोन-स्तरीय सुरक्षा (Two-Level Guard):</strong> नुसता पासवर्ड असून चालत नाही; लॉगिन करण्यासाठी कर्मचाऱ्याचे नाव किंवा मोबाईल नंबर तुमच्या <strong>&quot;Staff&quot;</strong> यादीत ॲडमिनने मंजूर (Approved) असणे अनिवार्य आहे.
-                    </li>
-                    <li>
-                      <strong>ॲडमिन पासवर्ड:</strong> मालक (Shubham) पासवर्ड बदलल्यास मुख्य खाती व सेटिंग्स फक्त नवीन पासवर्डनेच उघडतील.
-                    </li>
-                  </ul>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -435,37 +386,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       placeholder="उदा. staff किंवा 1234"
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-medium focus:ring-2 focus:ring-blue-500 outline-hidden"
                     />
-                    <span className="text-[10px] text-slate-500">हा बदलताच जुन्या पासवर्डने लॉगिन पूर्णपणे बंद होईल</span>
-                  </div>
-
-                  {/* WhatsApp VIP Group Link */}
-                  <div className="md:col-span-2 pt-2 border-t border-slate-100">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                        व्हॉट्सॲप व्हीआयपी ग्रुप लिंक (WhatsApp VIP Group Invite Link)
-                      </label>
-                      {formData.whatsappGroupLink && (
-                        <a
-                          href={formData.whatsappGroupLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold underline"
-                        >
-                          ग्रुप लिंक तपासा ↗
-                        </a>
-                      )}
-                    </div>
-                    <input
-                      type="url"
-                      value={formData.whatsappGroupLink || ''}
-                      onChange={(e) => handleChange('whatsappGroupLink', e.target.value)}
-                      placeholder="https://chat.whatsapp.com/..."
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm font-mono text-emerald-900 bg-emerald-50/40 focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                    />
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      ही ग्रुप लिंक बिलावरील व पासबुकवरील क्यूआर (QR) कोडमध्ये आणि ग्राहकांना डायरेक्ट व्हॉट्सॲप आमंत्रण पाठवण्यासाठी वापरली जाते.
-                    </p>
+                    <span className="text-[10px] text-slate-500">कर्मचाऱ्यांसाठी मर्यादित बिलिंग ॲक्सेस</span>
                   </div>
                 </div>
               </div>
@@ -542,286 +463,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Universal Excel / CSV Export Center */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-5">
-            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                  सर्व डेटा एक्सेल व CSV एक्सपोर्ट केंद्र (Universal Data Export Center)
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  सर्व योजना (Scheme 1, 2, 3), विक्री बिले, खरेदी, हप्ते पावत्या आणि खातेवही एक्सेल/CSV फॉरमॅटमध्ये एका क्लिकवर डाउनलोड करा.
-                </p>
-              </div>
-              <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                Excel & Sheets Ready
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* Scheme 1 */}
-              <div className="p-3.5 rounded-xl border border-purple-100 bg-purple-50/40 hover:bg-purple-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-purple-600" />
-                      योजना १ कार्ड्स (Scheme 1)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-200/70 text-purple-800">
-                      {db?.cardMembers?.filter(m => m.schemeId === 'scheme-1').length || 0} कार्ड्स
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-purple-700/80">
-                    योजना १ मधील सर्व सभासद, जमा हप्ते, शिल्लक व पत्ता यादी.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportSchemeCardsToCsv(db?.cardMembers || [], 'Scheme_1', 'scheme-1')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Scheme 1 (.csv)
-                </button>
-              </div>
-
-              {/* Scheme 2 */}
-              <div className="p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                      योजना २ कार्ड्स (Scheme 2)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-200/70 text-indigo-800">
-                      {db?.cardMembers?.filter(m => m.schemeId === 'scheme-2').length || 0} कार्ड्स
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-indigo-700/80">
-                    योजना २ मधील सर्व सभासद, जमा रक्कम, शिल्लक व पत्ता यादी.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportSchemeCardsToCsv(db?.cardMembers || [], 'Scheme_2', 'scheme-2')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Scheme 2 (.csv)
-                </button>
-              </div>
-
-              {/* Scheme 3 */}
-              <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/40 hover:bg-blue-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-600" />
-                      योजना ३ कार्ड्स (Scheme 3)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-200/70 text-blue-800">
-                      {db?.cardMembers?.filter(m => m.schemeId === 'scheme-3').length || 0} कार्ड्स
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-blue-700/80">
-                    योजना ३ मधील सर्व सभासद, जमा रक्कम, शिल्लक व पत्ता यादी.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportSchemeCardsToCsv(db?.cardMembers || [], 'Scheme_3', 'scheme-3')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Scheme 3 (.csv)
-                </button>
-              </div>
-
-              {/* All Schemes Combined */}
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-slate-700" />
-                      सर्व योजना एकत्र (All Schemes)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
-                      {db?.cardMembers?.length || 0} कार्ड्स
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600">
-                    सर्व योजनांचे मिळून सर्व सभासद, एकूण जमा व खाते माहिती.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportSchemeCardsToCsv(db?.cardMembers || [], 'All_Schemes', 'all')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड All Schemes (.csv)
-                </button>
-              </div>
-
-              {/* Receipts / Pavtya */}
-              <div className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/40 hover:bg-amber-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <Receipt className="w-3.5 h-3.5 text-amber-600" />
-                      सर्व हप्ते पावत्या (Receipts)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200/70 text-amber-800">
-                      {db?.cardTransactions?.length || 0} पावत्या
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-amber-700/80">
-                    एजंट व दुकानात जमा झालेले सर्व साप्ताहिक हप्ते व पावती नोंदी.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportReceiptsToCsv(db?.cardTransactions || [], 'ShriSai_All_Receipts')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Receipts (.csv)
-                </button>
-              </div>
-
-              {/* Sales Invoices */}
-              <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40 hover:bg-emerald-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                      <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
-                      विक्री बिले (Sales Invoices)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-200/70 text-emerald-800">
-                      {db?.transactions?.length || 0} बिले
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-emerald-700/80">
-                    सर्व रोख व उधारी विक्री बिले, ग्राहकाचे नाव व बाकी रक्कम.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportSalesToCsv(db?.transactions || [], 'ShriSai_Sales_Invoices')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Sales (.csv)
-                </button>
-              </div>
-
-              {/* Purchases */}
-              <div className="p-3.5 rounded-xl border border-cyan-100 bg-cyan-50/40 hover:bg-cyan-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-900 flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5 text-cyan-600" />
-                      खरेदी नोंदी (Purchases)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-200/70 text-cyan-800">
-                      {db?.purchases?.length || 0} नोंदी
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-cyan-700/80">
-                    सप्लायरकडून खरेदी केलेला सर्व माल, बिल नंबर व दिलेली रक्कम.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportPurchasesToCsv(db?.purchases || [], 'ShriSai_Purchases')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Purchases (.csv)
-                </button>
-              </div>
-
-              {/* Customers Khata */}
-              <div className="p-3.5 rounded-xl border border-rose-100 bg-rose-50/40 hover:bg-rose-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-rose-600" />
-                      ग्राहक खातेवही (Customers Khata)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-200/70 text-rose-800">
-                      {db?.customers?.length || 0} ग्राहक
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-rose-700/80">
-                    सर्व ग्राहकांची नावे, फोन नंबर, पत्ता, एकूण खरेदी व बाकी उधारी.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportCustomersToCsv(db?.customers || [], 'ShriSai_Customers_Khata')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Customers (.csv)
-                </button>
-              </div>
-
-              {/* Dealer Ledger */}
-              <div className="p-3.5 rounded-xl border border-teal-100 bg-teal-50/40 hover:bg-teal-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-teal-900 flex items-center gap-1.5">
-                      <Building className="w-3.5 h-3.5 text-teal-600" />
-                      डीलर खातेवही (Dealer Ledger)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-200/70 text-teal-800">
-                      {db?.dealers?.length || 0} डीलर्स
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-teal-700/80">
-                    सर्व डीलर्सची नावे, खरेदी, दिलेली रक्कम आणि देणे बाकी हिशोब.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportDealersToCsv(db?.dealers || [], 'ShriSai_Dealer_Ledger')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Dealer Ledger (.csv)
-                </button>
-              </div>
-
-              {/* Stock Inventory */}
-              <div className="p-3.5 rounded-xl border border-orange-100 bg-orange-50/40 hover:bg-orange-50 transition flex flex-col justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-orange-900 flex items-center gap-1.5">
-                      <Database className="w-3.5 h-3.5 text-orange-600" />
-                      उपलब्ध साठा (Stock Inventory)
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-200/70 text-orange-800">
-                      {db?.stock?.length || 0} वस्तू
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-orange-700/80">
-                    दुकानातील सर्व वस्तू, शिल्लक नग, खरेदी व विक्री दर आणि साठा मूल्य.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportStockToCsv(db?.stock || [], 'ShriSai_Stock_Inventory')}
-                  className="mt-3 w-full py-2 px-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  डाउनलोड Stock (.csv)
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* Backup and Data Export */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-4">
             <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
@@ -851,134 +492,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
               </label>
 
-              {onClearCardsData && (
-                <button
-                  type="button"
-                  id="btn-settings-clear-cards"
-                  onClick={() => {
-                    setCleanConfirmModal({
-                      type: 'cards',
-                      title: 'कार्ड योजना डेटा साफ़ करायचा आहे का?',
-                      description: 'सावधान: सर्व कार्ड्स आणि योजना हप्ते (Card Scheme Data) 100% साफ़ केले जातील.',
-                      action: () => {
-                        onClearCardsData();
-                        setCleanConfirmModal(null);
-                      },
-                    });
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  कार्ड डेटा साफ़ करा (Clear Cards)
-                </button>
-              )}
-
-              {onClearBillsData && (
-                <button
-                  type="button"
-                  id="btn-settings-clear-bills"
-                  onClick={() => {
-                    setCleanConfirmModal({
-                      type: 'bills',
-                      title: 'बिक्री बिल व ग्राहक खाते साफ़ करायचे का?',
-                      description: 'सावधान: सर्व विक्री बिल आणि ग्राहक खाते (Sales Bills Data) 100% साफ़ केले जातील.',
-                      action: () => {
-                        onClearBillsData();
-                        setCleanConfirmModal(null);
-                      },
-                    });
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  बिक्री बिल साफ़ करा (Clear Bills)
-                </button>
-              )}
-
               {onClearAllDemoData && (
                 <button
-                  type="button"
-                  id="btn-settings-clear-all-demo"
                   onClick={() => {
-                    setCleanConfirmModal({
-                      type: 'all',
-                      title: 'सर्व जुना व डेमो डेटा डिलीट करायचा आहे का?',
-                      description: 'सावधान: सर्व जुना डेटा (सर्व ग्राहक, बिले, पावत्या, खरेदी, कार्ड मेंबर्स व खर्च) 100% डिलीट होईल आणि सिस्टीम स्वच्छ होईल.',
-                      action: () => {
-                        onClearAllDemoData();
-                        setCleanConfirmModal(null);
-                      },
-                    });
+                    if (
+                      window.confirm(
+                        'चेतावनी: क्या आप पूरा डेमो/सैंपल डेटा (सभी टेस्ट ग्राहक, डमी बिक्री और टेस्ट कार्ड मेंबर्स) हटाना चाहते हैं?\n\nयह आपका खाता ₹0 बैलेंस के साथ 100% साफ़ कर देगा ताकि आप असली बिजनेस एंट्री शुरू कर सकें।'
+                      )
+                    ) {
+                      onClearAllDemoData();
+                    }
                   }}
                   className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
                 >
                   <Trash2 className="w-4 h-4" />
-                  सगळा जुना व डेमो डेटा डिलीट करा (Delete All Data)
+                  पूरा डेमो डेटा साफ़ करें (Start Clean Slate)
                 </button>
               )}
 
               <button
-                type="button"
-                id="btn-settings-reset-blank"
                 onClick={() => {
-                  setCleanConfirmModal({
-                    type: 'reset',
-                    title: 'नवीन कोरी सिस्टीम (Zero Balance) सुरू करायची आहे का?',
-                    description: 'सर्व चालू डेटा रीसेट करून पूर्ण नवीन कोरी सिस्टीम (Zero Balance / Clean Blank Slate) सुरू होईल.',
-                    action: () => {
-                      onResetData();
-                      setCleanConfirmModal(null);
-                    },
-                  });
+                  if (
+                    window.confirm(
+                      'Are you sure you want to restore default sample catalog data for Shree Sai Enterprises?'
+                    )
+                  ) {
+                    onResetData();
+                  }
                 }}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                नवीन कोरी सिस्टीम (Reset to Blank State)
+                Restore Sample Data
               </button>
             </div>
           </div>
         </div>
-
-      {/* In-App Clean Confirmation Modal - Works 100% in iFrames without popup blocking */}
-      {cleanConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {cleanConfirmModal.title}
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {cleanConfirmModal.description}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setCleanConfirmModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              >
-                रद्द करा (Cancel)
-              </button>
-              <button
-                type="button"
-                id="btn-confirm-clean-modal"
-                onClick={cleanConfirmModal.action}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                होय, आता डिलीट करा (Yes, Proceed)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

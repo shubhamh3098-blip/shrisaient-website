@@ -6,18 +6,19 @@ import {
   Users,
   Store,
   Download,
-  CloudCheck,
-  CloudOff
+  Zap,
+  BookOpen
 } from 'lucide-react';
 import { ActiveTab } from '../types';
-import { CloudSyncStatus } from '../lib/firebase';
 
 interface MobileBottomNavProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   onOpenShopView: () => void;
   onOpenInstallModal?: () => void;
-  cloudStatus?: CloudSyncStatus;
+  onOpenFieldActions?: () => void;
+  onOpenPocketKhata?: () => void;
+  cloudStatus?: 'idle' | 'syncing' | 'connected' | 'offline' | 'error';
   isInstallable?: boolean;
 }
 
@@ -26,6 +27,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   setActiveTab,
   onOpenShopView,
   onOpenInstallModal,
+  onOpenFieldActions,
+  onOpenPocketKhata,
   cloudStatus = 'connected',
   isInstallable = false,
 }) => {
@@ -37,30 +40,46 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B1528]/95 backdrop-blur-md border-t border-slate-800/80 px-2 py-1.5 lg:hidden safe-area-pb"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto text-[10px]">
+        {/* Field Quick Staff Actions Hub */}
+        {onOpenFieldActions && (
+          <button
+            type="button"
+            onClick={onOpenFieldActions}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[52px] text-amber-400 hover:text-amber-300 active:scale-95"
+            title="Field Staff Quick Actions (कलेक्शन / बिल / पावती)"
+          >
+            <div className="relative">
+              <Zap className="w-5 h-5 mb-0.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-[#0B1528]" />
+            </div>
+            <span className="font-extrabold text-[9px] text-amber-300">क्विक स्टाफ</span>
+          </button>
+        )}
+
         {/* Dashboard */}
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1.5 rounded-full transition-all cursor-pointer min-w-[48px] ${
             activeTab === 'dashboard'
-              ? 'text-amber-400 font-bold'
+              ? 'text-emerald-400 font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <LayoutDashboard className={`w-5 h-5 mb-0.5 ${activeTab === 'dashboard' ? 'scale-110' : ''}`} />
-          <span>Home</span>
+          <LayoutDashboard className={`w-5 h-5 mb-0.5 ${activeTab === 'dashboard' ? 'scale-110 text-emerald-400' : ''}`} />
+          <span className="text-[9px]">डॅशबोर्ड</span>
         </button>
 
         {/* Card Scheme */}
         <button
           onClick={() => setActiveTab('card-scheme')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
+          className={`flex flex-col items-center justify-center p-1.5 rounded-full transition-all cursor-pointer min-w-[48px] ${
             activeTab === 'card-scheme'
-              ? 'text-amber-400 font-bold'
+              ? 'text-emerald-400 font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <CreditCard className={`w-5 h-5 mb-0.5 ${activeTab === 'card-scheme' ? 'scale-110' : ''}`} />
-          <span>योजना</span>
+          <CreditCard className={`w-5 h-5 mb-0.5 ${activeTab === 'card-scheme' ? 'scale-110 text-emerald-400' : ''}`} />
+          <span className="text-[9px]">योजना</span>
         </button>
 
         {/* Center Primary Action: Add Entry */}
@@ -68,43 +87,55 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           onClick={() => setActiveTab('add-entry')}
           className="flex flex-col items-center justify-center -mt-4 cursor-pointer focus:outline-none"
         >
-          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30 border-2 border-[#0B1528] active:scale-95 transition-transform">
+          <div className="w-12 h-12 rounded-full bg-[#00523f] text-white flex items-center justify-center shadow-lg shadow-emerald-900/40 border-2 border-emerald-400/40 active:scale-95 transition-transform">
             <PlusCircle className="w-6 h-6 stroke-[2.5]" />
           </div>
-          <span className="text-[10px] font-bold text-amber-400 mt-0.5">नया बिल</span>
+          <span className="text-[10px] font-bold text-emerald-300 mt-0.5">+ नवीन बिल</span>
         </button>
 
-        {/* Customers / Khata */}
-        <button
-          onClick={() => setActiveTab('customers')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[54px] ${
-            activeTab === 'customers'
-              ? 'text-amber-400 font-bold'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Users className={`w-5 h-5 mb-0.5 ${activeTab === 'customers' ? 'scale-110' : ''}`} />
-          <span>ग्राहक</span>
-        </button>
+        {/* Pocket Khata / Mobile Dues Diary */}
+        {onOpenPocketKhata ? (
+          <button
+            type="button"
+            onClick={onOpenPocketKhata}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer min-w-[50px] text-teal-400 hover:text-teal-300 active:scale-95"
+            title="मोबाईल पॉकेट डायरी (थकीत हप्ते व WhatsApp)"
+          >
+            <BookOpen className="w-5 h-5 mb-0.5 text-teal-400" />
+            <span className="font-extrabold text-[9px] text-teal-300">पॉकेट डायरी</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`flex flex-col items-center justify-center p-1.5 rounded-full transition-all cursor-pointer min-w-[48px] ${
+              activeTab === 'customers'
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users className={`w-5 h-5 mb-0.5 ${activeTab === 'customers' ? 'scale-110 text-emerald-400' : ''}`} />
+            <span className="text-[9px]">ग्राहक</span>
+          </button>
+        )}
 
         {/* Customer Shop / Install */}
         {isInstallable && onOpenInstallModal ? (
           <button
             onClick={onOpenInstallModal}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-amber-300 hover:text-amber-200 transition-all cursor-pointer min-w-[54px]"
+            className="flex flex-col items-center justify-center p-1.5 rounded-full text-emerald-300 hover:text-emerald-200 transition-all cursor-pointer min-w-[48px]"
             title="Install App"
           >
             <Download className="w-5 h-5 mb-0.5 animate-bounce" />
-            <span className="font-bold">ॲप 📥</span>
+            <span className="font-bold text-[9px]">ॲप 📥</span>
           </button>
         ) : (
           <button
             onClick={onOpenShopView}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-slate-400 hover:text-amber-300 transition-all cursor-pointer min-w-[54px]"
+            className="flex flex-col items-center justify-center p-1.5 rounded-full text-slate-400 hover:text-emerald-300 transition-all cursor-pointer min-w-[48px]"
             title="Open Public Customer Shop"
           >
             <Store className="w-5 h-5 mb-0.5" />
-            <span>शॉप</span>
+            <span className="text-[9px]">स्टोअर</span>
           </button>
         )}
       </div>

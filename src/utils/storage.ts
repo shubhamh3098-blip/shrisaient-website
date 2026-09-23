@@ -12,35 +12,46 @@ import {
   StaffMember,
   StockItem,
   TransactionEntry,
-  AgentAdvanceEntry
+  AgentAdvance,
+  BillReceiptEntry,
+  MergedCustomerRecord,
+  FurnitureJobCard,
+  FinanceDORecord,
+  DailyCashReconciliation,
+  StockTransferRecord,
 } from '../types';
+import { saveDatabaseToIndexedDB } from './indexedDb';
+
+export const STORAGE_KEY = 'shri_sai_enterprise_db';
+export const GLOBAL_ZERO_RESET_KEY = 'shri_sai_reset_zero_v2026_09_17_clean_slate';
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
   businessName: 'Shri Sai Enterprises',
   businessNameHindi: 'श्री साई इंटरप्राइजेस',
-  domainName: 'ShriSaiEnt.in',
-  ownerName: 'Shubham',
+  domainName: 'shrisaient.in',
+  ownerName: 'Shubham Shende',
   role: 'Admin',
   phone: '8766486915',
   additionalPhones: ['8600122798', '9175534365', '7822859073'],
   email: 'shubhamh3098@gmail.com',
   gstin: '27ALOPL0030G2ZC',
-  address: 'Matoshree Sabhagruha Samor, Arvi Road, Punjab Colony, Wardha, 442001',
-  addressHindi: 'मातोश्री सभागृह समोर आर्वी रोड पंजाब कॉलनी वर्धा ,442001',
+  address: 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१',
+  addressHindi: 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१',
   invoicePrefix: 'INV-2026-',
   currency: '₹',
-  tagline: 'Electronics & Furniture Superstore, Wardha',
+  tagline: 'Electronics, Home Appliances & Contemporary Furniture Showroom',
   deliveryRates: {
     freeDeliveryMinAmount: 3000,
     localDeliveryFee: 100,
     outerDeliveryFee: 250,
     estimatedDeliveryTime: 'Same Day / 24 Hours',
     deliveryAreas: 'Wardha City, Arvi, and All Surrounding Villages (50 km)',
-    deliveryNote: 'Free home delivery on all major Electronics & Furniture items (Smart TVs, Fridges, Coolers, Washing Machines, Sofa Sets, Beds).',
+    deliveryNote: 'Free home delivery on orders above ₹3,000 and all Card Scheme major appliances & furniture.',
   },
-  shopNotice: 'Shri Sai Enterprises: 30-Month Weekly Savings Card Scheme Booking Open • Free Home Delivery on all major items!',
+  shopNotice: 'Shri Sai Electronics & Furniture: 30-Month Weekly Savings Scheme enrollment open • Free delivery across Wardha district!',
   whatsappOrderNumber: '8766486915',
   whatsappSecondaryNumber: '8600122798',
+  whatsappGroupLink: 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4',
   bankDetails: {
     bankName: 'HDFC Bank',
     accountNumber: '50200083215914',
@@ -48,10 +59,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
     branch: 'OPP.BANK OF MAHARASHTRA WARDHA 442001',
   },
   warrantyDisclaimer: 'दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस कंपनीच्या सर्व्हिस सेण्टरचा मोबाईल नंबर घ्यावा.',
-  upiId: '8766486915@ybl',
-  upiPayeeName: 'Shri Sai Enterprises',
-  whatsappGroupLink: 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4',
-  adminPassword: 'admin',
+  adminPassword: 'Saksham@291022',
   staffPassword: 'staff',
 };
 
@@ -61,22 +69,22 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     name: 'Scheme 1 (योजना 1)',
     code: 'SCH-1',
     startCardNo: 1001,
-    endCardNo: 2999,
+    endCardNo: 3000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 1 • कार्ड नं 1001 ते 2999 • सर्व मोठ्या होम अप्लायंसेजवर लागू',
+    description: '३०-महिने साप्ताहिक बचत योजना 1 • कार्ड नं 1001 ते 3000 • होम अप्लायंसेज',
     color: 'from-blue-600 to-blue-800',
   },
   {
     id: 'scheme2',
     name: 'Scheme 2 (योजना 2)',
     code: 'SCH-2',
-    startCardNo: 3001,
-    endCardNo: 3999,
+    startCardNo: 1001,
+    endCardNo: 3000,
     registrationFee: 50,
-    description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 3001 ते 3999 • कुलर, फ्रिज, वॉशिंग मशीन',
+    description: '३०-महिने साप्ताहिक बचत योजना 2 • कार्ड नं 1001 ते 3000 • कुलर, फ्रिज, वॉशिंग मशीन',
     color: 'from-emerald-600 to-teal-800',
   },
-{
+  {
     id: 'scheme3',
     name: 'Scheme 3 (योजना 3)',
     code: 'SCH-3',
@@ -90,231 +98,259 @@ export const SCHEMES_CONFIG: CardSchemeConfig[] = [
     id: 'scheme4',
     name: 'Scheme 4 (योजना 4)',
     code: 'SCH-4',
-    startCardNo: 6001,
-    endCardNo: 7999,
+    startCardNo: 1001,
+    endCardNo: 6000,
     registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 4 • कार्ड नं 6001 ते 7999 • प्रीमियम इलेक्ट्रॉनिक्स व फर्निचर',
+    description: '३०-महिने साप्ताहिक बचत योजना 4 • कार्ड नं 1001 ते 6000',
     color: 'from-amber-600 to-orange-800',
   },
   {
     id: 'scheme5',
     name: 'Scheme 5 (योजना 5)',
     code: 'SCH-5',
-    startCardNo: 8001,
-    endCardNo: 9999,
+    startCardNo: 1001,
+    endCardNo: 6000,
     registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 5 • कार्ड नं 8001 ते 9999 • नवीन ऑफर्स व फेस्टिव्हल स्कीम',
-    color: 'from-pink-600 to-rose-800',
-  },
-  {
-    id: 'scheme6',
-    name: 'Scheme 6 (योजना 6)',
-    code: 'SCH-6',
-    startCardNo: 10001,
-    endCardNo: 12000,
-    registrationFee: 50,
-    description: 'साप्ताहिक बचत योजना 6 • कार्ड नं 10001 ते 12000 • सुपर सेव्हर वीकली स्कीम',
-    color: 'from-cyan-600 to-blue-900',
+    description: '३०-महिने साप्ताहिक बचत योजना 5 (भविष्य योजना) • कार्ड नं 1001 ते 6000',
+    color: 'from-rose-600 to-pink-800',
   },
 ];
 
 
-export const INITIAL_STOCK: StockItem[] = [
+export const DEFAULT_SHOWROOM_PRODUCTS: StockItem[] = [
   {
-    id: 'stk-tv32',
-    name: 'Smart LED TV 32" HD Ready (Frameless)',
-    code: 'TV-32-SMART',
-    category: 'Home Appliances',
-    quantity: 14,
-    unit: 'Unit',
-    sellingPrice: 12500,
-    purchasePrice: 9800,
-    minStockLevel: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=600&q=80',
-    description: '32-inch Frameless Smart LED TV with YouTube, Netflix, Wi-Fi & 1 Year Warranty',
-  },
-  {
-    id: 'stk-tv43',
-    name: 'Smart LED TV 43" 4K Ultra HD Display',
-    code: 'TV-43-4K',
-    category: 'Home Appliances',
-    quantity: 8,
-    unit: 'Unit',
-    sellingPrice: 23900,
-    purchasePrice: 19500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1461151304267-38535e780c79?auto=format&fit=crop&w=600&q=80',
-    description: '43-inch 4K HDR Ultra Clear Display, Dolby Audio, Bluetooth & Screen Mirroring',
-  },
-  {
-    id: 'stk-lg-glt2216wyri',
-    name: 'LG GLT2216WYRI Refrigerator',
-    code: 'LG-GLT2216',
-    category: 'Home Appliances',
-    quantity: 2,
-    unit: 'Unit',
-    sellingPrice: 25478,
-    purchasePrice: 21592,
-    minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
-    description: 'LG Inverter Refrigerator (from MANISHA ENTERPRISES CS/2526/01604), Serials: 602NRZX294301, 602NRQV293652',
-  },
-  {
-    id: 'stk-fridge',
-    name: 'Double Door Refrigerator 240L (5-Star Inverter)',
-    code: 'FRIDGE-240L',
-    category: 'Home Appliances',
-    quantity: 6,
-    unit: 'Unit',
-    sellingPrice: 21500,
-    purchasePrice: 17800,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=600&q=80',
-    description: 'Frost-Free Inverter Compressor, Toughened Glass Shelves, 10 Years Compressor Warranty',
-  },
-  {
-    id: 'stk-cooler',
-    name: 'Desert Air Cooler 70L Heavy Duty Honeycomb',
-    code: 'CLR-70L-HD',
-    category: 'Home Appliances',
-    quantity: 18,
-    unit: 'Unit',
-    sellingPrice: 7800,
-    purchasePrice: 5900,
-    minStockLevel: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=600&q=80',
-    description: '70 Litres Tank, High Air Delivery Fan, 3-Side Honeycomb Cooling Pads & Inverter Compatible',
-  },
-  {
-    id: 'stk-wm',
-    name: 'Semi-Automatic Washing Machine 7.5 Kg',
-    code: 'WM-75-SEMI',
-    category: 'Home Appliances',
-    quantity: 9,
-    unit: 'Unit',
-    sellingPrice: 11200,
-    purchasePrice: 8900,
-    minStockLevel: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
-    description: '7.5 Kg Capacity, Powerful Spin Dryer, Rust-Proof Polypropylene Body & 5 Years Motor Warranty',
-  },
-  {
-    id: 'stk-tv55',
-    name: 'Smart QLED TV 55" 4K Ultra HD Frameless',
-    code: 'TV-55-QLED',
-    category: 'Electronics',
-    quantity: 6,
-    unit: 'Unit',
-    sellingPrice: 34990,
-    purchasePrice: 28500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=600&q=80',
-    description: '55-Inch 4K Ultra HD Smart Google TV with Dolby Vision Atmos, Hands-Free Voice Control & 3 Years Warranty',
-  },
-  {
-    id: 'stk-split-ac',
-    name: '1.5 Ton 5-Star Inverter Split Air Conditioner',
-    code: 'AC-15T-5S',
-    category: 'Electronics',
-    quantity: 5,
-    unit: 'Unit',
-    sellingPrice: 32500,
-    purchasePrice: 26800,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80',
-    description: '100% Copper Condenser, Dual Inverter Compressor, HD Anti-Bacterial Filter & Super Fast Cooling up to 54°C',
-  },
-  {
-    id: 'stk-wm-front',
-    name: 'Front Load Washing Machine 8.0 Kg Inverter Direct Drive',
-    code: 'WM-80-FL',
-    category: 'Electronics',
-    quantity: 4,
-    unit: 'Unit',
-    sellingPrice: 28500,
-    purchasePrice: 23200,
-    minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=600&q=80',
-    description: '8 Kg Fully Automatic Front Load, Steam Wash, Built-in Heater, Inverter Direct Drive Motor & 10-Year Motor Warranty',
-  },
-  {
-    id: 'stk-sofa',
-    name: 'Royal Teak Finish 3+1+1 High-Density Sofa Set',
-    code: 'FRN-SOFA-311',
+    id: 'sofa-teak-7s',
+    name: 'प्रीमियम सागवान एल-शेप सोफा सेट (७-सीटर)',
+    code: 'FURN-SOFA-01',
     category: 'Furniture',
     quantity: 4,
     unit: 'Set',
     sellingPrice: 38500,
-    purchasePrice: 29500,
+    purchasePrice: 28000,
     minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=600&q=80',
-    description: 'Premium Solid Teakwood Frame, High-Resilience 40-Density Foam, Stain-Resistant Fabric & 5-Year Warranty',
+    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80',
+    description: '१००% अस्सल सिझन्ड सागवान लाकूड, ४०-डेन्सिटी कम्फर्ट फोम, डाग-प्रतिरोधक मखमली फॅब्रिक, ५ वर्षे वाळवी व सिझनिंग वॉरंटी.',
   },
   {
-    id: 'stk-bed',
-    name: 'King Size Teak Finish Bed with Hydraulic Storage',
-    code: 'FRN-BED-KING',
+    id: 'bed-teak-hydraulic',
+    name: 'रॉयल सागवान हायड्रोलिक स्टोरेज बेड (किंग साईज ६x६.५ फूट)',
+    code: 'FURN-BED-02',
     category: 'Furniture',
     quantity: 5,
     unit: 'Unit',
-    sellingPrice: 28900,
+    sellingPrice: 29999,
     purchasePrice: 22000,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=600&q=80',
-    description: 'Sturdy Engineered Wood & Teak Finish, Smooth Hydraulic Gas-Lift Box Storage & Cushioned Headboard',
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
+    description: 'जर्मन गॅस-लिफ्ट हायड्रोलिक्स, प्रशस्त अंतर्गत स्टोरेज, वाळवी-प्रतिरोधक सागवान हेडबोर्ड व सॉलिड फ्रेम.',
   },
   {
-    id: 'stk-wardrobe',
-    name: '4-Door Solid Wood Almirah & Wardrobe with Mirror',
-    code: 'FRN-WRD-4D',
-    category: 'Furniture',
+    id: 'tv-43-4k-uhd',
+    name: '43" 4K Ultra HD Smart Google TV (Dolby Audio)',
+    code: 'ELEC-TV-03',
+    category: 'Electronics',
+    quantity: 8,
+    unit: 'Unit',
+    sellingPrice: 21999,
+    purchasePrice: 16500,
+    minStockLevel: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80',
+    description: 'बेझल-लेस 4K UHD डिस्प्ले, Google TV OS, ३० वॉट Dolby Audio, ड्युअल बँड Wi-Fi व ऑल ओटीटी ॲप्स सपोर्ट.',
+  },
+  {
+    id: 'fridge-260l-5star',
+    name: '260L 5-Star डबल डोअर फ्रॉस्ट-फ्री इनव्हर्टर रेफ्रिजरेटर',
+    code: 'ELEC-FRIDGE-04',
+    category: 'Electronics',
     quantity: 6,
     unit: 'Unit',
-    sellingPrice: 24500,
-    purchasePrice: 18500,
-    minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=600&q=80',
-    description: 'Spacious 4-Door Wardrobe with Full Length Dressing Mirror, Locker Drawer, Coat Hanging Rail & Safety Locks',
+    sellingPrice: 24499,
+    purchasePrice: 19000,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=800&auto=format&fit=crop&q=80',
+    description: 'स्मार्ट इनव्हर्टर कॉम्प्रेसर, टफन्ड ग्लास शेल्व्हज, मल्टि-एअर फ्लो व १० वर्षे कॉम्प्रेसर वॉरंटी.',
   },
   {
-    id: 'stk-dining',
-    name: '6-Seater Solid Sheesham Wood Dining Table Set',
-    code: 'FRN-DNG-6S',
+    id: 'cooler-75l-desert',
+    name: '75L हेवी-ड्युटी डेझर्ट एअर कुलर (हनीकॉम्ब पॅड)',
+    code: 'ELEC-COOLER-05',
+    category: 'Electronics',
+    quantity: 15,
+    unit: 'Unit',
+    sellingPrice: 8499,
+    purchasePrice: 5800,
+    minStockLevel: 3,
+    imageUrl: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&auto=format&fit=crop&q=80',
+    description: '७५ लिटर पाण्याची टाकी, ४५ फूट शक्तिशाली एअर थ्रो, १००% कॉपर हाय-स्पीड मोटर व इन्व्हर्टर सुसंगत.',
+  },
+  {
+    id: 'dining-6seater-teak',
+    name: '६-सीटर सॉलिड सागवान डायनिंग टेबल सेट (कुशन्ड चेअर्स)',
+    code: 'FURN-DINING-06',
     category: 'Furniture',
     quantity: 3,
     unit: 'Set',
-    sellingPrice: 32000,
-    purchasePrice: 25000,
+    sellingPrice: 26500,
+    purchasePrice: 19500,
     minStockLevel: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?auto=format&fit=crop&w=600&q=80',
-    description: 'Pure Sheesham Wood Craftsmanship, 6 Ergonomically Curved Dining Chairs with Premium Cushion Seating',
+    imageUrl: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?w=800&auto=format&fit=crop&q=80',
+    description: 'सॉलिड सागवान टेबलटॉप, ६ आरामदायी कुशन्ड खुर्च्या, नॅचरल मेलामाइन ग्लॉस पॉलिश फिनिश.',
   },
   {
-    id: 'stk-dressing',
-    name: 'Luxury Dressing Table with LED Mirror & Drawers',
-    code: 'FRN-DRS-LED',
+    id: 'wardrobe-3door-teak',
+    name: '३-डोअर सागवान लाकडी कपाट विथ ड्रेसर व लॉकर',
+    code: 'FURN-WARDROBE-07',
     category: 'Furniture',
-    quantity: 7,
+    quantity: 4,
     unit: 'Unit',
-    sellingPrice: 13500,
-    purchasePrice: 9800,
+    sellingPrice: 22999,
+    purchasePrice: 16500,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=800&auto=format&fit=crop&q=80',
+    description: 'प्रशस्त ३ कपाटे, अंतर्गत सिक्युरिटी लॉकर, कपडे हँगिंग रॉड व पूर्ण लांबीचा ड्रेसिंग मिरर.',
+  },
+  {
+    id: 'wm-75kg-frontload',
+    name: '7.5 kg फुली ऑटोमॅटिक फ्रंट लोड वॉशिंग मशीन',
+    code: 'ELEC-WM-08',
+    category: 'Electronics',
+    quantity: 5,
+    unit: 'Unit',
+    sellingPrice: 27499,
+    purchasePrice: 21000,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=800&auto=format&fit=crop&q=80',
+    description: 'इनव्हर्टर डायरेक्ट ड्राईव्ह मोटर, स्टीम वॉश तंत्रज्ञान, ५-स्टार एनर्जी सेव्हिंग व अँटी-बॅक्टेरियल सायकल.',
+  },
+  {
+    id: 'tv-55-4k-frameless',
+    name: '55" Frameless 4K UHD Google Smart LED TV',
+    code: 'ELEC-TV-09',
+    category: 'Electronics',
+    quantity: 6,
+    unit: 'Unit',
+    sellingPrice: 34999,
+    purchasePrice: 26500,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1461151304267-38535e780c79?w=800&auto=format&fit=crop&q=80',
+    description: '५५ इंच भव्य सिनेमॅटिक स्क्रीन, डॉल्बी व्हिजन व ॲटमॉस, हँड्स-फ्री व्हॉईस कंट्रोल व २ वर्षे ऑन-साईट वॉरंटी.',
+  },
+  {
+    id: 'fan-1200mm-bldc',
+    name: '1200mm हाय-स्पीड इनव्हर्टर BLDC सीलिंग फॅन',
+    code: 'ELEC-FAN-10',
+    category: 'Electronics',
+    quantity: 20,
+    unit: 'Unit',
+    sellingPrice: 2899,
+    purchasePrice: 1950,
+    minStockLevel: 5,
+    imageUrl: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=800&auto=format&fit=crop&q=80',
+    description: 'ऊर्जा बचत BLDC मोटर, रिमोट कंट्रोल, एरोडायनॅमिक ब्लेड्स, ६५% वीज बचत.',
+  },
+  {
+    id: 'tvunit-teak-console',
+    name: 'सागवान डिझायनर टीव्ही युनिट & कन्सोल वॉल कॅबिनेट',
+    code: 'FURN-TVUNIT-11',
+    category: 'Furniture',
+    quantity: 5,
+    unit: 'Unit',
+    sellingPrice: 14500,
+    purchasePrice: 10500,
+    minStockLevel: 1,
+    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=80',
+    description: '६५ इंचांपर्यंत टीव्हीसाठी परिपूर्ण, सेट-टॉप बॉक्स शेल्फ, साउंडबार कम्पार्टमेंट व वायर मॅनेजमेंट.',
+  },
+  {
+    id: 'tv-32-smart-led',
+    name: '32" HD Ready Smart Google TV (Wi-Fi + OTT)',
+    code: 'ELEC-TV-12',
+    category: 'Electronics',
+    quantity: 10,
+    unit: 'Unit',
+    sellingPrice: 10999,
+    purchasePrice: 8200,
     minStockLevel: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1534349762230-e0cadf78f5da?auto=format&fit=crop&w=600&q=80',
-    description: 'Contemporary Dressing Vanity with Touch LED Lighted Mirror, Multiple Storage Drawers & Cosmetics Shelves',
+    imageUrl: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&auto=format&fit=crop&q=80',
+    description: '३२ इंच एचडी रेडी, यूट्यूब, नेटफ्लिक्स व प्राईम व्हिडिओ ॲप्स, २० वॉट स्टीरिओ स्पीकर्स.',
   },
 ];
 
-export const INITIAL_CUSTOMERS: Customer[] = [];
-export const INITIAL_TRANSACTIONS: TransactionEntry[] = [];
-export const INITIAL_PURCHASES: PurchaseEntry[] = [];
-export const INITIAL_STAFF: StaffMember[] = [];
-export const INITIAL_EXPENSES: ExpenseEntry[] = [];
-export const INITIAL_DEALERS: Dealer[] = [];
-export const INITIAL_DEALER_PAYMENTS: DealerPayment[] = [];
-export const INITIAL_CARD_MEMBERS: CardMember[] = [];
-export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [];
+export const INITIAL_STOCK: StockItem[] = DEFAULT_SHOWROOM_PRODUCTS;
 
-const STORAGE_KEY = 'shri_sai_ent_db_v2';
+export const INITIAL_CUSTOMERS: Customer[] = [];
+
+export const INITIAL_TRANSACTIONS: TransactionEntry[] = [];
+
+export const INITIAL_PURCHASES: PurchaseEntry[] = [];
+
+export const CORE_AGENTS = [
+  { name: 'Shubham Shende', marathiName: 'शुभम शेंडे', phone: '8766486915' },
+  { name: 'Bhushan Lidbe', marathiName: 'भूषण लिडबे', phone: '8600122798' },
+  { name: 'Suraj Pendam', marathiName: 'सुरज पेंदाम', phone: '9175534365' },
+  { name: 'Ninad Hole', marathiName: 'निनाद होले', phone: '7822859073' },
+];
+
+export const INITIAL_STAFF: StaffMember[] = [
+  {
+    id: "stf-shubham",
+    name: "Shubham Shende",
+    role: "Field Collection Agent (शुभम शेंडे)",
+    phone: "8766486915",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+    status: 'Active',
+    isApprovedByAdmin: true,
+    approvedBy: 'Shubham Shende (Admin)',
+  },
+  {
+    id: "stf-bhushan",
+    name: "Bhushan Lidbe",
+    role: "Field Collection Agent (भूषण लिडबे)",
+    phone: "8600122798",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+    status: 'Active',
+    isApprovedByAdmin: true,
+    approvedBy: 'Shubham Shende (Admin)',
+  },
+  {
+    id: "stf-suraj",
+    name: "Suraj Pendam",
+    role: "Field Collection Agent (सुरज पेंदाम)",
+    phone: "9175534365",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+    status: 'Active',
+    isApprovedByAdmin: true,
+    approvedBy: 'Shubham Shende (Admin)',
+  },
+  {
+    id: "stf-ninad",
+    name: "Ninad Hole",
+    role: "Field Collection Agent (निनाद होले)",
+    phone: "7822859073",
+    salary: 15000,
+    advancePaid: 0,
+    attendanceToday: 'Present',
+    status: 'Active',
+    isApprovedByAdmin: true,
+    approvedBy: 'Shubham Shende (Admin)',
+  }
+];
+
+export const INITIAL_EXPENSES: ExpenseEntry[] = [];
+
+export const INITIAL_DEALERS: Dealer[] = [];
+
+export const INITIAL_DEALER_PAYMENTS: DealerPayment[] = [];
+
+export const INITIAL_CARD_MEMBERS: CardMember[] = [];
+
+export const INITIAL_CARD_TRANSACTIONS: CardTransaction[] = [];
 
 export interface AppDatabase {
   settings: BusinessSettings;
@@ -328,88 +364,39 @@ export interface AppDatabase {
   cardTransactions: CardTransaction[];
   staff: StaffMember[];
   expenses: ExpenseEntry[];
-  agentAdvances?: AgentAdvanceEntry[];
-}
-
-export function deduplicateStock(items: StockItem[]): StockItem[] {
-  if (!Array.isArray(items)) return [];
-  const mergedMap = new Map<string, StockItem>();
-
-  items.forEach((item, index) => {
-    if (!item) return;
-    const name = (item.name || '').trim();
-    // Normalize name to alphanumeric slug to catch variations like "DIWAN 4*6" vs "DIWAN 4/6"
-    const nameSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const idSlug = (item.id || '').trim();
-
-    // Grouping key: if id exists and starts with prod-, use idSlug; otherwise use nameSlug or fallback
-    const groupKey = (idSlug && idSlug.startsWith('prod-'))
-      ? idSlug
-      : (nameSlug || idSlug || `item-${index}`);
-
-    if (mergedMap.has(groupKey)) {
-      const existing = mergedMap.get(groupKey)!;
-      existing.quantity = (Number(existing.quantity) || 0) + (Number(item.quantity) || 0);
-      if ((!existing.sellingPrice || existing.sellingPrice === 0) && item.sellingPrice) {
-        existing.sellingPrice = item.sellingPrice;
-      }
-      if ((!existing.purchasePrice || existing.purchasePrice === 0) && item.purchasePrice) {
-        existing.purchasePrice = item.purchasePrice;
-      }
-      if (!existing.imageUrl && item.imageUrl) {
-        existing.imageUrl = item.imageUrl;
-      }
-      if (!existing.category && item.category) {
-        existing.category = item.category;
-      }
-      if ((!existing.description || existing.description.length < (item.description || '').length) && item.description) {
-        existing.description = item.description;
-      }
-    } else {
-      mergedMap.set(groupKey, { ...item });
-    }
-  });
-
-  // Guarantee that every single item in the returned array has a strictly unique ID
-  const result: StockItem[] = [];
-  const seenIds = new Set<string>();
-
-  mergedMap.forEach((item, groupKey) => {
-    let finalId = item.id ? item.id.trim() : `prod-${groupKey}`;
-    if (!finalId || seenIds.has(finalId)) {
-      finalId = `${finalId || 'prod'}-${result.length + 1}`;
-    }
-    seenIds.add(finalId);
-    result.push({
-      ...item,
-      id: finalId,
-    });
-  });
-
-  return result;
+  agentAdvances: AgentAdvance[];
+  billReceipts?: BillReceiptEntry[];
+  mergedRecords?: MergedCustomerRecord[];
+  furnitureJobCards?: FurnitureJobCard[];
+  financeDORecords?: FinanceDORecord[];
+  cashReconciliations?: DailyCashReconciliation[];
+  stockTransfers?: StockTransferRecord[];
 }
 
 export function loadDatabase(): AppDatabase {
   try {
-    const PURGE_KEY = 'shri_sai_all_demo_data_purged_v2026_09_18_clean_v2';
-    if (!localStorage.getItem(PURGE_KEY)) {
-      localStorage.setItem(PURGE_KEY, 'true');
-      const cleanDb: AppDatabase = {
-        settings: DEFAULT_SETTINGS,
-        stock: INITIAL_STOCK,
-        customers: [],
-        transactions: [],
-        purchases: [],
-        dealers: [],
-        dealerPayments: [],
-        cardMembers: [],
-        cardTransactions: [],
-        staff: [],
-        expenses: [],
-        agentAdvances: [],
-      };
-      saveDatabase(cleanDb);
-      return cleanDb;
+    if (typeof window !== 'undefined') {
+      const isResetDone = localStorage.getItem(GLOBAL_ZERO_RESET_KEY);
+      if (isResetDone !== 'done') {
+        localStorage.setItem(GLOBAL_ZERO_RESET_KEY, 'done');
+        localStorage.removeItem(STORAGE_KEY);
+        return {
+          settings: DEFAULT_SETTINGS,
+          stock: [],
+          customers: [],
+          transactions: [],
+          purchases: [],
+          dealers: [],
+          dealerPayments: [],
+          cardMembers: [],
+          cardTransactions: [],
+          staff: INITIAL_STAFF,
+          expenses: [],
+          agentAdvances: [],
+          billReceipts: [],
+          mergedRecords: [],
+        };
+      }
     }
 
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -421,56 +408,143 @@ export function loadDatabase(): AppDatabase {
         ? { ...DEFAULT_SETTINGS, ...rawSettings, ...DEFAULT_SETTINGS }
         : { ...DEFAULT_SETTINGS, ...rawSettings };
 
-      // Ensure active 30-month scheme notice in English and dual WhatsApp numbers
-      if (!mergedSettings.shopNotice || mergedSettings.shopNotice.includes('13-महीने') || mergedSettings.shopNotice.includes('13-महिने') || mergedSettings.shopNotice.includes('श्री साई इंटरप्राइजेस')) {
-        mergedSettings.shopNotice = 'Shri Sai Enterprises: 30-Month Weekly Savings Card Scheme Booking Open • Free Home Delivery on all major items!';
+      // Ensure active 30-month scheme notice and dual WhatsApp numbers
+      if (!mergedSettings.shopNotice || mergedSettings.shopNotice.includes('13-महीने') || mergedSettings.shopNotice.includes('13-महिने')) {
+        mergedSettings.shopNotice = 'श्री साई इंटरप्राइजेस: ३०-महिने साप्ताहिक बचत कार्ड योजना बुकिंग चालू आहे • सर्व मोठ्या वस्तूंवर फ्री होम डिलिव्हरी!';
       }
-      mergedSettings.tagline = 'Electronics & Furniture Superstore, Wardha';
       mergedSettings.whatsappOrderNumber = '8766486915';
       mergedSettings.whatsappSecondaryNumber = '8600122798';
       if (!mergedSettings.additionalPhones || mergedSettings.additionalPhones.includes('8600122978')) {
         mergedSettings.additionalPhones = ['8600122798', '9175534365', '7822859073'];
       }
-      if (!mergedSettings.whatsappGroupLink || mergedSettings.whatsappGroupLink.includes('/invite')) {
+      if (!mergedSettings.adminPassword || mergedSettings.adminPassword === 'admin') {
+        mergedSettings.adminPassword = 'Saksham@291022';
+      }
+      mergedSettings.email = 'shubhamh3098@gmail.com';
+      mergedSettings.domainName = 'shrisaient.in';
+      mergedSettings.ownerName = 'Shubham Shende';
+      if (!mergedSettings.address || mergedSettings.address.includes('बोरगाव') || mergedSettings.address.includes('आरटीओ')) {
+        mergedSettings.address = 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१';
+        mergedSettings.addressHindi = 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१';
+      }
+      if (!mergedSettings.whatsappGroupLink || mergedSettings.whatsappGroupLink.includes('invite/shrisaienterprises')) {
         mergedSettings.whatsappGroupLink = 'https://chat.whatsapp.com/CLcaeUq1bHH1RE0203oPaP?s=cl&p=a&mlu=4&ilr=4';
       }
 
-      const rawStockList: StockItem[] = Array.isArray(parsed.stock) && parsed.stock.length > 0
+      const demoStockIds = new Set(['stk-tv32', 'stk-tv43', 'stk-fridge', 'stk-cooler', 'stk-wm', 'stk-fan', 'stk-1', 'stk-2', 'stk-6', 'stk-bed1', 'stk-dining1', 'stk-wardrobe1', 'stk-recliner1']);
+      const loadedStock: StockItem[] = Array.isArray(parsed.stock)
         ? parsed.stock
-            .filter((item: StockItem) => item.category !== 'Electricals' && item.category !== 'Industrial' && item.id !== 'stk-1' && item.id !== 'stk-2' && item.id !== 'stk-6')
+            .filter((item: StockItem) => !demoStockIds.has(item.id))
             .map((item: StockItem) => {
-              if (!item.imageUrl) {
-                const matched = INITIAL_STOCK.find((s) => s.id === item.id || s.code === item.code);
-                if (matched?.imageUrl) {
-                  return { ...item, imageUrl: matched.imageUrl, description: item.description || matched.description };
+              const total = Number(item.quantity || 0);
+              let sQty = item.shopQty;
+              let gQty = item.godownQty;
+              if (sQty === undefined && gQty === undefined) {
+                if (total <= 1) {
+                  sQty = total;
+                  gQty = 0;
+                } else {
+                  gQty = Math.floor(total * 0.6);
+                  sQty = total - gQty;
                 }
+              } else if (sQty === undefined) {
+                sQty = Math.max(0, total - (gQty || 0));
+              } else if (gQty === undefined) {
+                gQty = Math.max(0, total - (sQty || 0));
               }
-              return item;
+              return {
+                ...item,
+                shopQty: Number(sQty || 0),
+                godownQty: Number(gQty || 0),
+                godownLocation: item.godownLocation || 'मुख्य गोडावून (आर्वी रोड, वर्धा)',
+                quantity: Number(sQty || 0) + Number(gQty || 0),
+              };
             })
-        : INITIAL_STOCK;
+        : [];
 
-      const loadedStock = deduplicateStock(rawStockList);
+      const demoCustIds = new Set(['cust-1', 'cust-2', 'cust-3', 'cust-4']);
+      const loadedCustomers: Customer[] = Array.isArray(parsed.customers)
+        ? parsed.customers
+            .filter((c: Customer) => !demoCustIds.has(c.id))
+            .map((c: Customer) => {
+              const purchased = Number(c.totalPurchased || 0);
+              const paid = Number(c.totalPaid || 0);
+              const due = Number(c.balanceDue || 0);
+              if (purchased === 0 && (paid > 0 || due > 0)) {
+                return {
+                  ...c,
+                  totalPurchased: paid + due,
+                };
+              }
+              return c;
+            })
+        : [];
 
-      const isDemoCust = (c: any) => c?.id && (c.id.startsWith('cust-bhagat') || c.id.startsWith('demo-') || c.id.includes('placeholder'));
-      const isDemoCard = (m: any) => m?.id && (m.id.startsWith('cm-demo') || m.id.startsWith('card-demo') || m.id.startsWith('demo-'));
-      const isDemoTx = (t: any) => t?.id && (t.id.startsWith('tx-bhagat') || t.id.startsWith('tx-demo') || t.id.startsWith('demo-'));
-      const isDemoPur = (p: any) => p?.id && (p.id.startsWith('pur-demo') || p.id.startsWith('demo-'));
-      const isDemoDlr = (d: any) => d?.id && (d.id.startsWith('dlr-demo') || d.id.startsWith('demo-'));
-      const isDemoStaff = (s: any) => s?.id && (s.id.startsWith('stf-demo') || s.id.startsWith('demo-'));
+      const demoTxIds = new Set(['tx-1', 'tx-2', 'tx-3']);
+      const loadedTransactions: TransactionEntry[] = Array.isArray(parsed.transactions)
+        ? parsed.transactions.filter((t: TransactionEntry) => !demoTxIds.has(t.id))
+        : [];
+
+      const demoPurIds = new Set(['pur-manisha-1', 'pur-manisha-2', 'pur-1', 'pur-2']);
+      const loadedPurchases: PurchaseEntry[] = Array.isArray(parsed.purchases)
+        ? parsed.purchases.filter((p: PurchaseEntry) => !demoPurIds.has(p.id))
+        : [];
+
+      const demoDlrIds = new Set(['dlr-1', 'dlr-2', 'dlr-3']);
+      const loadedDealers: Dealer[] = Array.isArray(parsed.dealers)
+        ? parsed.dealers.filter((d: Dealer) => !demoDlrIds.has(d.id))
+        : [];
+
+      const demoDpIds = new Set(['dp-1', 'dp-2', 'dp-3', 'dp-4']);
+      const loadedDealerPayments: DealerPayment[] = Array.isArray(parsed.dealerPayments)
+        ? parsed.dealerPayments.filter((dp: DealerPayment) => !demoDpIds.has(dp.id))
+        : [];
+
+      const demoCardTxIds = new Set(['ctx-1', 'ctx-2', 'ctx-3', 'ctx-4', 'ctx-5']);
+      const loadedCardTransactions: CardTransaction[] = Array.isArray(parsed.cardTransactions)
+        ? parsed.cardTransactions.filter((ctx: CardTransaction) => !demoCardTxIds.has(ctx.id) && ctx.customerName !== 'Prakash Shinde')
+        : [];
+
+      const demoExpIds = new Set(['exp-1', 'exp-2', 'exp-3', 'exp-4', 'exp-5']);
+      const loadedExpenses: ExpenseEntry[] = Array.isArray(parsed.expenses)
+        ? parsed.expenses.filter((e: ExpenseEntry) => !demoExpIds.has(e.id))
+        : [];
+
+      // Ensure the 4 primary agents always exist in staff
+      const rawStaff: StaffMember[] = Array.isArray(parsed.staff) && parsed.staff.length > 0
+        ? parsed.staff.filter((s: StaffMember) => s.name !== 'Rahul Sharma')
+        : [];
+      INITIAL_STAFF.forEach((agent) => {
+        if (!rawStaff.some((s) => s.name.toLowerCase() === agent.name.toLowerCase())) {
+          rawStaff.push(agent);
+        }
+      });
+      const loadedStaff = rawStaff;
+
+      const finalPurchases = loadedPurchases;
+      const finalDealers = loadedDealers;
 
       return {
         settings: mergedSettings,
         stock: loadedStock,
-        customers: Array.isArray(parsed.customers) ? parsed.customers.filter((c: any) => !isDemoCust(c)) : [],
-        transactions: Array.isArray(parsed.transactions) ? parsed.transactions.filter((t: any) => !isDemoTx(t)) : [],
-        purchases: Array.isArray(parsed.purchases) ? parsed.purchases.filter((p: any) => !isDemoPur(p)) : [],
-        dealers: Array.isArray(parsed.dealers) ? parsed.dealers.filter((d: any) => !isDemoDlr(d)) : [],
-        dealerPayments: Array.isArray(parsed.dealerPayments) ? parsed.dealerPayments : [],
-        cardMembers: Array.isArray(parsed.cardMembers) ? parsed.cardMembers.filter((m: any) => !isDemoCard(m)) : [],
-        cardTransactions: Array.isArray(parsed.cardTransactions) ? parsed.cardTransactions : [],
-        staff: Array.isArray(parsed.staff) ? parsed.staff.filter((s: any) => !isDemoStaff(s)) : [],
-        expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+        customers: loadedCustomers,
+        transactions: loadedTransactions,
+        purchases: finalPurchases,
+        dealers: finalDealers,
+        dealerPayments: loadedDealerPayments,
+        cardMembers: Array.isArray(parsed.cardMembers)
+        ? parsed.cardMembers.filter((cm: CardMember) => !["cm-1030", "cm-1029", "cm-1021", "cm-1081", "cm-4181", "cm-4302", "cm-4349", "cm-4352", "cm-4398", "cm-4393", "cm-4049"].includes(cm.id))
+        : [],
+        cardTransactions: loadedCardTransactions,
+        staff: loadedStaff,
+        expenses: loadedExpenses,
         agentAdvances: Array.isArray(parsed.agentAdvances) ? parsed.agentAdvances : [],
+        billReceipts: Array.isArray(parsed.billReceipts) ? parsed.billReceipts : [],
+        mergedRecords: Array.isArray(parsed.mergedRecords) ? parsed.mergedRecords : [],
+        furnitureJobCards: Array.isArray(parsed.furnitureJobCards) ? parsed.furnitureJobCards : [],
+        financeDORecords: Array.isArray(parsed.financeDORecords) ? parsed.financeDORecords : [],
+        cashReconciliations: Array.isArray(parsed.cashReconciliations) ? parsed.cashReconciliations : [],
+        stockTransfers: Array.isArray(parsed.stockTransfers) ? parsed.stockTransfers : [],
       };
     }
   } catch (e) {
@@ -478,7 +552,7 @@ export function loadDatabase(): AppDatabase {
   }
   return {
     settings: DEFAULT_SETTINGS,
-    stock: INITIAL_STOCK,
+    stock: [],
     customers: [],
     transactions: [],
     purchases: [],
@@ -486,16 +560,22 @@ export function loadDatabase(): AppDatabase {
     dealerPayments: [],
     cardMembers: [],
     cardTransactions: [],
-    staff: [],
+    staff: INITIAL_STAFF,
     expenses: [],
     agentAdvances: [],
+    billReceipts: [],
+    mergedRecords: [],
+    furnitureJobCards: [],
+    financeDORecords: [],
+    cashReconciliations: [],
+    stockTransfers: [],
   };
 }
 
 export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
   const clean: AppDatabase = {
     settings: currentDb.settings || DEFAULT_SETTINGS,
-    stock: currentDb.stock && currentDb.stock.length > 0 ? currentDb.stock : INITIAL_STOCK,
+    stock: [],
     customers: [],
     transactions: [],
     purchases: [],
@@ -503,43 +583,62 @@ export function clearAllDemoData(currentDb: AppDatabase): AppDatabase {
     dealerPayments: [],
     cardMembers: [],
     cardTransactions: [],
-    staff: [],
+    staff: currentDb.staff && currentDb.staff.length > 0 ? currentDb.staff : INITIAL_STAFF,
     expenses: [],
     agentAdvances: [],
-  };
-  saveDatabase(clean);
-  return clean;
-}
-
-export function clearCardsData(currentDb: AppDatabase): AppDatabase {
-  const clean: AppDatabase = {
-    ...currentDb,
-    cardMembers: [],
-    cardTransactions: [],
-  };
-  saveDatabase(clean);
-  return clean;
-}
-
-export function clearBillsData(currentDb: AppDatabase): AppDatabase {
-  const clean: AppDatabase = {
-    ...currentDb,
-    transactions: [],
-    customers: [],
+    billReceipts: [],
+    mergedRecords: [],
+    furnitureJobCards: [],
+    financeDORecords: [],
+    cashReconciliations: [],
   };
   saveDatabase(clean);
   return clean;
 }
 
 export function saveDatabase(db: AppDatabase): void {
+  // 1. Always save the complete database to IndexedDB (unlimited storage)
+  saveDatabaseToIndexedDB(db).catch((err) => {
+    console.warn('IndexedDB save notice:', err);
+  });
+
+  // 2. Try saving to localStorage. If quota is exceeded, gracefully fall back to saving
+  // critical core configuration and summary so app never crashes or errors out.
   try {
-    const cleanDb = {
-      ...db,
-      stock: deduplicateStock(db.stock || []),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanDb));
-  } catch (e) {
-    console.error('Failed to save database to localStorage', e);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  } catch (e: any) {
+    const isQuota =
+      e?.name === 'QuotaExceededError' ||
+      e?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      e?.message?.includes('quota') ||
+      e?.message?.includes('Quota') ||
+      e?.code === 22 ||
+      e?.code === 1014;
+
+    if (isQuota) {
+      console.warn('localStorage quota exceeded. Large dataset is safely stored in IndexedDB and Cloud Firestore.');
+      try {
+        // Save an essential compact version to localStorage so synchronous boots still have settings & stock
+        const compactDb: Partial<AppDatabase> = {
+          settings: db.settings,
+          stock: db.stock,
+          staff: db.staff,
+          // Limit heavy arrays in localStorage to prevent quota errors
+          customers: (db.customers || []).slice(0, 100),
+          transactions: (db.transactions || []).slice(0, 50),
+          cardMembers: (db.cardMembers || []).slice(0, 50),
+          cardTransactions: (db.cardTransactions || []).slice(0, 50),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(compactDb));
+      } catch (innerErr) {
+        // If even compact doesn't fit, just save minimal settings
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings: db.settings, staff: db.staff }));
+        } catch (_) {}
+      }
+    } else {
+      console.error('Failed to save database to localStorage', e);
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Printer, Share2, Building2, Phone, MapPin, CheckCircle2, FileText, Truck } from 'lucide-react';
+import { Printer, Share2, X, Building2, QrCode, Phone, MapPin, Truck, CheckCircle } from 'lucide-react';
 import { PurchaseEntry, BusinessSettings } from '../types';
 
 interface PurchaseInvoiceModalProps {
@@ -19,372 +19,409 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
     window.print();
   };
 
-  const handleWhatsApp = () => {
+  const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `*खरेदी कर बीजक (Purchase Tax Invoice)*\n` +
-      `वितरक (Supplier): ${purchase.supplierName}\n` +
-      `बीजक क्र. (Invoice No): ${purchase.billNo}\n` +
-      `दिनांक (Date): ${purchase.date}\n` +
-      `वस्तू / Model: ${purchase.items}\n` +
-      `रक्कम (Total): ₹${purchase.totalAmount.toLocaleString()}\n` +
-      `पेमेंट स्थिती: ${purchase.status}\n` +
-      (purchase.bankDetails ? `बँक खाते: ${purchase.bankDetails.bankName || ''} A/C: ${purchase.bankDetails.accountNo || ''}\n` : '') +
-      `दुकान: ${settings.businessName} (Wardha)`
+      `*PURCHASE TAX INVOICE*\n` +
+      `*Supplier:* ${purchase.supplierName}\n` +
+      (purchase.supplierGstin ? `*Supplier GSTIN:* ${purchase.supplierGstin}\n` : '') +
+      `*Invoice No:* ${purchase.billNo}\n` +
+      `*Date:* ${purchase.date}\n` +
+      (purchase.poNo ? `*PO No:* ${purchase.poNo} (${purchase.poDate || ''})\n` : '') +
+      `--------------------------------\n` +
+      `*Buyer:* ${purchase.buyerName || settings.businessName}\n` +
+      `*Items:* ${purchase.items}\n` +
+      (purchase.itemsDetail && purchase.itemsDetail.some(i => i.serialNumbers && i.serialNumbers.length > 0)
+        ? `*Serials:* ${purchase.itemsDetail.flatMap(i => i.serialNumbers || []).join(', ')}\n`
+        : '') +
+      `--------------------------------\n` +
+      `*Subtotal (Taxable):* ₹${(purchase.subtotal || purchase.totalAmount).toLocaleString('en-IN')}\n` +
+      (purchase.cgstAmount ? `*CGST:* ₹${purchase.cgstAmount.toLocaleString('en-IN')}\n` : '') +
+      (purchase.sgstAmount ? `*SGST:* ₹${purchase.sgstAmount.toLocaleString('en-IN')}\n` : '') +
+      `*TOTAL INVOICE:* ₹${purchase.totalAmount.toLocaleString('en-IN')}\n` +
+      `*Paid:* ₹${purchase.paidAmount.toLocaleString('en-IN')} (${purchase.paymentMode})\n` +
+      `*Balance Due:* ₹${Math.max(0, purchase.totalAmount - purchase.paidAmount).toLocaleString('en-IN')}\n` +
+      `--------------------------------\n` +
+      `Shri Sai Enterprises • Wardha ERP`
     );
-    const phone = (purchase.supplierPhone || '').replace(/\D/g, '');
+
+    const phone = purchase.supplierPhone ? purchase.supplierPhone.replace(/[^0-9]/g, '') : '';
     const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(url, '_blank');
   };
 
-  const lineItems = purchase.lineItems && purchase.lineItems.length > 0 ? purchase.lineItems : [
-    {
-      description: purchase.items || 'माल / इलेक्ट्रॉनिक्स साहित्य',
-      hsn: '84182100',
-      quantity: 1,
-      rate: purchase.taxableAmount || Math.round(purchase.totalAmount / 1.18),
-      discount: 0,
-      taxableAmount: purchase.taxableAmount || Math.round(purchase.totalAmount / 1.18),
-      cgstRate: 9,
-      cgstAmount: purchase.cgstAmount || Math.round((purchase.totalAmount * 0.09) / 1.18),
-      sgstRate: 9,
-      sgstAmount: purchase.sgstAmount || Math.round((purchase.totalAmount * 0.09) / 1.18),
-      totalAmount: purchase.totalAmount,
-      serialNumbers: purchase.notes?.match(/([A-Z0-9]{8,20})/g) || [],
-    }
-  ];
+  // Fallback items array if itemsDetail is not set
+  const itemsList = purchase.itemsDetail && purchase.itemsDetail.length > 0
+    ? purchase.itemsDetail
+    : [
+        {
+          id: 'item-1',
+          description: purchase.items || 'Procured Goods / Electronics',
+          hsn: '84182100',
+          qty: 1,
+          rate: purchase.subtotal || Math.round(purchase.totalAmount / 1.18),
+          discount: 0,
+          taxableAmount: purchase.subtotal || Math.round(purchase.totalAmount / 1.18),
+          taxRate: 18,
+          cgstRate: 9,
+          cgstAmount: purchase.cgstAmount || Math.round((purchase.totalAmount - (purchase.subtotal || Math.round(purchase.totalAmount / 1.18))) / 2),
+          sgstRate: 9,
+          sgstAmount: purchase.sgstAmount || Math.round((purchase.totalAmount - (purchase.subtotal || Math.round(purchase.totalAmount / 1.18))) / 2),
+          taxAmount: purchase.totalTax || (purchase.totalAmount - (purchase.subtotal || Math.round(purchase.totalAmount / 1.18))),
+          totalAmount: purchase.totalAmount,
+          serialNumbers: [],
+        },
+      ];
 
-  const subtotal = purchase.taxableAmount || lineItems.reduce((acc, it) => acc + (it.taxableAmount || 0), 0);
-  const cgst = purchase.cgstAmount || lineItems.reduce((acc, it) => acc + (it.cgstAmount || 0), 0);
-  const sgst = purchase.sgstAmount || lineItems.reduce((acc, it) => acc + (it.sgstAmount || 0), 0);
+  const subtotal = purchase.subtotal || itemsList.reduce((acc, i) => acc + (i.taxableAmount || 0), 0);
+  const cgstTotal = purchase.cgstAmount || itemsList.reduce((acc, i) => acc + (i.cgstAmount || 0), 0);
+  const sgstTotal = purchase.sgstAmount || itemsList.reduce((acc, i) => acc + (i.sgstAmount || 0), 0);
+  const grandTotal = purchase.totalAmount;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white text-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh]">
-        {/* Modal Top Control Bar (Hidden on Print) */}
-        <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between no-print border-b border-slate-800">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:static print:bg-white">
+      <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-slate-200 animate-fade-in my-auto print:my-0 print:border-none print:shadow-none print:rounded-none print:max-w-none text-slate-900 font-sans">
+        
+        {/* Top Control Bar (Hidden when printing) */}
+        <div className="no-print bg-slate-900 text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-2 py-0.5 rounded bg-blue-600 font-bold uppercase text-[10px]">
+              खरेदी बीजक (Purchase Tax Invoice)
+            </span>
+            <span className="font-mono text-slate-300 font-bold">
+              #{purchase.billNo}
+            </span>
+            <span className="text-slate-400">
+              • {purchase.supplierName}
+            </span>
+          </div>
+
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-400" />
+            <button
+              onClick={handlePrint}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>प्रिंट (Print A4 Invoice)</span>
+            </button>
+
+            <button
+              onClick={handleShareWhatsApp}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>WhatsApp पाठवा</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              type="button"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Purchase Tax Invoice Layout (Exact replica of Manisha Enterprises format) */}
+        <div className="p-6 sm:p-8 bg-white print:p-4 text-[11px] leading-tight text-black border border-slate-300 print:border-black">
+          
+          {/* Supplier Header Block */}
+          <div className="flex justify-between items-start border-b border-black pb-3">
+            <div className="flex-1 pr-4">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 border border-blue-900 text-blue-900 flex items-center justify-center font-black text-xs">
+                  M
+                </div>
+                <div>
+                  <h1 className="text-base sm:text-lg font-black tracking-tight text-blue-950 uppercase">
+                    {purchase.supplierName || 'MANISHA ENTERPRISES'}
+                  </h1>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">
+                    DISTRIBUTOR & WHOLESALE ELECTRONICS
+                  </p>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[10px] text-slate-700">
+                <span className="font-bold">Registered Address:</span>{' '}
+                {purchase.supplierAddress || 'INGOLE CHOWK MAIN ROAD WARDHA 442001 MAHARASHTRA INDIA'}
+              </p>
+              <p className="text-[10px] text-slate-700">
+                <span className="font-bold">Phone:</span> {purchase.supplierPhone || '9766911693'}
+              </p>
+              <p className="text-[10px] text-slate-700">
+                <span className="font-bold">GSTIN/UIN:</span>{' '}
+                <span className="font-mono font-bold">{purchase.supplierGstin || '27ABDPB8956C1ZS'}</span>
+                {' '}• <span className="font-bold">State:</span> {purchase.supplierState || 'MAHARASHTRA'}
+              </p>
+            </div>
+
+            {/* QR Code / IRN Box Placeholder */}
+            <div className="w-24 h-24 border border-black p-1 flex flex-col items-center justify-center text-center shrink-0 bg-slate-50">
+              <QrCode className="w-14 h-14 text-black stroke-[1.2]" />
+              <span className="text-[8px] font-mono mt-0.5">GST E-INVOICE</span>
+            </div>
+          </div>
+
+          {/* Location & Tax Invoice Title Bar */}
+          <div className="grid grid-cols-3 border-b border-black py-1.5 bg-slate-100/70 font-semibold text-[10px]">
             <div>
-              <span className="font-bold text-sm">खरेदी कर बीजक (Purchase Tax Invoice)</span>
-              <span className="text-xs text-slate-400 ml-2">#{purchase.billNo}</span>
+              <span className="text-slate-600">Location :</span>{' '}
+              <span className="font-bold">{purchase.location || 'LG DISTRIBUTION'}</span>
+            </div>
+            <div className="text-center font-black text-xs tracking-wider uppercase underline">
+              Tax Invoice
+            </div>
+            <div className="text-right">
+              <span className="text-slate-600">Sales Consultant :</span>{' '}
+              <span className="font-bold">{purchase.salesConsultant || 'DHIRAJ BHOWARE'}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              <span>प्रिंट करा (Print A4)</span>
-            </button>
-            <button
-              onClick={handleWhatsApp}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>WhatsApp</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+
+          {/* Invoice No, Date & Approval */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 border-b border-black py-1 text-[10px]">
+            <div>
+              <span className="font-bold">Tax Invoice :</span>{' '}
+              <span className="font-mono font-bold text-[11px]">{purchase.billNo}</span>
+            </div>
+            <div className="text-center">
+              <span className="font-bold">Date :</span>{' '}
+              <span className="font-mono font-bold">{purchase.date}</span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-600">Approved By :</span>{' '}
+              <span className="font-bold">{purchase.approvedBy || 'ARTI INGOLE'}</span>
+            </div>
           </div>
-        </div>
 
-        {/* Printable Official Invoice Body (Matches Manisha Enterprises exact layout) */}
-        <div className="p-6 sm:p-8 overflow-y-auto font-sans text-xs print:p-0 print:m-0 print:text-[11px] leading-tight select-text">
-          {/* Top Section: Supplier Details & Tax Invoice Title */}
-          <div className="border border-slate-900 p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-3 border-b border-slate-400">
-              <div>
-                <span className="text-[10px] text-slate-500 font-semibold block uppercase">Registered Address :</span>
-                <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase">
-                  {purchase.supplierName}
-                </h2>
-                <p className="text-xs text-slate-700 font-medium max-w-md mt-0.5">
-                  {purchase.supplierAddress || 'INGOLE CHOWK MAIN ROAD WARDHA 442001 MAHARASHTRA INDIA'}
-                </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-800 mt-1 font-semibold">
-                  <span>Phone : {purchase.supplierPhone || '9766911693'}</span>
-                  <span>GSTIN/UIN : <strong className="font-mono">{purchase.supplierGstin || '27ABDPB8956C1ZS'}</strong></span>
-                  <span>State : MAHARASHTRA</span>
+          {/* Bill To & Ship To 2-Column Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 border-b border-black text-[10px]">
+            {/* Bill To */}
+            <div className="p-2 border-r border-black">
+              <p className="font-bold uppercase text-[10px] text-slate-800">
+                Bill To : <span className="font-black">{purchase.buyerName || `${settings.businessName}-LG-WARDHA[NEW]`}</span>
+              </p>
+              <p className="text-slate-700 mt-0.5">
+                {purchase.buyerAddress || settings.address || 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१'}
+              </p>
+              <p className="mt-1 text-slate-700">
+                <span className="font-bold">Phone :</span> {settings.phone || '8766486915 / 8600122798'}
+              </p>
+              <p className="text-slate-700">
+                <span className="font-bold">Email :</span> {settings.email || 'shubhamh3098@gmail.com'}
+              </p>
+              <p className="text-slate-700 font-mono mt-1">
+                <span className="font-bold font-sans">GSTIN/UIN :</span>{' '}
+                <span className="font-bold">{purchase.buyerGstin || settings.gstin || '27ALOPL0030G2ZC'}</span>
+              </p>
+              <p className="text-slate-700">
+                <span className="font-bold">State :</span> MAHARASHTRA
+              </p>
+            </div>
+
+            {/* Ship To & PO Info */}
+            <div className="p-2">
+              <p className="font-bold uppercase text-[10px] text-slate-800">
+                Ship To : <span className="font-black">{purchase.buyerName || `${settings.businessName}-LG-WARDHA[NEW]`}</span>
+              </p>
+              <p className="text-slate-700 mt-0.5">
+                {purchase.buyerAddress || settings.address || 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१'}
+              </p>
+              <p className="mt-1 text-slate-700">
+                <span className="font-bold">Phone :</span> {settings.phone || '8766486915 / 8600122798'}
+              </p>
+              <div className="mt-2 pt-1 border-t border-dashed border-slate-300 grid grid-cols-2 gap-1 text-[10px]">
+                <div>
+                  <span className="font-bold">PO No :</span>{' '}
+                  <span className="font-mono font-bold">{purchase.poNo || 'CSSO2526-00579'}</span>
                 </div>
-              </div>
-
-              <div className="text-right sm:min-w-[220px]">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-wide border-b-2 border-slate-900 pb-1 inline-block">
-                  Tax Invoice
-                </h1>
-                <div className="mt-2 space-y-1 text-xs text-slate-800">
-                  <div className="flex justify-between gap-2">
-                    <span className="font-bold">Tax Invoice :</span>
-                    <span className="font-black font-mono">{purchase.billNo}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="font-bold">Date :</span>
-                    <span className="font-semibold">{purchase.date}</span>
-                  </div>
-                  <div className="flex justify-between gap-2 text-[11px] text-slate-600">
-                    <span>Location :</span>
-                    <span>{purchase.location || 'LG DISTRIBUTION'}</span>
-                  </div>
-                  {purchase.salesConsultant && (
-                    <div className="flex justify-between gap-2 text-[11px] text-slate-600">
-                      <span>Sales Consultant :</span>
-                      <span>{purchase.salesConsultant}</span>
-                    </div>
-                  )}
-                  {purchase.approvedBy && (
-                    <div className="flex justify-between gap-2 text-[11px] text-slate-600">
-                      <span>Approved By :</span>
-                      <span>{purchase.approvedBy}</span>
-                    </div>
-                  )}
+                <div>
+                  <span className="font-bold">PO Date :</span>{' '}
+                  <span className="font-mono">{purchase.poDate || '23/02/2026'}</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Bill To & Ship To (Customer/Buyer = Shri Sai Enterprises) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 border-b border-slate-400">
-              <div className="border-r border-slate-300 pr-3">
-                <span className="font-bold text-slate-900 text-xs block mb-1">
-                  Bill To : <strong className="uppercase">{settings.businessName || 'SHRI SAI ENTERPRISES'}-LG-WARDHA[NEW]</strong>
-                </span>
-                <p className="text-xs text-slate-700">
-                  {settings.address || 'WARD NO 1, NEAR DATEY SABHAGRUH, ARVI ROAD, WARDHA 442001 MAHARASHTRA INDIA'}
-                </p>
-                <div className="mt-1 space-y-0.5 text-xs text-slate-800">
-                  <p>Phone : {settings.phone || '8600122978'}, {settings.additionalPhones?.[0] || '8766486915'}</p>
-                  <p>Email : {settings.email || 'shrisaienterprises@gmail.com'}</p>
-                  <p>GSTIN/UIN : <strong className="font-mono">{settings.gstin || '27ALOPL0030G2ZC'}</strong></p>
-                  <p>State : MAHARASHTRA | PAN : ALOPL0030G</p>
-                </div>
-              </div>
-
-              <div className="pl-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-bold text-slate-900 text-xs block mb-1">
-                      Ship To : <strong className="uppercase">{settings.businessName || 'SHRI SAI ENTERPRISES'}-LG-WARDHA[NEW]</strong>
-                    </span>
-                    <p className="text-xs text-slate-700">
-                      {settings.address || 'WARD NO 1, NEAR DATEY SABHAGRUH, ARVI ROAD, WARDHA 442001 MAHARASHTRA INDIA'}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-800">Phone : {settings.phone || '8600122978'}</p>
-                  </div>
-                  <div className="text-right text-xs bg-slate-50 p-2 rounded border border-slate-200 min-w-[130px]">
-                    <p className="font-bold text-slate-900">PO No : {purchase.poNo || 'CSSO2526-00579'}</p>
-                    <p className="text-slate-600">PO Date : {purchase.poDate || '23/02/2026'}</p>
-                    <p className="text-[10px] text-indigo-700 font-semibold mt-1">BP LESS 500 EXTRA</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Line Items Table */}
-            <div className="my-3 overflow-x-auto">
-              <table className="w-full border-collapse border border-slate-400 text-xs text-left">
-                <thead>
-                  <tr className="bg-slate-100 font-bold border-b border-slate-400 text-slate-900">
-                    <th className="p-2 border-r border-slate-400 text-center w-8">#</th>
-                    <th className="p-2 border-r border-slate-400">Description / Model</th>
-                    <th className="p-2 border-r border-slate-400 text-center w-20">HSN</th>
-                    <th className="p-2 border-r border-slate-400 text-center w-12">Qty</th>
-                    <th className="p-2 border-r border-slate-400 text-right w-20">Rate</th>
-                    <th className="p-2 border-r border-slate-400 text-right w-16">Discount</th>
-                    <th className="p-2 border-r border-slate-400 text-right w-24">Taxable</th>
-                    <th className="p-2 border-r border-slate-400 text-right w-20">Tax</th>
-                    <th className="p-2 text-right w-24">Amount</th>
+          {/* Main Items Table with Serial Numbers Under Row */}
+          <table className="w-full border-collapse border-b border-black text-[10px]">
+            <thead>
+              <tr className="border-b border-black bg-slate-100 font-bold text-center">
+                <th className="p-1.5 border-r border-black w-8">#</th>
+                <th className="p-1.5 border-r border-black text-left">Description</th>
+                <th className="p-1.5 border-r border-black w-20">HSN</th>
+                <th className="p-1.5 border-r border-black w-12">Qty</th>
+                <th className="p-1.5 border-r border-black w-18 text-right">Rate</th>
+                <th className="p-1.5 border-r border-black w-14 text-right">Discount</th>
+                <th className="p-1.5 border-r border-black w-20 text-right">Taxable</th>
+                <th className="p-1.5 border-r border-black w-16 text-right">Tax</th>
+                <th className="p-1.5 text-right w-22">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itemsList.map((item, idx) => (
+                <React.Fragment key={item.id || idx}>
+                  <tr className="border-b border-slate-200">
+                    <td className="p-1.5 border-r border-black text-center font-bold">{idx + 1}</td>
+                    <td className="p-1.5 border-r border-black font-bold uppercase">{item.description}</td>
+                    <td className="p-1.5 border-r border-black text-center font-mono">{item.hsn || '84182100'}</td>
+                    <td className="p-1.5 border-r border-black text-center font-bold">{item.qty}</td>
+                    <td className="p-1.5 border-r border-black text-right font-mono">{item.rate?.toLocaleString('en-IN')}</td>
+                    <td className="p-1.5 border-r border-black text-right font-mono">{item.discount || 0}</td>
+                    <td className="p-1.5 border-r border-black text-right font-mono font-bold">{item.taxableAmount?.toLocaleString('en-IN')}</td>
+                    <td className="p-1.5 border-r border-black text-right font-mono">{item.taxAmount?.toLocaleString('en-IN')}</td>
+                    <td className="p-1.5 text-right font-mono font-bold">{item.totalAmount?.toLocaleString('en-IN')}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((item, idx) => (
-                    <React.Fragment key={idx}>
-                      <tr className="border-b border-slate-300">
-                        <td className="p-2 border-r border-slate-400 text-center font-bold">{idx + 1}</td>
-                        <td className="p-2 border-r border-slate-400 font-black text-slate-900">
-                          <div>{item.description}</div>
-                          {item.modelNo && (
-                            <div className="text-[11px] text-indigo-700 font-mono font-bold mt-0.5">
-                              मॉडेल क्र. (Model No): {item.modelNo}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2 border-r border-slate-400 text-center font-mono">{item.hsn || '84182100'}</td>
-                        <td className="p-2 border-r border-slate-400 text-center font-bold">{item.quantity}</td>
-                        <td className="p-2 border-r border-slate-400 text-right font-mono font-semibold">
-                          {(item.rate || 0).toLocaleString()}
-                        </td>
-                        <td className="p-2 border-r border-slate-400 text-right font-mono">
-                          {(item.discount || 0).toLocaleString()}
-                        </td>
-                        <td className="p-2 border-r border-slate-400 text-right font-mono font-bold">
-                          {(item.taxableAmount || 0).toLocaleString()}
-                        </td>
-                        <td className="p-2 border-r border-slate-400 text-right font-mono">
-                          {((item.cgstAmount || 0) + (item.sgstAmount || 0)).toLocaleString()}
-                        </td>
-                        <td className="p-2 text-right font-mono font-black text-slate-900">
-                          {(item.totalAmount || 0).toLocaleString()}
-                        </td>
-                      </tr>
-                      {/* Serial Numbers / IMEI Row */}
-                      {item.serialNumbers && item.serialNumbers.length > 0 && (
-                        <tr className="border-b border-slate-400 bg-amber-50/40">
-                          <td className="p-1 border-r border-slate-400"></td>
-                          <td colSpan={8} className="p-2 font-mono text-[11px] text-slate-800">
-                            <span className="font-bold text-slate-900 mr-2">सिरीयल क्रमांक (Serial / IMEI Nos):</span>
-                            <span className="bg-white px-2 py-0.5 rounded border border-amber-300 font-bold text-indigo-950">
-                              {item.serialNumbers.join(', ')}
-                            </span>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
+                  
+                  {/* Serial Numbers / Barcodes row printed underneath item */}
+                  {item.serialNumbers && item.serialNumbers.length > 0 && (
+                    <tr className="border-b border-black bg-slate-50/70">
+                      <td className="p-1 border-r border-black"></td>
+                      <td colSpan={8} className="p-1 font-mono text-[9px] text-slate-800">
+                        <span className="font-bold text-slate-500 font-sans">Serial Nos:</span>{' '}
+                        <span className="font-bold tracking-wider">{item.serialNumbers.join(', ')}</span>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Tax Breakdown Table (Exact match to Manisha Enterprises Tax Detail block) */}
+          <div className="mt-2 border border-black">
+            <div className="bg-slate-100 border-b border-black px-2 py-0.5 font-bold text-[9px] uppercase">
+              Tax Detail
             </div>
+            <table className="w-full border-collapse text-[9px] text-center">
+              <thead>
+                <tr className="border-b border-black font-semibold">
+                  <th className="p-1 border-r border-black">HSN CODE</th>
+                  <th className="p-1 border-r border-black" colSpan={2}>CGST</th>
+                  <th className="p-1 border-r border-black" colSpan={2}>U/SGST</th>
+                  <th className="p-1 border-r border-black" colSpan={2}>IGST</th>
+                  <th className="p-1 border-r border-black">CESS</th>
+                  <th className="p-1">TOTAL TAX</th>
+                </tr>
+                <tr className="border-b border-black text-[8px] bg-slate-50">
+                  <th className="p-0.5 border-r border-black"></th>
+                  <th className="p-0.5 border-r border-black w-12">%</th>
+                  <th className="p-0.5 border-r border-black w-16">Amount</th>
+                  <th className="p-0.5 border-r border-black w-12">%</th>
+                  <th className="p-0.5 border-r border-black w-16">Amount</th>
+                  <th className="p-0.5 border-r border-black w-12">%</th>
+                  <th className="p-0.5 border-r border-black w-16">Amount</th>
+                  <th className="p-0.5 border-r border-black"></th>
+                  <th className="p-0.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="p-1 border-r border-black font-mono">84182100</td>
+                  <td className="p-1 border-r border-black font-mono">9.00 %</td>
+                  <td className="p-1 border-r border-black font-mono">{cgstTotal.toFixed(2)}</td>
+                  <td className="p-1 border-r border-black font-mono">9.00 %</td>
+                  <td className="p-1 border-r border-black font-mono">{sgstTotal.toFixed(2)}</td>
+                  <td className="p-1 border-r border-black font-mono">0.00 %</td>
+                  <td className="p-1 border-r border-black font-mono">0.00</td>
+                  <td className="p-1 border-r border-black font-mono">0.00</td>
+                  <td className="p-1 font-mono font-bold">{(cgstTotal + sgstTotal).toFixed(2)}</td>
+                </tr>
+                <tr className="border-t border-black font-bold bg-slate-50">
+                  <td className="p-1 border-r border-black">Total</td>
+                  <td className="p-1 border-r border-black"></td>
+                  <td className="p-1 border-r border-black font-mono">{cgstTotal.toFixed(2)}</td>
+                  <td className="p-1 border-r border-black"></td>
+                  <td className="p-1 border-r border-black font-mono">{sgstTotal.toFixed(2)}</td>
+                  <td className="p-1 border-r border-black"></td>
+                  <td className="p-1 border-r border-black font-mono">0.00</td>
+                  <td className="p-1 border-r border-black">0.00</td>
+                  <td className="p-1 font-mono">{(cgstTotal + sgstTotal).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-            {/* Tax Detail Breakdown Table (Matching HSN / CGST / SGST exactly) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-3 items-start">
-              <div className="border border-slate-400">
-                <div className="bg-slate-100 p-1.5 font-bold text-[11px] text-slate-900 border-b border-slate-400">
-                  Tax Detail (कराचा तपशील)
-                </div>
-                <table className="w-full text-[11px] text-left">
-                  <thead>
-                    <tr className="border-b border-slate-300 bg-slate-50 font-semibold">
-                      <th className="p-1.5 border-r border-slate-300">HSN CODE</th>
-                      <th className="p-1.5 border-r border-slate-300 text-center" colSpan={2}>CGST</th>
-                      <th className="p-1.5 border-r border-slate-300 text-center" colSpan={2}>U/SGST</th>
-                      <th className="p-1.5 text-right">TOTAL TAX</th>
-                    </tr>
-                    <tr className="border-b border-slate-400 text-[10px] text-slate-600 bg-slate-50">
-                      <th className="p-1 border-r border-slate-300"></th>
-                      <th className="p-1 text-center">%</th>
-                      <th className="p-1 border-r border-slate-300 text-right">रक्कम</th>
-                      <th className="p-1 text-center">%</th>
-                      <th className="p-1 border-r border-slate-300 text-right">रक्कम</th>
-                      <th className="p-1 text-right">₹</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-slate-300 font-mono">
-                      <td className="p-1.5 border-r border-slate-300 font-bold">84182100</td>
-                      <td className="p-1.5 text-center">9.00%</td>
-                      <td className="p-1.5 border-r border-slate-300 text-right">₹{cgst.toLocaleString()}</td>
-                      <td className="p-1.5 text-center">9.00%</td>
-                      <td className="p-1.5 border-r border-slate-300 text-right">₹{sgst.toLocaleString()}</td>
-                      <td className="p-1.5 text-right font-bold">₹{(cgst + sgst).toLocaleString()}</td>
-                    </tr>
-                  </tbody>
-                  <tfoot>
-                    <tr className="font-bold bg-slate-100 font-mono">
-                      <td className="p-1.5 border-r border-slate-300">एकूण कर (Total)</td>
-                      <td className="p-1.5 text-center">9%</td>
-                      <td className="p-1.5 border-r border-slate-300 text-right">₹{cgst.toLocaleString()}</td>
-                      <td className="p-1.5 text-center">9%</td>
-                      <td className="p-1.5 border-r border-slate-300 text-right">₹{sgst.toLocaleString()}</td>
-                      <td className="p-1.5 text-right font-black">₹{(cgst + sgst).toLocaleString()}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Subtotal, CGST, SGST, Total Calculation Card */}
-              <div className="border border-slate-400 divide-y divide-slate-300">
-                <div className="flex justify-between p-2">
-                  <span className="font-bold text-slate-700">Subtotal (करपात्र मूल्य) :</span>
-                  <span className="font-mono font-bold text-slate-900">₹{subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between p-2">
-                  <span className="text-slate-700">CGST (9%) :</span>
-                  <span className="font-mono text-slate-900">₹{cgst.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between p-2">
-                  <span className="text-slate-700">U/SGST (9%) :</span>
-                  <span className="font-mono text-slate-900">₹{sgst.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between p-2.5 bg-slate-900 text-white font-black text-sm">
-                  <span>TOTAL INVOICE (एकूण देय रक्कम) :</span>
-                  <span className="font-mono text-base">₹{purchase.totalAmount.toLocaleString()}</span>
-                </div>
-                <div className="p-2 text-[11px] text-slate-600 bg-slate-50 flex justify-between">
-                  <span>पेमेंट स्थिती: <strong className="text-emerald-700">{purchase.status}</strong> (मोड: {purchase.paymentMode})</span>
-                  <span>जमा: ₹{purchase.paidAmount.toLocaleString()}</span>
-                </div>
+          {/* Bank Details & Totals Summary Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 border border-black border-t-0 text-[10px]">
+            {/* Left: Bank details & Transporter */}
+            <div className="p-2 border-r border-black space-y-1">
+              <p className="font-bold uppercase text-[9px] text-slate-600">Supplier Bank Details:</p>
+              <p className="font-bold">A/C NAME : {purchase.supplierBank?.accountName || 'MANISHA ENTERPRISE'}</p>
+              <p className="font-mono">A/C NO. : {purchase.supplierBank?.accountNo || '108051000302'}</p>
+              <p className="font-mono">IFSC CODE : {purchase.supplierBank?.ifscCode || 'ICIC0001080'}</p>
+              <p>BANK : {purchase.supplierBank?.bankName || 'ICICI BANK'}, BRANCH : {purchase.supplierBank?.branch || 'SHIVAJI CHOWK, ARVI ROAD, WARDHA'}</p>
+              <div className="pt-2 mt-2 border-t border-dashed border-slate-300">
+                <span className="font-bold">Transporter :</span> {purchase.transporter || 'GENERAL TRANSPORT'}
+                {purchase.vehicleNo && <span> • Vehicle: {purchase.vehicleNo}</span>}
               </div>
             </div>
 
-            {/* Bank Details & Logistics Footer */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 border-t border-slate-400 text-xs">
-              <div className="space-y-1">
-                <span className="font-bold text-slate-900 uppercase block">वितरक बँक तपशील (Supplier Bank Details):</span>
-                <p className="font-mono font-bold text-slate-800">
-                  A/C NAME : {purchase.bankDetails?.accountName || 'MANISHA ENTERPRISE'}
-                </p>
-                <p className="font-mono font-bold text-slate-800">
-                  A/C NO. : {purchase.bankDetails?.accountNo || '108051000302'} | IFSC CODE : {purchase.bankDetails?.ifsc || 'ICIC0001080'}
-                </p>
-                <p className="text-slate-700">
-                  BANK : {purchase.bankDetails?.bankName || 'ICICI BANK, BRANCH : SHIVAJI CHOWK, ARVI ROAD, WARDHA'}
-                </p>
-                <div className="pt-2 text-[11px] text-slate-600 space-y-0.5">
-                  <p>Transporter : <strong>{purchase.transporter || 'GENERAL TRANSPORT'}</strong></p>
-                  <p className="font-mono truncate">IRN / Eway Bill : {purchase.ewayBillNo || '1157e72a690b8a5814ec191c0d6fc38f595d1ba078a40ccff9b91418bf4e10f4'}</p>
-                  <p>Ack Date : {purchase.ackDate || '2026-02-25 19:26:00'}</p>
-                </div>
+            {/* Right: Subtotal, CGST, SGST, Grand Total */}
+            <div className="divide-y divide-black">
+              <div className="flex justify-between p-1.5 font-bold">
+                <span>Subtotal (करपात्र रक्कम) :</span>
+                <span className="font-mono">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
-
-              {/* Declarations & Signatures */}
-              <div className="flex flex-col justify-between pt-1">
-                <div className="text-[10px] text-slate-600 space-y-0.5 border border-slate-200 p-2 rounded bg-slate-50">
-                  <span className="font-bold text-slate-800 block">Declaration & Terms:</span>
-                  <p>1) Received the above goods in good condition with registered serial numbers.</p>
-                  <p>2) Articles once sold will not be taken back without original packaging.</p>
-                  <p>3) Subject to Wardha / Nagpur Jurisdiction.</p>
+              <div className="flex justify-between p-1.5">
+                <span>CGST (९%) :</span>
+                <span className="font-mono">₹{Math.round(cgstTotal).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between p-1.5">
+                <span>U/SGST (९%) :</span>
+                <span className="font-mono">₹{Math.round(sgstTotal).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between p-2 font-black text-sm bg-slate-100">
+                <span>TOTAL INVOICE (एकूण देय) :</span>
+                <span className="font-mono">₹{grandTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between p-1.5 text-[10px] bg-emerald-50">
+                <span className="text-emerald-900 font-bold">रक्कम जमा (Paid) :</span>
+                <span className="font-mono font-bold text-emerald-800">₹{purchase.paidAmount.toLocaleString('en-IN')}</span>
+              </div>
+              {grandTotal - purchase.paidAmount > 0 && (
+                <div className="flex justify-between p-1.5 text-[10px] bg-rose-50">
+                  <span className="text-rose-900 font-bold">उर्वरित बाकी (Payable Due) :</span>
+                  <span className="font-mono font-black text-rose-700">₹{(grandTotal - purchase.paidAmount).toLocaleString('en-IN')}</span>
                 </div>
+              )}
+            </div>
+          </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-6 text-center text-xs">
-                  <div className="border-t border-slate-400 pt-1 font-bold text-slate-800">
-                    Customer Signature
-                    <span className="block text-[10px] font-normal text-slate-500">(Shri Sai Enterprises)</span>
-                  </div>
-                  <div className="border-t border-slate-400 pt-1 font-bold text-slate-800">
-                    Authorised Signatory
-                    <span className="block text-[10px] font-normal text-slate-500">For {purchase.supplierName}</span>
-                  </div>
-                </div>
+          {/* Footer Terms & Signatures */}
+          <div className="grid grid-cols-2 border border-black border-t-0 p-2 text-[9px]">
+            <div>
+              <p className="font-bold underline">Declaration :</p>
+              <p className="text-slate-600 mt-0.5">
+                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+              </p>
+              <ol className="list-decimal pl-3.5 mt-1 text-slate-500 space-y-0.2">
+                <li>Cheques are subject to realization</li>
+                <li>Received the above goods in good condition</li>
+                <li>Articles once sold will not be taken back</li>
+                <li>Subject to Wardha/Nagpur Jurisdiction</li>
+              </ol>
+            </div>
+
+            <div className="flex flex-col justify-between items-end text-right pl-4">
+              <p className="font-bold">For {purchase.supplierName || 'MANISHA ENTERPRISES'}</p>
+              <div className="pt-8">
+                <p className="border-t border-black font-bold pt-1 px-4">
+                  Authorised Signatory
+                </p>
               </div>
             </div>
           </div>
+
+          {/* Acknowledgement / IRN footer */}
+          <div className="mt-1 text-[8px] font-mono text-slate-500 flex justify-between">
+            <span>IRN : {purchase.irn || '1157e72a690b8a5814ec191c0d6fc38f595d1ba078a40ccff9b91418bf4e10f4'}</span>
+            <span>Ack Date : {purchase.date} 19:26:00</span>
+          </div>
+
         </div>
 
-        {/* Modal Bottom Footer Actions (Hidden on Print) */}
-        <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 flex items-center justify-between border-t border-slate-200 dark:border-slate-700 no-print">
-          <span className="text-xs text-slate-500">
-            ✓ अधिकृत जीएसटी खरेदी बीजक (Official GST Purchase Tax Invoice Format)
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              <span>प्रिंट इनव्हॉइस (Print)</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition cursor-pointer"
-            >
-              बंद करा (Close)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

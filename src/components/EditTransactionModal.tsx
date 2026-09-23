@@ -264,7 +264,11 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               <input
                 type="text"
                 value={formData.modelNumber || formData.model || ''}
-                onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value, model: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updatedItems = formData.itemsDetail?.map((it, i) => i === 0 ? { ...it, modelNumber: val } : it);
+                  setFormData({ ...formData, modelNumber: val, model: val, itemsDetail: updatedItems });
+                }}
                 placeholder="उदा. GL-B191KOWX, 43LM5600"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
               />
@@ -278,12 +282,61 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               <input
                 type="text"
                 value={formData.serialNumber || ''}
-                onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const updatedItems = formData.itemsDetail?.map((it, i) => i === 0 ? { ...it, serialNumber: val } : it);
+                  setFormData({ ...formData, serialNumber: val, itemsDetail: updatedItems });
+                }}
                 placeholder="उदा. 602NRZX294301 / IMEI"
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               />
             </div>
           </div>
+
+          {/* Detailed Items List if available */}
+          {formData.itemsDetail && formData.itemsDetail.length > 0 && (
+            <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block">
+                प्रत्येक वस्तूचे मॉडेल व सिरीयल नंबर (Individual Item Serials):
+              </span>
+              <div className="space-y-2">
+                {formData.itemsDetail.map((it, idx) => (
+                  <div key={idx} className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="sm:col-span-1">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">{it.productName}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">Qty: {it.quantity} | ₹{it.total.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Model No"
+                        value={it.modelNumber || ''}
+                        onChange={(e) => {
+                          const updated = [...(formData.itemsDetail || [])];
+                          updated[idx] = { ...updated[idx], modelNumber: e.target.value };
+                          setFormData({ ...formData, itemsDetail: updated, modelNumber: idx === 0 ? e.target.value : formData.modelNumber });
+                        }}
+                        className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Serial / IMEI"
+                        value={it.serialNumber || ''}
+                        onChange={(e) => {
+                          const updated = [...(formData.itemsDetail || [])];
+                          updated[idx] = { ...updated[idx], serialNumber: e.target.value };
+                          setFormData({ ...formData, itemsDetail: updated, serialNumber: idx === 0 ? e.target.value : formData.serialNumber });
+                        }}
+                        className="w-full px-2 py-1 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Financial Amounts Box */}
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">

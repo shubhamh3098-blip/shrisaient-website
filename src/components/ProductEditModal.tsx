@@ -61,7 +61,6 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (item) {
@@ -481,39 +480,19 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({
           {/* Action Buttons */}
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
             {isEditing && onDelete && (
-              confirmDelete ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (item) {
-                        onDelete(item.id);
-                        onClose();
-                      }
-                    }}
-                    className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    नक्की काढून टाका
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    className="text-xs text-slate-500 hover:text-slate-800 underline"
-                  >
-                    रद्द
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  काढून टाका
-                </button>
-              )
+              <button
+                type="button"
+                onClick={() => {
+                  if (item && window.confirm(`उत्पादन '${item.name}' कायमचे काढायचे आहे का?`)) {
+                    onDelete(item.id);
+                    onClose();
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                काढून टाका
+              </button>
             )}
 
             <div className="flex items-center gap-2 ml-auto">

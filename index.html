@@ -1,74 +1,85 @@
 <!doctype html>
-<html lang="en-IN">
+<html lang="en">
   <head>
-    <!-- React Fast Refresh Preamble (Required for @vitejs/plugin-react in Vite dev mode) -->
+    <meta charset="UTF-8" />
     <script>
-      window.$RefreshReg$ = window.$RefreshReg$ || function() {};
-      window.$RefreshSig$ = window.$RefreshSig$ || function() { return function(type) { return type; }; };
-      window.__vite_plugin_react_preamble_installed__ = true;
+      // Suppress benign [vite] websocket connection notices in AI Studio preview iframe
       (function() {
-        function isBenignNoise(val) {
-          if (!val) return false;
-          try {
-            const str = (typeof val === 'string')
-              ? val
-              : (val.message || val.reason || (val.error && val.error.message) || val.stack || String(val) || '');
-            const lower = str.toLowerCase();
-            return lower.includes('[vite]') ||
-                   lower.includes('vite-hmr') ||
-                   lower.includes('websocket closed without opened') ||
-                   lower.includes('failed to connect to websocket');
-          } catch (_) {
-            return false;
-          }
+        var _realConsole = window.console;
+        try {
+          Object.defineProperty(window, 'console', {
+            get: function() { return _realConsole; },
+            set: function(newVal) {
+              if (newVal && typeof newVal.error === 'function') {
+                var origError = newVal.error;
+                newVal.error = function() {
+                  var first = arguments[0];
+                  var text = typeof first === 'string' ? first : (first && first.message ? first.message : '');
+                  if (text.indexOf('[vite]') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('WebSocket') !== -1) {
+                    return;
+                  }
+                  return origError.apply(this, arguments);
+                };
+              }
+              _realConsole = newVal;
+            },
+            configurable: true
+          });
+        } catch (e) {}
+
+        if (window.console && window.console.error) {
+          var currErr = window.console.error;
+          window.console.error = function() {
+            var first = arguments[0];
+            var text = typeof first === 'string' ? first : (first && first.message ? first.message : '');
+            if (text.indexOf('[vite]') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('WebSocket') !== -1) {
+              return;
+            }
+            return currErr.apply(this, arguments);
+          };
         }
 
-        const _origErr = console.error;
-        console.error = function(...args) {
-          if (args.some(isBenignNoise)) return;
-          return _origErr.apply(console, args);
-        };
-
-        window.addEventListener('error', function(e) {
-          if (isBenignNoise(e.message) || isBenignNoise(e.error) || isBenignNoise(e)) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-          }
-        }, true);
-
-        window.addEventListener('unhandledrejection', function(e) {
-          const reason = e && (e.reason || e);
-          if (isBenignNoise(reason) || (reason && isBenignNoise(reason.message)) || (reason && isBenignNoise(reason.stack))) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-          }
-        }, true);
+        var _realOnError = null;
+        try {
+          Object.defineProperty(window, 'onerror', {
+            get: function() { return _realOnError; },
+            set: function(fn) {
+              _realOnError = function(message) {
+                var str = String(message || '');
+                if (str.indexOf('[vite]') !== -1 || str.indexOf('websocket') !== -1) {
+                  return true;
+                }
+                if (fn) return fn.apply(this, arguments);
+              };
+            },
+            configurable: true
+          });
+        } catch (e) {}
       })();
     </script>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
-    <title>Shri Sai Enterprises - Cash & Business Manager | Wardha</title>
-    <meta name="description" content="Shri Sai Enterprises, Wardha - Electronics & Furniture showroom, home appliances, 30-month savings scheme, and business billing ERP system for shrisaient.in" />
-    <meta name="keywords" content="Shri Sai Enterprises Wardha, electronics furniture showroom Wardha, sofa shop Wardha, double bed mattress Wardha, smart TV Wardha, refrigerator cooler Arvi road Wardha, 30 month savings scheme, shrisaient.in" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Shri Sai Enterprises - Cash & Business Manager</title>
+    <meta name="description" content="Shri Sai Enterprises, Wardha - Premium electronics, contemporary furniture showroom, and 30-month savings scheme management system." />
+    <meta name="keywords" content="Shri Sai Enterprises Wardha, electronics and furniture Wardha, sofa set Wardha, wooden bed Wardha, air coolers Wardha, smart TV Wardha, home appliances Arvi road Punjab Colony Wardha, 30 month savings scheme, shrisaient.in" />
     <link rel="canonical" href="https://shrisaient.in/" />
-
-    <!-- Google Fonts: Plus Jakarta Sans, Playfair Display & Cinzel -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://shrisaient.in/" />
-    <meta property="og:title" content="Shri Sai Enterprises - Cash & Business Manager | Wardha" />
-    <meta property="og:description" content="Shri Sai Enterprises, Wardha - Electronics & Furniture showroom, home appliances, 30-month savings scheme, and business billing ERP system for shrisaient.in" />
+    <meta property="og:title" content="Shri Sai Enterprises - Cash & Business Manager" />
+    <meta property="og:description" content="Shri Sai Enterprises, Wardha - Premium electronics, contemporary furniture showroom, and 30-month savings scheme management system." />
     <meta property="og:image" content="https://shrisaient.in/pwa-512x512.png" />
     <meta property="og:locale" content="en_IN" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Shri Sai Enterprises - Wardha Electronics & Furniture" />
-    <meta name="twitter:description" content="Wardha's top store for Electronics, Furniture, Coolers, Smart TVs, Sofas, Beds & 30-Month Savings Scheme. Phone: 8766486915." />
+    <meta name="twitter:title" content="Shri Sai Enterprises - Premium Electronics & Contemporary Furniture" />
+    <meta name="twitter:description" content="Wardha's top showroom for electronics, home appliances, teak furniture and 30-month savings scheme. Phone: 8766486915." />
+
+    <!-- Google Fonts: Inter (Latin Clean) & Noto Sans Devanagari / Rozha One for refined Marathi typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Yantramanav:wght@400;500;700;900&display=swap" rel="stylesheet" />
 
     <!-- Structured Data / JSON-LD for Google Local SEO & Google Business Profile -->
     <script type="application/ld+json">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Printer, Share2, X, CheckCircle2, Receipt, Banknote, Smartphone, Building2, User, Phone, MapPin, Calendar, FileText } from 'lucide-react';
 import { BusinessSettings, BillReceiptEntry } from '../types';
 import { AppLogo } from './AppLogo';
+import { getSafeWhatsAppUrl } from '../utils/numbering';
 
 interface AgainstBillReceiptModalProps {
   receipt: BillReceiptEntry | null;
@@ -52,8 +53,7 @@ export const AgainstBillReceiptModal: React.FC<AgainstBillReceiptModalProps> = (
       `धन्यवाद! श्री साई इंटरप्राइजेस, वर्धा`
     );
 
-    const phone = receipt.customerPhone ? receipt.customerPhone.replace(/[^0-9]/g, '') : '';
-    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    const url = getSafeWhatsAppUrl(receipt.customerPhone, text);
     window.open(url, '_blank');
   };
 

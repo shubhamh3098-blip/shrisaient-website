@@ -39,7 +39,7 @@ import { getNextReceiptNumber } from '../utils/numbering';
 import { CollectionSlipModal } from './CollectionSlipModal';
 import { CardPassbookModal } from './CardPassbookModal';
 
-export type FieldActionTab = 'card-collection' | 'card-ledger' | 'receipt' | 'new-card' | 'sales' | 'cash-refund' | 'ledger';
+export type FieldActionTab = 'card-collection' | 'card-ledger' | 'receipt' | 'new-card' | 'sales' | 'cash-refund' | 'ledger' | 'settle-khata';
 
 interface FieldStaffQuickActionsProps {
   isOpen: boolean;
@@ -47,6 +47,7 @@ interface FieldStaffQuickActionsProps {
   initialTab?: FieldActionTab;
   cardMembers: CardMember[];
   cardTransactions: CardTransaction[];
+  salesTransactions?: TransactionEntry[];
   customers: Customer[];
   stock: StockItem[];
   settings: BusinessSettings;
@@ -70,6 +71,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   initialTab = 'card-collection',
   cardMembers,
   cardTransactions = [],
+  salesTransactions = [],
   customers,
   stock,
   settings,
@@ -81,7 +83,16 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   onUpdateMember,
   onNavigateTab
 }) => {
-  const [activeTab, setActiveTab] = useState<FieldActionTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<FieldActionTab>(initialTab === 'settle-khata' ? 'receipt' : initialTab);
+
+  // Synchronize tab whenever initialTab or modal opens
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab === 'settle-khata' ? 'receipt' : initialTab);
+      setErrorNotice('');
+      setSuccessNotice('');
+    }
+  }, [initialTab, isOpen]);
 
   // Status message
   const [successNotice, setSuccessNotice] = useState<string>('');
@@ -101,8 +112,9 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   });
   const [collectionReceiptNo, setCollectionReceiptNo] = useState<string>('');
   const [collectionRemarks, setCollectionRemarks] = useState('');
+  const [isSubmittingWeekly, setIsSubmittingWeekly] = useState(false);
 
-  // Auto-calculate next receipt number (baseline 1078 -> 1079...)
+  // Auto-calculate next receipt number (CR-0001 series)
   useEffect(() => {
     setCollectionReceiptNo(getNextReceiptNumber(cardTransactions));
   }, [cardTransactions, selectedMember]);
@@ -233,6 +245,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   // -------------------------------------------------------------
   const [saleCustName, setSaleCustName] = useState('');
   const [saleCustPhone, setSaleCustPhone] = useState('');
+  const [isSaleCustDropdownOpen, setIsSaleCustDropdownOpen] = useState(false);
   const [saleItemDetails, setSaleItemDetails] = useState('');
   const [saleTotalAmount, setSaleTotalAmount] = useState<string>('');
   const [salePayingNow, setSalePayingNow] = useState<string>('');
@@ -242,6 +255,66 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
   const [selectedStockId, setSelectedStockId] = useState<string>('');
   const [stockSearch, setStockSearch] = useState<string>('');
   const [stockQty, setStockQty] = useState<number>(1);
+
+  // Search card members & customers in Field Sales tab
+  const filteredSaleCustomers = useMemo(() => {
+    const q = saleCustName.trim().toLowerCase();
+    if (!q) return [];
+    const list: Array<{
+      id: string;
+      name: string;
+      phone?: string;
+      village?: string;
+      isCard?: boolean;
+      cardNumber?: number;
+      schemeId?: CardSchemeId;
+      netBalance?: number;
+    }> = [];
+
+    for (const m of cardMembers) {
+      if (
+        (m.customerName && m.customerName.toLowerCase().includes(q)) ||
+        (m.cardNumber && m.cardNumber.toString().includes(q)) ||
+        (m.phone && m.phone.includes(q)) ||
+        (m.village && m.village.toLowerCase().includes(q))
+      ) {
+        list.push({
+          id: m.id,
+          name: m.customerName,
+          phone: m.phone,
+          village: m.village,
+          isCard: true,
+          cardNumber: m.cardNumber,
+          schemeId: m.schemeId,
+          netBalance: m.netBalance,
+        });
+        if (list.length >= 15) break;
+      }
+    }
+
+    for (const c of customers) {
+      if (
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q))
+      ) {
+        const already = list.some((x) => x.name.toLowerCase() === c.name.toLowerCase());
+        if (!already) {
+          list.push({
+            id: c.id,
+            name: c.name,
+            phone: c.phone,
+            village: c.village,
+            isCard: false,
+            cardNumber: c.linkedCardNumber,
+            schemeId: c.linkedSchemeId,
+          });
+          if (list.length >= 25) break;
+        }
+      }
+    }
+
+    return list.slice(0, 15);
+  }, [saleCustName, cardMembers, customers]);
 
   // -------------------------------------------------------------
   // 3. RECEIPT / PAYMENT IN (उधार वसूली पावती)
@@ -390,6 +463,8 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
     setErrorNotice('');
     setSuccessNotice('');
 
+    if (isSubmittingWeekly) return;
+
     if (!selectedMember) {
       setErrorNotice('कृपया सदस्य कार्ड निवडा किंवा सर्च करा');
       return;
@@ -399,6 +474,8 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
       setErrorNotice('कृपया योग्य हफ्ता रक्कम टाका');
       return;
     }
+
+    setIsSubmittingWeekly(true);
 
     // Auto-save member detail updates if edited during weekly collection
     const finalCustomerName = editCustomerName.trim() || selectedMember.customerName;
@@ -474,6 +551,9 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
     setSelectedMember(null);
     setCardSearch('');
     setCollectionRemarks('');
+    setTimeout(() => {
+      setIsSubmittingWeekly(false);
+    }, 1000);
   };
 
   // Handle New Card Registration Submit (नवीन कार्ड नोंदणी)
@@ -1209,25 +1289,38 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
 
                   {/* Fast Amount Selector Buttons */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      हफ्ता रक्कम (Installment Amount ₹) *
-                    </label>
-                    <div className="grid grid-cols-4 gap-2 mb-2">
-                      {[100, 200, 500, 1000].map((amt) => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setCollectionAmount(amt)}
-                          className={`py-2 rounded-xl font-black text-xs transition cursor-pointer ${
-                            collectionAmount === amt
-                              ? 'bg-amber-400 text-slate-950 shadow-sm'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          ₹{amt}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        हफ्ता रक्कम (Installment Amount ₹) *
+                      </label>
+                      <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                        निवडलेली रक्कम: ₹{collectionAmount.toLocaleString('en-IN')}
+                      </span>
                     </div>
+
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      {[100, 200, 500, 1000].map((amt) => {
+                        const isSelected = collectionAmount === amt;
+                        return (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setCollectionAmount(amt)}
+                            className={`py-2.5 px-1 rounded-xl font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border touch-manipulation active:scale-95 ${
+                              isSelected
+                                ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-md ring-2 ring-amber-400/60 font-black'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span className="text-sm">₹{amt}</span>
+                            {isSelected && (
+                              <span className="text-[9px] font-bold text-slate-900 leading-none">✓ फिक्स</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     <input
                       type="number"
                       value={collectionAmount || ''}
@@ -1242,16 +1335,17 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        पावती क्र. (Receipt No) *
+                        पावती क्र. (Receipt No - कार्ड सिरीज) *
                       </label>
                       <input
                         type="text"
                         required
                         value={collectionReceiptNo}
                         onChange={(e) => setCollectionReceiptNo(e.target.value)}
-                        placeholder="1079"
+                        placeholder="CR-0001"
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold font-mono text-emerald-700 bg-white"
                       />
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">स्वतंत्र कार्ड सिरीज (CR-xxxx)</span>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1299,10 +1393,24 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 cursor-pointer active:scale-98 transition"
+                      disabled={isSubmittingWeekly}
+                      className={`w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 transition ${
+                        isSubmittingWeekly
+                          ? 'opacity-70 cursor-not-allowed scale-98'
+                          : 'cursor-pointer active:scale-98'
+                      }`}
                     >
-                      <CheckCircle2 className="w-5 h-5 text-slate-950" />
-                      <span>हफ्ता पावती जतन करा (₹{collectionAmount})</span>
+                      {isSubmittingWeekly ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                          <span>हफ्ता पावती जतन होत आहे...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-slate-950" />
+                          <span>हफ्ता पावती जतन करा (₹{collectionAmount})</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1532,7 +1640,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
 
               {/* Customer details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+                <div className="relative">
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     ग्राहकाचे नाव (Customer Name) *
                   </label>
@@ -1540,10 +1648,45 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
                     type="text"
                     required
                     value={saleCustName}
-                    onChange={(e) => setSaleCustName(e.target.value)}
-                    placeholder="उदा. Ramesh Patil"
+                    onChange={(e) => {
+                      setSaleCustName(e.target.value);
+                      setIsSaleCustDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsSaleCustDropdownOpen(true)}
+                    placeholder="उदा. Ramesh Patil किंवा कार्ड नं"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {isSaleCustDropdownOpen && saleCustName.length > 0 && filteredSaleCustomers.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                      {filteredSaleCustomers.map((cust) => (
+                        <div
+                          key={cust.id}
+                          onClick={() => {
+                            setSaleCustName(cust.name);
+                            if (cust.phone) setSaleCustPhone(cust.phone);
+                            if (cust.cardNumber && cust.schemeId) {
+                              setSaleLinkedScheme(cust.schemeId);
+                              setSaleLinkedCardNo(cust.cardNumber.toString());
+                            }
+                            setIsSaleCustDropdownOpen(false);
+                          }}
+                          className="p-2 hover:bg-blue-50 cursor-pointer text-xs flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-800">{cust.name}</span>
+                            <span className="text-[10px] text-slate-500 block">
+                              {cust.phone ? `फोन: ${cust.phone}` : ''}{cust.village ? ` | ${cust.village}` : ''}
+                            </span>
+                          </div>
+                          {cust.isCard && (
+                            <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                              कार्ड #{cust.cardNumber}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2659,6 +2802,7 @@ export const FieldStaffQuickActions: React.FC<FieldStaffQuickActionsProps> = ({
         <CardPassbookModal
           member={activePassbookModal}
           transactions={cardTransactions}
+          salesTransactions={salesTransactions}
           settings={settings}
           onClose={() => setActivePassbookModal(null)}
         />

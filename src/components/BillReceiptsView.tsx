@@ -62,6 +62,7 @@ export const BillReceiptsView: React.FC<BillReceiptsViewProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('Shubham Shende');
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-fill customer balance & pending bills when customer is selected
   const selectedCustomer = useMemo(() => {
@@ -99,6 +100,7 @@ export const BillReceiptsView: React.FC<BillReceiptsViewProps> = ({
 
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!selectedCustomer) {
@@ -110,6 +112,8 @@ export const BillReceiptsView: React.FC<BillReceiptsViewProps> = ({
       setFormError('कृपया वैध जमा रक्कम टाका (Please enter a valid amount paid)');
       return;
     }
+
+    setIsSubmitting(true);
 
     const cleanReceiptNo = receiptNo.trim() || nextReceiptNo;
 
@@ -135,6 +139,9 @@ export const BillReceiptsView: React.FC<BillReceiptsViewProps> = ({
     setShowNewReceiptModal(false);
     // Directly open print modal for the saved receipt!
     setActiveReceiptForModal(newReceipt);
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 600);
   };
 
   // Today & Yesterday dates
@@ -837,11 +844,14 @@ export const BillReceiptsView: React.FC<BillReceiptsViewProps> = ({
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   id="btn-submit-save-bill-receipt"
-                  className="px-5 py-2.5 rounded-xl bg-[#00523f] hover:bg-[#004232] text-white font-bold text-xs shadow-md shadow-[#00523f]/20 flex items-center gap-2 cursor-pointer active:scale-95"
+                  className={`px-5 py-2.5 rounded-xl bg-[#00523f] hover:bg-[#004232] text-white font-bold text-xs shadow-md shadow-[#00523f]/20 flex items-center gap-2 transition ${
+                    isSubmitting ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-95'
+                  }`}
                 >
                   <Receipt className="w-4 h-4" />
-                  <span>पावती जतन करा व प्रिंट करा (Save & Print)</span>
+                  <span>{isSubmitting ? 'पावती जतन होत आहे...' : 'पावती जतन करा व प्रिंट करा (Save & Print)'}</span>
                 </button>
               </div>
             </form>

@@ -18,9 +18,13 @@ import {
   User,
   UserCheck,
   Wallet,
-  X
+  X,
+  Target,
+  BarChart3,
+  CheckCircle2,
+  TrendingDown
 } from 'lucide-react';
-import { CardMember, CardTransaction, AgentAdvance, BusinessSettings } from '../types';
+import { CardMember, CardTransaction, AgentAdvance, BusinessSettings, TransactionEntry } from '../types';
 import { calculateAgentEarnings, DayWiseCollectionSummary } from '../utils/numbering';
 
 interface AgentCommissionViewProps {
@@ -31,6 +35,7 @@ interface AgentCommissionViewProps {
   onRecordAdvance: (advance: Omit<AgentAdvance, 'id' | 'createdAt'>) => void;
   currentAgentFilter?: string;
   onRefreshSync?: () => void;
+  salesTransactions?: TransactionEntry[];
 }
 
 export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
@@ -41,6 +46,7 @@ export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
   onRecordAdvance,
   currentAgentFilter = '',
   onRefreshSync,
+  salesTransactions = [],
 }) => {
   // Discover all unique agents across transactions, members, advances and the 4 core agents
   const allAgentNames = useMemo(() => {
@@ -81,8 +87,55 @@ export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
-  // Active view tab inside dashboard: 'daywise' | 'newcards' | 'advances'
-  const [activeSubTab, setActiveSubTab] = useState<'daywise' | 'newcards' | 'advances'>('daywise');
+  // Active view tab inside dashboard: 'daywise' | 'newcards' | 'advances' | 'sales-targets'
+  const [activeSubTab, setActiveSubTab] = useState<'daywise' | 'newcards' | 'advances' | 'sales-targets'>('daywise');
+
+  // Sales Performance by Staff / Agent
+  const salesPerformanceData = useMemo(() => {
+    const defaultMonthlyTarget = 200000; // default ₹2,00,000 monthly sales target
+
+    const list = Array.from(allAgentNames).map((name: string) => {
+      // Find store sales transactions where agentName matches
+      const agentSales = (salesTransactions || []).filter((t) => {
+        const agName = (t.agentName || '').trim().toLowerCase();
+        const targetName = String(name).trim().toLowerCase();
+        return agName === targetName || (name === 'Shubham Shende' && !t.agentName);
+      });
+
+      const totalRevenue = agentSales.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+      const totalOrdersCount = agentSales.length;
+      const salesIncentive = Math.round(totalRevenue * 0.01); // 1% showroom sales incentive
+
+      // Card Scheme stats for this agent
+      const agentCards = (cardMembers || []).filter(
+        (m) => (m.agentName || '').trim().toLowerCase() === String(name).trim().toLowerCase()
+      );
+      const agentTxs = (cardTransactions || []).filter(
+        (tx) => (tx.agentName || '').trim().toLowerCase() === String(name).trim().toLowerCase() && tx.type === 'WeeklyPayment'
+      );
+      const collectionAmount = agentTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      const collectionCommission = Math.round(collectionAmount * 0.04); // 4% scheme commission
+
+      const targetProgress = Math.min(100, Math.round((totalRevenue / defaultMonthlyTarget) * 100));
+      const totalCombinedEarnings = salesIncentive + collectionCommission;
+
+      return {
+        name,
+        totalRevenue,
+        totalOrdersCount,
+        salesIncentive,
+        activeCardsCount: agentCards.length,
+        collectionAmount,
+        collectionCommission,
+        monthlyTarget: defaultMonthlyTarget,
+        targetProgress,
+        totalCombinedEarnings,
+        sales: agentSales,
+      };
+    });
+
+    return list.sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }, [allAgentNames, salesTransactions, cardMembers, cardTransactions]);
 
   // Day detail modal / expanded state
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -451,6 +504,18 @@ export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
             <Wallet className="w-3.5 h-3.5" />
             ॲडव्हान्स हिशोब ({stats.advancesList.length} नोंदी = -₹{stats.advancePaid})
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('sales-targets')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeSubTab === 'sales-targets'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            विक्री टार्गेट व कामगिरी (Sales & Targets)
+          </button>
         </div>
 
         {/* TAB 1: DAYWISE MONITOR */}
@@ -717,9 +782,287 @@ export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
             )}
           </div>
         )}
+
+        {/* TAB 4: SALES TARGETS & STAFF PERFORMANCE */}
+        {activeSubTab === 'sales-targets' && (
+          <div className="p-4 sm:p-6 space-y-6">
+            {/* Header & Quick Action */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Target className="w-5 h-5 text-indigo-500" />
+                  कर्मचारी विक्री टार्गेट व कामगिरी डॅशबोर्ड (Sales & Target Dashboard)
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  शोरूममधील प्रत्यक्ष विक्री (Showroom Sales) + ३०-महिने बचत योजना वसुली (Card Collections) चा एकत्रित अहवाल
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const currentPerf = salesPerformanceData.find(
+                    (p) => p.name.toLowerCase() === selectedAgent.toLowerCase()
+                  ) || salesPerformanceData[0];
+                  if (!currentPerf) return;
+
+                  const text =
+                    `🎯 *श्री साई एंटरप्रायझेस, वर्धा - कर्मचारी कामगिरी व टार्गेट अहवाल*\n\n` +
+                    `👤 *कर्मचारी:* ${currentPerf.name}\n` +
+                    `📅 *कालावधी:* चालू महिना\n` +
+                    `🏬 *शोरूम विक्री महसूल:* ₹${currentPerf.totalRevenue.toLocaleString('en-IN')} (${currentPerf.totalOrdersCount} ऑर्डर्स)\n` +
+                    `🎯 *मासिक विक्री टार्गेट:* ₹${currentPerf.monthlyTarget.toLocaleString('en-IN')}\n` +
+                    `📊 *टार्गेट पूर्तता:* ${currentPerf.targetProgress}%\n` +
+                    `💰 *विक्री इन्सेंटिव्ह (1%):* ₹${currentPerf.salesIncentive.toLocaleString('en-IN')}\n` +
+                    `💳 *३०-महिने योजना वसुली:* ₹${currentPerf.collectionAmount.toLocaleString('en-IN')}\n` +
+                    `💎 *योजना कमिशन (4%):* ₹${currentPerf.collectionCommission.toLocaleString('en-IN')}\n` +
+                    `━━━━━━━━━━━━━━━━━\n` +
+                    `💵 *एकूण एकत्रित कमाई (Total Earnings):* ₹${currentPerf.totalCombinedEarnings.toLocaleString('en-IN')}\n\n` +
+                    `_Shri Sai Enterprises ERP System_`;
+
+                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>WhatsApp वर कामगिरी पाठवा</span>
+              </button>
+            </div>
+
+            {/* Target & Incentive KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-1">
+                  <span className="text-xs font-bold">शोरूम विक्री महसूल</span>
+                  <BarChart3 className="w-4 h-4 text-indigo-500" />
+                </div>
+                <p className="text-xl font-black text-slate-900 dark:text-white">
+                  ₹{salesPerformanceData.reduce((sum, p) => sum + p.totalRevenue, 0).toLocaleString('en-IN')}
+                </p>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  सर्व कर्मचाऱ्यांचे मिळून {salesPerformanceData.reduce((sum, p) => sum + p.totalOrdersCount, 0)} ऑर्डर्स
+                </span>
+              </div>
+
+              <div className="bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/60 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-indigo-600 dark:text-indigo-400 mb-1">
+                  <span className="text-xs font-bold">विक्री इन्सेंटिव्ह (1%)</span>
+                  <Award className="w-4 h-4 text-indigo-600" />
+                </div>
+                <p className="text-xl font-black text-indigo-700 dark:text-indigo-300">
+                  ₹{salesPerformanceData.reduce((sum, p) => sum + p.salesIncentive, 0).toLocaleString('en-IN')}
+                </p>
+                <span className="text-[11px] text-indigo-600/70 dark:text-indigo-400/70 mt-1 block">
+                  थेट शोरूम विक्रीवरील अतिरिक्त कमिशन
+                </span>
+              </div>
+
+              <div className="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+                  <span className="text-xs font-bold">३०-महिने योजना वसुली</span>
+                  <CreditCard className="w-4 h-4 text-emerald-600" />
+                </div>
+                <p className="text-xl font-black text-emerald-700 dark:text-emerald-300">
+                  ₹{salesPerformanceData.reduce((sum, p) => sum + p.collectionAmount, 0).toLocaleString('en-IN')}
+                </p>
+                <span className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-1 block">
+                  कमिशन (4%): ₹{salesPerformanceData.reduce((sum, p) => sum + p.collectionCommission, 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div className="bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-1">
+                  <span className="text-xs font-bold">मासिक टार्गेट बेंचमार्क</span>
+                  <Target className="w-4 h-4 text-amber-600" />
+                </div>
+                <p className="text-xl font-black text-amber-700 dark:text-amber-300">
+                  ₹2,00,000 / कर्मचारी
+                </p>
+                <span className="text-[11px] text-amber-600/70 dark:text-amber-400/70 mt-1 block">
+                  टार्गेट पूर्ण झाल्यावर विशेष मासिक बोनस
+                </span>
+              </div>
+            </div>
+
+            {/* Staff Performance Comparison Leaderboard */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-500" />
+                  कर्मचारी विक्री व कमिशन लीडरबोर्ड (Staff Performance Comparison)
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {salesPerformanceData.length} प्रतिनिधी कार्यरत
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4 w-12 text-center">रँक</th>
+                      <th className="py-3 px-4">कर्मचारी नाव</th>
+                      <th className="py-3 px-4 text-right">शोरूम विक्री</th>
+                      <th className="py-3 px-4 text-right">विक्री इन्सेंटिव्ह (1%)</th>
+                      <th className="py-3 px-4 text-right">योजना वसुली (4%)</th>
+                      <th className="py-3 px-4 min-w-[180px]">टार्गेट प्रगती (Target %): ₹2 लाख</th>
+                      <th className="py-3 px-4 text-right text-indigo-600 dark:text-indigo-400 font-bold">
+                        एकूण पेआउट कमाई
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {salesPerformanceData.map((perf, idx) => {
+                      const isSelected = perf.name.toLowerCase() === selectedAgent.toLowerCase();
+                      return (
+                        <tr
+                          key={perf.name}
+                          className={`transition ${
+                            isSelected
+                              ? 'bg-indigo-50/50 dark:bg-indigo-950/30 font-semibold'
+                              : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
+                          }`}
+                        >
+                          <td className="py-3 px-4 text-center font-bold">
+                            {idx === 0 ? (
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 text-xs font-black">
+                                🥇 1
+                              </span>
+                            ) : idx === 1 ? (
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 text-xs font-black">
+                                🥈 2
+                              </span>
+                            ) : idx === 2 ? (
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-800 dark:text-amber-300 text-xs font-black">
+                                🥉 3
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono">#{idx + 1}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAgent(perf.name)}
+                              className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 text-left block cursor-pointer"
+                            >
+                              {perf.name}
+                            </button>
+                            <span className="text-[10px] text-slate-400">
+                              {perf.totalOrdersCount} स्टोअर ऑर्डर्स • {perf.activeCardsCount} कार्ड ग्राहक
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                            ₹{perf.totalRevenue.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-indigo-600 dark:text-indigo-400 font-bold">
+                            ₹{perf.salesIncentive.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                            ₹{perf.collectionCommission.toLocaleString('en-IN')}
+                            <span className="block text-[10px] text-slate-400">
+                              (₹{perf.collectionAmount.toLocaleString('en-IN')})
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">
+                                  {perf.targetProgress}%
+                                </span>
+                                <span className="text-slate-400 text-[10px]">
+                                  ₹{perf.totalRevenue.toLocaleString('en-IN')} / ₹{perf.monthlyTarget.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    perf.targetProgress >= 100
+                                      ? 'bg-emerald-500'
+                                      : perf.targetProgress >= 50
+                                      ? 'bg-indigo-500'
+                                      : 'bg-amber-500'
+                                  }`}
+                                  style={{ width: `${perf.targetProgress}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-black text-sm text-indigo-700 dark:text-indigo-300">
+                            ₹{perf.totalCombinedEarnings.toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Selected Agent Store Sales Breakdown */}
+            {(() => {
+              const currentPerf = salesPerformanceData.find(
+                (p) => p.name.toLowerCase() === selectedAgent.toLowerCase()
+              );
+              if (!currentPerf || !currentPerf.sales || currentPerf.sales.length === 0) {
+                return (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
+                    <p>
+                      <strong>{selectedAgent}</strong> यांनी नोंदवलेल्या थेट शोरूम विक्री पावत्या उपलब्ध नाहीत.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden p-4 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    {selectedAgent} - नोंदवलेल्या थेट स्टोअर विक्री पावत्या ({currentPerf.sales.length})
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                          <th className="py-2 px-3">पावती क्र.</th>
+                          <th className="py-2 px-3">तारीख</th>
+                          <th className="py-2 px-3">ग्राहक</th>
+                          <th className="py-2 px-3">वस्तू / तपशील</th>
+                          <th className="py-2 px-3 text-right">रक्कम</th>
+                          <th className="py-2 px-3 text-right text-indigo-600 dark:text-indigo-400 font-bold">1% इन्सेंटिव्ह</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {currentPerf.sales.slice(0, 10).map((s) => (
+                          <tr key={s.id}>
+                            <td className="py-2 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
+                              {s.invoiceNo}
+                            </td>
+                            <td className="py-2 px-3 text-slate-500">{s.date}</td>
+                            <td className="py-2 px-3 font-medium text-slate-900 dark:text-white">
+                              {s.customerName}
+                            </td>
+                            <td className="py-2 px-3 text-slate-600 dark:text-slate-400">
+                              {s.items?.map((i) => i.name).join(', ') || 'इलेक्ट्रॉनिक्स/फर्निचर'}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold">
+                              ₹{(s.totalAmount || 0).toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                              ₹{Math.round((s.totalAmount || 0) * 0.01).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
-      {/* MODAL: ADD ADVANCE */}
       {showAdvanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-5 sm:p-6 shadow-2xl">

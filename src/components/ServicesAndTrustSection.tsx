@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
   Tv,
-  Wind,
-  Zap,
-  Wrench,
+  Sofa,
+  Sparkles,
   Truck,
   ShieldCheck,
   Star,
@@ -12,14 +11,8 @@ import {
   MessageCircle,
   MapPin,
   Clock,
-  FileText,
-  Send,
-  Sparkles,
-  ExternalLink,
   ChevronRight,
-  HelpCircle,
   Award,
-  Users,
   Building2,
   X
 } from 'lucide-react';
@@ -31,14 +24,12 @@ interface ServicesAndTrustSectionProps {
 
 interface ServiceItem {
   id: string;
-  nameMr: string;
-  nameEn: string;
+  name: string;
   category: string;
   icon: React.ElementType;
   description: string;
   advantages: string[];
   pricingHint: string;
-  sampleItems: string;
 }
 
 export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = ({
@@ -47,7 +38,7 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
   // 3-Step Simple Enquiry Form state
   const [enquiryName, setEnquiryName] = useState('');
   const [enquiryPhone, setEnquiryPhone] = useState('');
-  const [enquiryService, setEnquiryService] = useState('कूलर किंवा इलेक्ट्रॉनिक्स खरेदी (New Purchase)');
+  const [enquiryService, setEnquiryService] = useState('Contemporary Furniture (Sofa / Bed / Dining)');
   const [enquiryNotes, setEnquiryNotes] = useState('');
   const [enquirySubmitted, setEnquirySubmitted] = useState(false);
 
@@ -56,154 +47,130 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
 
   const services: ServiceItem[] = [
     {
-      id: 'appliances-sales',
-      nameMr: 'घरगुती इलेक्ट्रॉनिक्स व कुलर विक्री',
-      nameEn: 'Home Appliances & Air Coolers',
-      category: 'Sales & Free Delivery',
-      icon: Wind,
+      id: 'furniture-collection',
+      name: 'Contemporary Furniture Studio',
+      category: 'Solid Teak & Sheesham',
+      icon: Sofa,
       description:
-        'सर्व नामांकित कंपन्यांचे हेवी-ड्युटी कुलर, स्मार्ट एलईडी टीव्ही, सिंगल व डबल डोअर फ्रिज, वॉशिंग मशीन आणि सीलिंग फॅन उपलब्ध.',
+        'Designer living room sofas, ergonomic king-size hydraulic beds, 6-seater dining sets, and multi-door wardrobes crafted for durability and timeless elegance.',
       advantages: [
-        'वर्धा शहर व परिसरात विनामूल्य होम डिलिव्हरी (Free Delivery)',
-        'अधिकृत कंपनी वॉरंटी व पक्के जीएसटी बिल',
-        'होलसेल व वाजवी रीटेल दर',
+        'Seasoned teak and Sheesham wood with termite protection',
+        'High-density resilient foam with stain-resistant fabrics',
+        'Complimentary room delivery & professional assembly',
       ],
-      pricingHint: 'थेट रिटेल व स्कीम डिस्काउंट उपलब्ध',
-      sampleItems: 'कूलर, स्मार्ट TV, फ्रिज, फॅन, मिक्सर',
+      pricingHint: 'Direct showroom pricing & custom sizing',
+    },
+    {
+      id: 'appliances-sales',
+      name: 'Smart Electronics & Home Appliances',
+      category: 'Authorised Retailer',
+      icon: Tv,
+      description:
+        '4K Ultra HD Smart Google TVs, 5-Star inverter frost-free refrigerators, heavy-duty honeycomb air coolers, and front/top load washing machines.',
+      advantages: [
+        '100% genuine brand warranty with tax invoice',
+        'Free home delivery across Wardha and Arvi region',
+        'Zero-cost replacement assistance during warranty',
+      ],
+      pricingHint: 'Special retail & festive bundle discounts',
     },
     {
       id: 'savings-scheme',
-      nameMr: '३०-महिने साप्ताहिक बचत कार्ड योजना',
-      nameEn: '30-Month Weekly Savings Scheme',
-      category: 'Weekly Lucky Draw Hub',
+      name: '30-Month Weekly Passbook Scheme',
+      category: 'Guaranteed Delivery & Draws',
       icon: Sparkles,
       description:
-        'प्रत्येक आठवड्याला छोटी बचत करा आणि ३० महिन्यांत आपल्या स्वप्नातील ब्रँडेड टीव्ही, फ्रिज किंवा कुलर निश्चित मिळवा.',
+        'Save small convenient amounts weekly over 30 months. Track your real-time digital passbook online, participate in weekly lucky draws, and take home guaranteed major appliances.',
       advantages: [
-        'अल्प नोंदणी शुल्क व सुलभ साप्ताहिक हप्ते',
-        'डिजिटल ऑनलाइन पासबुक - हप्ता भरल्याची त्वरित पावती',
-        'लकी ड्रॉ मध्ये बंपर गिफ्ट्स जिंकण्याची सुवर्णसंधी',
+        'Low initial registration fee with weekly deposit flexibility',
+        'Instant digital receipts and 24/7 online passbook tracker',
+        'Guaranteed appliance handover upon term completion',
       ],
-      pricingHint: 'योजना १, २ व ३ (Cards 1 ते 2000)',
-      sampleItems: 'योजना १ (₹१५०), योजना २ (₹१००), योजना ३ (₹२००)',
+      pricingHint: 'Schemes starting from ₹100 / week',
     },
     {
-      id: 'electrical-wiring',
-      nameMr: 'इलेक्ट्रिकल वायरिंग व कॉन्ट्रॅक्टिंग',
-      nameEn: 'Residential & Commercial Wiring',
-      category: 'Installation & Fitting',
-      icon: Zap,
+      id: 'custom-interior',
+      name: 'White-Glove Delivery & Corporate Supply',
+      category: 'Care & Assembly',
+      icon: Truck,
       description:
-        'नवीन घरे, दुकाने, हॉस्पिटल्स आणि गोदामांचे संपूर्ण कन्सिल्ड वायरिंग, एमसीबी पॅनेल, अर्थिंग आणि इन्व्हर्टर फिटिंग.',
+        'End-to-end delivery logistics, unboxing, on-site assembly, and turnkey electronic/furniture supply for residential homes, offices, and builder projects.',
       advantages: [
-        'अनुभवी व कुशल वायरमन टीम',
-        'Polycab, Anchor व Finolex चे ओरिजिनल मटेरियल',
-        'अचूक वेळेत सुरक्षित काम पूर्ण करण्याची हमी',
+        'Safe doorstep transport with blanket-padded handling',
+        'Trained technicians for TV mounting & furniture setup',
+        'GST input credit for corporate & contractor bulk purchases',
       ],
-      pricingHint: 'जागेवर मोफत साईट व्हिजिट व कोटेशन',
-      sampleItems: 'कन्सिल्ड वायरिंग, MCB फिटिंग, अर्थिंग',
-    },
-    {
-      id: 'appliance-repair',
-      nameMr: 'कूलर व फॅन दुरुस्ती व देखभाल',
-      nameEn: 'Cooler & Appliance Repair Service',
-      category: 'Maintenance & Spares',
-      icon: Wrench,
-      description:
-        'उन्हाळ्यात कुलर सर्व्हिसिंग, नवीन पॅड्स बसवणे, सबमर्सिबल वॉटर पंप, फॅन मोटर वाइंडिंग आणि इलेक्ट्रिकल उपकरण दुरुस्ती.',
-      advantages: [
-        'ओरिजिनल स्पेअर पार्टसची उपलब्धता',
-        'जलद स्थानिक दुरुस्ती सेवा',
-        'किफायतशीर व पारदर्शक दर',
-      ],
-      pricingHint: 'तपासणी शुल्क वाजवी • जागेवर दुरुस्ती',
-      sampleItems: 'कूलर पंप, फॅन मोटर, वायरिंग रिपेअर',
-    },
-    {
-      id: 'wholesale-contractor',
-      nameMr: 'घाऊक पुरवठा (बिल्डर्स व कॉन्ट्रॅक्टर्स)',
-      nameEn: 'Wholesale & Builder Supply',
-      category: 'B2B & Bulk Deals',
-      icon: Building2,
-      description:
-        'स्थानिक इलेक्ट्रिशियन, बिल्डर्स आणि कॉन्ट्रॅक्टर्ससाठी इलेक्ट्रिकल वायर्स, पाईप्स, स्विचेस आणि फिक्सचर्सचा थेट घाऊक पुरवठा.',
-      advantages: [
-        'थेट डिलरशिप होलसेल दरपत्रक',
-        'जीएसटी इनव्हॉईस व सुलभ पेमेंट',
-        'मोठ्या ऑर्डर्सवर थेट साईट डिलिव्हरी',
-      ],
-      pricingHint: 'बल्क डिस्काउंट उपलब्ध • GST इनपुट क्रेडिट',
-      sampleItems: 'वायर बंडल, पीव्हीसी पाईप, स्विचगियर',
+      pricingHint: 'Free on qualifying purchases',
     },
   ];
 
   const testimonials = [
     {
-      name: 'राजेश देशमुख',
-      location: 'आर्वी रोड, वर्धा',
+      name: 'Rajesh Deshmukh',
+      location: 'Arvi Road, Wardha',
       rating: 5,
-      date: 'फेब्रुवारी २०२५',
-      product: 'हेवी ड्युटी कुलर खरेदी',
+      date: 'February 2026',
+      product: 'Teak Wood 5-Seater Sofa Set',
       review:
-        'श्री साई इंटरप्राइजेसकडून घरासाठी मोठा कुलर घेतला. त्याच दिवशी दुपारी घरी मोफत डिलिव्हरी मिळाली आणि कुलरची हवा खूपच थंड आहे. भावही वर्ध्यातील इतर दुकानांपेक्षा वाजवी मिळाला!',
+        'Purchased a 5-seater teak wood sofa set for our living room. Exceptional finish, premium fabric, and delivered right to our living room on the same day. Highly recommended!',
     },
     {
-      name: 'संजय ठाकरे',
-      location: 'सेवाग्राम, वर्धा',
+      name: 'Sanjay Thackeray',
+      location: 'Sevagram, Wardha',
       rating: 5,
-      date: 'जानेवारी २०२५',
-      product: '३०-महिने बचत योजना सभासद',
+      date: 'January 2026',
+      product: '30-Month Scheme Member (#1024)',
       review:
-        '३०-महिन्यांच्या साप्ताहिक बचत योजनेचे कार्ड काढले आहे. ऑनलाईन मोबाईलवर पासबुक पाहण्याची सोय खूपच उत्कृष्ट आहे. हप्ता भरल्याची पावती लगेच दिसते. अतिशय विश्वासू संस्था.',
+        'Enrolled in the 30-month weekly scheme. The online digital passbook feature is smooth and transparent. Whenever I pay my weekly installment, the balance updates right away.',
     },
     {
-      name: 'अमित कोल्हे',
-      location: 'पवार नगर, देवळी',
+      name: 'Amit Kolhe',
+      location: 'Pawar Nagar, Deoli',
       rating: 5,
-      date: 'मार्च २०२५',
-      product: 'नवीन घराचे संपूर्ण इलेक्ट्रिकल वायरिंग',
+      date: 'March 2026',
+      product: 'King Bed with Hydraulic Storage',
       review:
-        'नवीन बंगल्याचे संपूर्ण वायरिंग साहित्य श्री साई इंटरप्राइजेसकडून घेतले. सर्व वायर्स व स्विचेस Polycab चे पक्के ओरिजिनल मिळाले. दुकानदार खूप प्रामाणिक आणि सहकार्य करणारे आहेत.',
+        'The king bed with hydraulic storage is rock solid and spacious. The carpenters assembled everything neatly within an hour. Genuine products and warm customer service.',
     },
     {
-      name: 'प्रमोद वाघमारे',
-      location: 'हिंगणघाट रोड, वर्धा',
+      name: 'Pramod Waghmare',
+      location: 'Hinganghat Road, Wardha',
       rating: 5,
-      date: 'डिसेंबर २०२४',
-      product: '४३ इंच स्मार्ट एलईडी टीव्ही',
+      date: 'December 2025',
+      product: '43" 4K Smart TV & Refrigerator',
       review:
-        'दुकानदारांनी टीव्हीची सर्व माहिती अगदी स्पष्ट समजावून सांगितली आणि थेट कंपनी वॉरंटी दिली. बिल आणि वॉरंटीची कायदेशीर नोंद व्यवस्थित आहे. ५ पैकी ५ स्टार सेवा!',
+        'Got a 43-inch 4K Google TV and double-door inverter refrigerator. Direct showroom warranty, original GST bill, and unbeatable price compared to big city stores.',
     },
   ];
 
   const galleryItems = [
     {
-      title: 'हेवी ड्युटी कुलर थेट गोडाऊन स्टॉक',
-      category: 'उत्पादने व कुलर',
-      subtitle: 'उन्हाळ्यासाठी ताज्या स्टॉकची उपलब्धता',
+      title: 'Handcrafted Teak Living Room Sofas',
+      category: 'Living Room Furniture',
+      subtitle: 'Premium velvet & high-resilience foam sets',
       imageUrl:
-        'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=600&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80',
     },
     {
-      title: 'स्मार्ट टीव्ही व फ्रिज घरपोच डिलिव्हरी',
-      category: 'फ्री होम डिलिव्हरी',
-      subtitle: 'वर्धा व आर्वी तालुक्यातील ग्राहकांसाठी जलद सेवा',
+      title: 'Hydraulic Storage Teak Beds',
+      category: 'Bedroom Furniture',
+      subtitle: 'Termite-treated solid wood with soft headboard',
       imageUrl:
-        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=600&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
     },
     {
-      title: 'दर्जेदार इलेक्ट्रिकल वायरिंग प्रकल्प',
-      category: 'इलेक्ट्रिकल कामे',
-      subtitle: 'सुरक्षित कन्सिल्ड वायरिंग व एमसीबी इन्स्टॉलेशन',
+      title: '4K Smart Google TVs & Soundbars',
+      category: 'Home Entertainment',
+      subtitle: 'Dolby audio, ultra-thin bezels & official warranty',
       imageUrl:
-        'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80',
     },
     {
-      title: '३०-महिने बचत योजना लकी ड्रॉ व बक्षीस वितरण',
-      category: 'बचत योजना',
-      subtitle: 'आनंदी सभासदांना घरगुती उपकरणांचे वितरण',
+      title: 'Heavy-Duty Coolers & Refrigerators',
+      category: 'Cooling & Appliances',
+      subtitle: 'Inverter double door fridges & 70L desert coolers',
       imageUrl:
-        'https://images.unsplash.com/photo-1556742049-0a67c5574f73?w=600&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=800&auto=format&fit=crop&q=80',
     },
   ];
 
@@ -217,19 +184,19 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
 
   const handleSendEnquiryWhatsApp = (targetPhone = '8766486915') => {
     if (!enquiryName.trim() || !enquiryPhone.trim()) {
-      alert('कृपया आपले नाव आणि मोबाईल नंबर टाका.');
+      alert('Please enter your full name and 10-digit mobile number.');
       return;
     }
 
     const message =
-      `*नवीन कोटेशन / दरपत्रक चौकशी (ShriSaiEnt.in)*\n` +
+      `*Showroom Quotation & Product Inquiry (ShriSaiEnt.in)*\n` +
       `--------------------------------\n` +
-      `👤 *ग्राहक नाव:* ${enquiryName.trim()}\n` +
-      `📞 *मोबाईल नंबर:* ${enquiryPhone.trim()}\n` +
-      `⚡ *सेवेची गरज / विषय:* ${enquiryService}\n` +
-      (enquiryNotes.trim() ? `📝 *तपशील / नोंद:* ${enquiryNotes.trim()}\n` : '') +
+      `👤 *Customer Name:* ${enquiryName.trim()}\n` +
+      `📞 *Mobile Number:* ${enquiryPhone.trim()}\n` +
+      `🛋️ *Product / Requirement:* ${enquiryService}\n` +
+      (enquiryNotes.trim() ? `📝 *Notes:* ${enquiryNotes.trim()}\n` : '') +
       `--------------------------------\n` +
-      `कृपया तात्काळ दरपत्रक व माहिती पाठवा. धन्यवाद!`;
+      `Please provide product pricing, brochure, and delivery availability. Thank you!`;
 
     window.open(
       `https://wa.me/91${targetPhone}?text=${encodeURIComponent(message)}`,
@@ -239,85 +206,82 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
   };
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-20 py-8">
       {/* 1. SERVICES & PRICING / QUOTATION SECTION */}
-      <section id="services" className="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
-        <div className="text-center max-w-3xl mx-auto space-y-3 mb-12">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-300 text-xs font-bold uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-teal-600" />
-            आमच्या अधिकृत सेवा व दरपत्रक (Verified Services in Wardha)
+      <section id="services" className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="text-center max-w-2xl mx-auto space-y-3 mb-12">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[#00523f] text-xs font-semibold tracking-wide">
+            <ShieldCheck className="w-4 h-4 text-[#00523f]" />
+            <span>Curated Showroom Services • Wardha</span>
           </div>
-          <h2 className="text-2xl sm:text-4xl font-black text-[var(--tactile-text-heading)] tracking-tight">
-            Best Enterprise Services in Wardha, Maharashtra
+          <h2 className="text-2xl sm:text-4xl font-semibold text-slate-900 tracking-tight">
+            Craftsmanship, Electronics & Savings
           </h2>
-          <p className="text-sm sm:text-base text-[var(--tactile-text-muted)] leading-relaxed">
-            श्री साई इंटरप्राइजेस - घरगुती इलेक्ट्रॉनिक्स विक्री, ३०-महिने साप्ताहिक बचत योजना, वायरिंग व रिपेअरिंगची विश्वासू सेवा.
+          <p className="text-sm text-slate-500 leading-relaxed max-w-xl mx-auto">
+            From hand-built teak furniture to certified 4K smart entertainment and disciplined installment schemes, discover our core capabilities.
           </p>
         </div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {services.map((srv) => {
             const Icon = srv.icon;
             return (
               <div
                 key={srv.id}
-                className="tactile-card rounded-3xl border border-[var(--tactile-border)] p-6 shadow-xs hover:border-[var(--tactile-primary)] transition-all duration-300 flex flex-col justify-between group"
+                className="bg-white rounded-3xl border border-slate-150 p-6 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_45px_-8px_rgba(0,0,0,0.08)] hover:border-slate-300 transition-all duration-300 flex flex-col justify-between group"
               >
                 <div className="space-y-4">
                   {/* Header with Icon & Category */}
                   <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 rounded-2xl tactile-inset text-[var(--tactile-primary)] flex items-center justify-center group-hover:bg-[var(--tactile-primary)] group-hover:text-white transition-colors duration-300 shadow-xs">
-                      <Icon className="w-6 h-6 stroke-[2]" />
+                    <div className="w-12 h-12 rounded-2xl bg-slate-50 text-[#00523f] flex items-center justify-center group-hover:bg-[#00523f] group-hover:text-white transition-colors duration-300 border border-slate-100">
+                      <Icon className="w-6 h-6 stroke-[1.8]" />
                     </div>
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg tactile-inset text-[var(--tactile-text-muted)]">
+                    <span className="text-[11px] font-medium px-3 py-1 rounded-full bg-slate-100 text-slate-600">
                       {srv.category}
                     </span>
                   </div>
 
                   {/* Service Title */}
                   <div>
-                    <h3 className="text-lg font-black text-[var(--tactile-text-heading)] group-hover:text-[var(--tactile-primary)] transition-colors">
-                      {srv.nameMr}
+                    <h3 className="text-base font-semibold text-slate-900 group-hover:text-[#00523f] transition-colors leading-snug">
+                      {srv.name}
                     </h3>
-                    <span className="text-xs font-medium text-[var(--tactile-text-dim)] block mt-0.5">
-                      {srv.nameEn}
-                    </span>
                   </div>
 
-                  <p className="text-xs text-[var(--tactile-text-muted)] leading-relaxed">
+                  <p className="text-xs text-slate-500 leading-relaxed">
                     {srv.description}
                   </p>
 
                   {/* Advantages bullet points */}
-                  <div className="tactile-inset rounded-2xl p-3.5 space-y-2 border border-[var(--tactile-border-subtle)]">
-                    <span className="text-[10px] font-black uppercase text-[var(--tactile-text-dim)] tracking-wider block">
-                      मुख्य वैशिष्ट्ये व फायदे (Key Advantages):
+                  <div className="bg-slate-50/80 rounded-2xl p-3.5 space-y-2 border border-slate-100">
+                    <span className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider block">
+                      Key Highlights
                     </span>
                     {srv.advantages.map((adv, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-[var(--tactile-text-main)]">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                        <span className="leading-snug">{adv}</span>
+                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00523f] shrink-0 mt-0.5" />
+                        <span className="leading-snug text-[11px]">{adv}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Bottom Action & Quote Button */}
-                <div className="pt-5 mt-5 border-t border-[var(--tactile-border-subtle)] space-y-3">
+                <div className="pt-4 mt-5 border-t border-slate-100 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-[var(--tactile-text-muted)] font-medium">दर स्वरूप:</span>
-                    <span className="font-bold text-[var(--tactile-text-heading)] text-[11px] text-right">
+                    <span className="text-[11px] text-slate-400 font-medium">Pricing:</span>
+                    <span className="font-semibold text-slate-800 text-[11px] text-right">
                       {srv.pricingHint}
                     </span>
                   </div>
 
                   <button
-                    onClick={() => handleSelectServiceForQuote(srv.nameMr)}
-                    className="w-full py-2.5 rounded-xl tactile-btn-primary text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                    onClick={() => handleSelectServiceForQuote(srv.name)}
+                    className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-[#00523f] text-white text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
-                    <span>Request a Quote / दरपत्रक मिळवा</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-amber-300 group-hover:text-white" />
+                    <span>Request Quotation</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                   </button>
                 </div>
               </div>
@@ -326,114 +290,114 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
         </div>
       </section>
 
-      {/* 2. 3-STEP SIMPLE ENQUIRY FORM (फॉर्म लहान: १. नाव, २. मोबाईल, ३. सेवेची गरज) */}
+      {/* 2. 3-STEP SIMPLE ENQUIRY FORM */}
       <section id="enquiry-section" className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-6 sm:p-10 shadow-2xl border border-white/15 relative overflow-hidden">
-          {/* Subtle decorative glow */}
-          <div className="absolute -right-20 -top-20 w-60 h-60 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="bg-gradient-to-b from-slate-950 via-[#033b2e] to-slate-950 text-white rounded-[2.5rem] p-8 sm:p-12 shadow-[0_24px_60px_-15px_rgba(0,82,63,0.3)] border border-emerald-900/40 relative overflow-hidden">
+          {/* Subtle warm amber ambient aura */}
+          <div className="absolute -right-16 -top-16 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="max-w-2xl mx-auto text-center space-y-2 mb-8">
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-xs font-bold">
-              <Clock className="w-3.5 h-3.5" />
-              १० मिनिटांत तात्काळ कोटेशन व माहिती मिळेल
+          <div className="max-w-2xl mx-auto text-center space-y-2 mb-8 relative z-10">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 text-emerald-300 text-xs font-medium backdrop-blur-xs border border-white/10">
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              Quick 10-Minute Response
             </div>
-            <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
-              ३-सोप्या स्टेप्समध्ये दरपत्रक मिळवा (3-Step Quick Enquiry)
+            <h3 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+              Instant Quotation & Inquiry
             </h3>
-            <p className="text-xs sm:text-sm text-slate-300">
-              आपल्याला हव्या असलेल्या उत्पादनाची किंवा सेवेची माहिती भरा. आमची टीम थेट संपर्क करेल.
+            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto">
+              Share what you are looking for. Our Wardha showroom team will send complete photos, catalog specs, and pricing directly to your WhatsApp.
             </p>
           </div>
 
           {enquirySubmitted ? (
-            <div className="bg-emerald-900/60 border border-emerald-500/40 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
+            <div className="bg-emerald-950/60 border border-emerald-500/30 rounded-3xl p-8 text-center space-y-3 animate-fade-in relative z-10">
               <div className="w-12 h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6 stroke-[3]" />
+                <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
               </div>
-              <h4 className="text-lg font-bold text-white">चौकशी यशस्वीरित्या पाठवली!</h4>
-              <p className="text-xs text-slate-200">
-                आपली विनंती प्राप्त झाली आहे. आम्ही दिलेल्या मोबाईल नंबरवर त्वरित संपर्क साधू.
+              <h4 className="text-lg font-semibold text-white">Inquiry Sent Successfully</h4>
+              <p className="text-xs text-slate-300 max-w-md mx-auto">
+                We have received your details. A showroom consultant will reach out with photographs, dimensions, and current discount offers.
               </p>
               <button
                 onClick={() => setEnquirySubmitted(false)}
-                className="text-xs text-amber-300 font-bold underline hover:text-white mt-2 inline-block cursor-pointer"
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-medium underline mt-2 inline-block cursor-pointer"
               >
-                दुसरी चौकशी पाठवा
+                Send Another Inquiry
               </button>
             </div>
           ) : (
-            <div className="space-y-4 max-w-xl mx-auto">
+            <div className="space-y-4 max-w-xl mx-auto relative z-10">
               {/* Step 1: Name */}
               <div>
-                <label className="text-xs font-bold text-slate-200 flex items-center justify-between mb-1">
-                  <span>१. आपले पूर्ण नाव (Your Full Name) *</span>
-                  <span className="text-[10px] text-amber-300">पायरी १/३</span>
+                <label className="text-xs font-medium text-slate-300 flex items-center justify-between mb-1.5">
+                  <span>1. Full Name *</span>
+                  <span className="text-[10px] text-emerald-300">Step 1 of 3</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="उदा. राहुल देशमुख / Rahul Deshmukh"
+                  placeholder="e.g. Rahul Deshmukh"
                   value={enquiryName}
                   onChange={(e) => setEnquiryName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                  className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/15 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm"
                 />
               </div>
 
               {/* Step 2: Mobile Number */}
               <div>
-                <label className="text-xs font-bold text-slate-200 flex items-center justify-between mb-1">
-                  <span>२. मोबाईल / WhatsApp नंबर (10-Digit Mobile) *</span>
-                  <span className="text-[10px] text-amber-300">पायरी २/३</span>
+                <label className="text-xs font-medium text-slate-300 flex items-center justify-between mb-1.5">
+                  <span>2. Mobile / WhatsApp Number *</span>
+                  <span className="text-[10px] text-emerald-300">Step 2 of 3</span>
                 </label>
                 <input
                   type="tel"
-                  placeholder="उदा. 9876543210"
+                  placeholder="e.g. 9876543210"
                   value={enquiryPhone}
                   onChange={(e) => setEnquiryPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm font-mono"
+                  className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/15 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm font-mono"
                 />
               </div>
 
               {/* Step 3: Service Requirement */}
               <div>
-                <label className="text-xs font-bold text-slate-200 flex items-center justify-between mb-1">
-                  <span>३. सेवेची गरज / चौकशीचा विषय (Service Needed) *</span>
-                  <span className="text-[10px] text-amber-300">पायरी ३/३</span>
+                <label className="text-xs font-medium text-slate-300 flex items-center justify-between mb-1.5">
+                  <span>3. Category / Requirement *</span>
+                  <span className="text-[10px] text-emerald-300">Step 3 of 3</span>
                 </label>
                 <select
                   value={enquiryService}
                   onChange={(e) => setEnquiryService(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-[#0B1528] border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm cursor-pointer"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/15 text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm cursor-pointer"
                 >
-                  <option value="कूलर किंवा इलेक्ट्रॉनिक्स खरेदी (New Appliance Purchase)">
-                    कूलर किंवा इलेक्ट्रॉनिक्स खरेदी (New Appliance Purchase)
+                  <option value="Contemporary Furniture (Sofa / Bed / Dining)">
+                    Contemporary Furniture (Sofa, Bed, Dining, Wardrobe)
                   </option>
-                  <option value="३०-महिने साप्ताहिक बचत कार्ड योजना (30-Month Card Scheme)">
-                    ३०-महिने साप्ताहिक बचत कार्ड योजना (30-Month Card Scheme)
+                  <option value="Smart Electronics & Appliances (TV / Fridge / Cooler / Washing Machine)">
+                    Smart Electronics (4K TV, Inverter Fridge, Air Cooler, Washer)
                   </option>
-                  <option value="घरगुती किंवा दुकान इलेक्ट्रिकल वायरिंग (Electrical Wiring)">
-                    घरगुती किंवा दुकान इलेक्ट्रिकल वायरिंग (Electrical Wiring)
+                  <option value="30-Month Weekly Installment Card Scheme">
+                    30-Month Weekly Savings Card Scheme
                   </option>
-                  <option value="कूलर किंवा पंखा दुरुस्ती व सर्व्हिसिंग (Appliance Repair)">
-                    कूलर किंवा पंखा दुरुस्ती व सर्व्हिसिंग (Appliance Repair)
+                  <option value="Custom Interior & Furniture Fabrication">
+                    Custom Interior & Modular Furniture Fabrication
                   </option>
-                  <option value="होलसेल साहित्य पुरवठा (Wholesale Builder Inquiry)">
-                    होलसेल साहित्य पुरवठा (Wholesale Builder Inquiry)
+                  <option value="Wholesale & Commercial Project Supply">
+                    Wholesale Builder & Corporate Supply
                   </option>
-                  <option value="इतर चौकशी (Other Details)">इतर चौकशी (Other Details)</option>
+                  <option value="General Inquiries">General Inquiries</option>
                 </select>
               </div>
 
               {/* Optional brief notes */}
               <div>
-                <label className="text-xs text-slate-300 block mb-1">
-                  काही विशेष माहिती (पर्यायी - Additional Notes):
+                <label className="text-xs text-slate-300 block mb-1.5">
+                  Additional Details (Optional):
                 </label>
                 <input
                   type="text"
-                  placeholder="उदा. २ कुलर हवे आहेत, पत्ता आर्वी रोड..."
+                  placeholder="e.g. Need 5-seater sofa dimensions or Scheme 1 enrollment details..."
                   value={enquiryNotes}
                   onChange={(e) => setEnquiryNotes(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-400 text-xs"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-white/10 border border-white/15 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-xs"
                 />
               </div>
 
@@ -441,75 +405,75 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => handleSendEnquiryWhatsApp('8766486915')}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                  className="w-full py-3.5 rounded-full bg-[#00523f] hover:bg-[#004232] text-white font-medium text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(0,82,63,0.35)] cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  दरपत्रक मागा (WA: 8766486915)
+                  Inquire on WhatsApp 1
                 </button>
                 <button
                   onClick={() => handleSendEnquiryWhatsApp('8600122798')}
-                  className="w-full py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                  className="w-full py-3.5 rounded-full bg-white/15 hover:bg-white/20 text-white font-medium text-xs sm:text-sm transition flex items-center justify-center gap-2 border border-white/20 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  दरपत्रक मागा (WA: 8600122798)
+                  Inquire on WhatsApp 2
                 </button>
               </div>
 
               <p className="text-[11px] text-slate-400 text-center pt-1">
-                🔒 आपली माहिती पूर्णपणे सुरक्षित राहील. आम्ही कोणताही स्पॅम मेसेज पाठवत नाही.
+                🔒 Your contact info is strictly confidential and used solely to send quotation details.
               </p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 3. SOCIAL PROOF & TRUST FACTORS (समाधानी ग्राहकांचे अभिप्राय व ५-स्टार रिव्ह्यूज) */}
+      {/* 3. SOCIAL PROOF & REVIEWS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto space-y-2 mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800/60">
+        <div className="text-center max-w-2xl mx-auto space-y-2 mb-12">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-medium border border-amber-200/80">
             <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-            ग्राहकांचा विश्वास (100% Verified Customer Reviews)
+            Verified Customer Reviews
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            वर्धा जिल्ह्यातील समाधानी ग्राहकांचे अभिप्राय
+          <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
+            Trusted by Families Across Wardha
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-            श्री साई इंटरप्राइजेसने गेल्या अनेक वर्षांत शेकडो कुटुंबांचा विश्वास संपादन केला आहे.
+          <p className="text-xs sm:text-sm text-slate-500">
+            Hundreds of households rely on Shri Sai for genuine appliances, enduring teak furniture, and hassle-free savings.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {testimonials.map((t, idx) => (
             <div
               key={idx}
-              className="bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-400 dark:hover:border-amber-500 transition"
+              className="bg-white rounded-3xl border border-slate-150 p-6 shadow-[0_10px_30px_-6px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4 hover:border-slate-300 transition"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex text-amber-400">
+                  <div className="flex text-amber-400 gap-0.5">
                     {[...Array(t.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
-                  <span className="text-[10px] text-slate-400">{t.date}</span>
+                  <span className="text-[11px] text-slate-400">{t.date}</span>
                 </div>
 
-                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                <p className="text-xs text-slate-600 leading-relaxed italic">
                   "{t.review}"
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-xs">{t.name}</h4>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <MapPin className="w-2.5 h-2.5 text-blue-500" />
+                    <h4 className="font-semibold text-slate-900 text-xs">{t.name}</h4>
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3 text-slate-400" />
                       {t.location}
                     </span>
                   </div>
-                  <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
-                    सत्यापित ग्राहक
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#00523f] font-semibold border border-emerald-100">
+                    Verified
                   </span>
                 </div>
               </div>
@@ -518,42 +482,42 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
         </div>
       </section>
 
-      {/* 4. PROJECT GALLERY / WORK SHOWCASE (पूर्ण झालेल्या कामांचे व डिलिव्हरीचे फोटो) */}
+      {/* 4. GALLERY & WORK SHOWCASE */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto space-y-2 mb-8">
-          <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">
-            Work Showcase & Delivery Gallery
+        <div className="text-center max-w-2xl mx-auto space-y-2 mb-10">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Showroom Showcase & Delivery Gallery
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            कामांचे फोटो व डिलिव्हरीचे क्षण
+          <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
+            Curated Collections in Focus
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-            आमच्या दर्जेदार उत्पादने, कुलर स्टॉक व वर्धा परिसरातील यशस्वी डिलिव्हरीची काही क्षणचित्रे.
+          <p className="text-xs sm:text-sm text-slate-500">
+            A glimpse into our showroom stock, handcrafted timber creations, and doorstep delivery service.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {galleryItems.map((item, idx) => (
             <div
               key={idx}
-              className="group bg-white dark:bg-[#1E293B] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col"
+              className="group bg-white rounded-3xl border border-slate-150 overflow-hidden shadow-[0_10px_30px_-6px_rgba(0,0,0,0.04)] hover:shadow-lg transition flex flex-col"
             >
-              <div className="relative h-48 overflow-hidden bg-slate-100 dark:bg-[#0F172A]">
+              <div className="relative h-52 overflow-hidden bg-slate-100">
                 <img
                   src={item.imageUrl}
-                  alt={`Shri Sai Enterprises Wardha - ${item.title}`}
+                  alt={`Shri Sai Showroom - ${item.title}`}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
-                <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-[#0B1528]/80 backdrop-blur-xs text-amber-300 text-[10px] font-bold">
+                <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium">
                   {item.category}
                 </span>
               </div>
-              <div className="p-4 space-y-1">
-                <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm leading-snug group-hover:text-blue-500 transition">
+              <div className="p-5 space-y-1">
+                <h4 className="font-semibold text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-[#00523f] transition">
                   {item.title}
                 </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-slate-400 leading-relaxed">
                   {item.subtitle}
                 </p>
               </div>
@@ -562,20 +526,20 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
         </div>
       </section>
 
-      {/* 5. GOOGLE BUSINESS PROFILE (GOOGLE MAP) & LOCATION GUIDE */}
+      {/* 5. SHOWROOM LOCATION & GOOGLE MAPS */}
       <section id="location" className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-10 shadow-xs space-y-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
+        <div className="bg-white rounded-3xl border border-slate-150 p-6 sm:p-10 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.05)] space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold mb-2">
-                <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                Google Business Profile • Wardha Location
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium mb-2">
+                <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                Physical Showroom • Wardha
               </div>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                Shri Sai Enterprises (Google Map वर थेट शोधा)
+              <h3 className="text-xl sm:text-2xl font-semibold text-slate-900">
+                Shri Sai Electronics & Furniture
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - 442001
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१ (Opp. Matoshree Sabhagruha, Arvi Road, Punjab Colony, Wardha)
               </p>
             </div>
 
@@ -584,72 +548,72 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
                 href="https://maps.google.com/?q=Matoshree+Sabhagruha+Arvi+Road+Wardha+442001"
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold text-xs transition flex items-center gap-2 shadow-sm"
+                className="px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition flex items-center gap-2 shadow-xs"
               >
-                <MapPin className="w-4 h-4" />
-                Google Maps वर दिशा पहा (Directions)
+                <MapPin className="w-3.5 h-3.5" />
+                Open Google Maps
               </a>
               <a
                 href="tel:8766486915"
-                className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-amber-400 hover:bg-slate-800 dark:hover:bg-amber-300 text-amber-300 dark:text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+                className="px-5 py-2.5 rounded-full bg-[#00523f] hover:bg-[#004232] text-white font-medium text-xs transition flex items-center gap-1.5 shadow-[0_4px_14px_rgba(0,82,63,0.25)]"
               >
                 <Phone className="w-3.5 h-3.5" />
-                8766486915 वर कॉल करा
+                Call 8766486915
               </a>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
-              <span className="font-bold text-slate-900 dark:text-white block">दुकान उघडे असण्याची वेळ:</span>
-              <p className="text-slate-600 dark:text-slate-300">सोमवार ते रविवार: सकाळी ९:०० ते रात्री ९:००</p>
-              <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-[10px]">
-                आठवड्याचे ७ दिवस सुरू
+            <div className="space-y-2 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="font-semibold text-slate-900 block">Showroom Hours:</span>
+              <p className="text-slate-600">Monday to Sunday: 9:00 AM – 9:00 PM</p>
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[10px]">
+                Open 7 Days a Week
               </span>
             </div>
 
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
-              <span className="font-bold text-slate-900 dark:text-white block">जवळचा महत्त्वाचा लँडमार्क:</span>
-              <p className="text-slate-600 dark:text-slate-300">मातोश्री सभागृहाच्या अगदी समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा.</p>
-              <span className="text-[10px] text-slate-400">पिनकोड: 442001</span>
+            <div className="space-y-2 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="font-semibold text-slate-900 block">Prominent Landmark & Address:</span>
+              <p className="text-slate-600">मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१ (Opp. Matoshree Sabhagruha, Arvi Road, Punjab Colony, Wardha).</p>
+              <span className="text-[11px] text-slate-400">PIN Code: 442001</span>
             </div>
 
-            <div className="space-y-2 p-4 rounded-2xl bg-slate-50 dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800">
-              <span className="font-bold text-slate-900 dark:text-white block">अधिकृत व्यवसाय नोंदणी:</span>
-              <p className="text-slate-600 dark:text-slate-300 font-mono">GSTIN: 27ALOPL0030G2ZC</p>
-              <p className="text-slate-600 dark:text-slate-300 font-mono">Udyam: UDYAM-MH-33-0012948</p>
+            <div className="space-y-2 p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="font-semibold text-slate-900 block">Official Business Registrations:</span>
+              <p className="text-slate-600 font-mono">GSTIN: 27ALOPL0030G2ZC</p>
+              <p className="text-slate-600 font-mono">Udyam: UDYAM-MH-33-0012948</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 6. TRUST LINKS & LEGAL PAGES BAR (About Us, Contact Us, Privacy Policy & Warranty) */}
+      {/* 6. LEGAL PAGES BAR */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="bg-slate-100 dark:bg-[#1E293B] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+        <div className="bg-slate-100/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 border border-slate-200/80">
           <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={() => setActiveModal('about')}
-              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
+              className="font-medium text-slate-700 hover:text-slate-900 transition cursor-pointer"
             >
-              आमच्याबद्दल (About Us)
+              About Us
             </button>
             <span>•</span>
             <button
               onClick={() => setActiveModal('contact')}
-              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
+              className="font-medium text-slate-700 hover:text-slate-900 transition cursor-pointer"
             >
-              संपर्क व पत्ता (Contact Us)
+              Contact & Address
             </button>
             <span>•</span>
             <button
               onClick={() => setActiveModal('privacy')}
-              className="font-semibold text-slate-800 dark:text-slate-200 hover:text-blue-500 transition cursor-pointer"
+              className="font-medium text-slate-700 hover:text-slate-900 transition cursor-pointer"
             >
-              गोपनीयता धोरण व वॉरंटी नियम (Privacy Policy & Warranty)
+              Privacy Policy & Warranty Terms
             </button>
           </div>
 
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="text-[11px] text-slate-400">
             Shri Sai Enterprises © 2026 • shrisaient.in
           </div>
         </div>
@@ -657,83 +621,81 @@ export const ServicesAndTrustSection: React.FC<ServicesAndTrustSectionProps> = (
 
       {/* LEGAL / INFO MODALS */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 animate-fade-in max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-black text-slate-900 dark:text-white text-base">
-                {activeModal === 'about' && 'आमच्याबद्दल (About Shri Sai Enterprises)'}
-                {activeModal === 'contact' && 'संपर्क व पत्ता (Contact Us)'}
-                {activeModal === 'privacy' && 'गोपनीयता धोरण आणि वॉरंटी अटी'}
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-150 space-y-4 animate-fade-in max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-semibold text-slate-900 text-base">
+                {activeModal === 'about' && 'About Shri Sai Enterprises'}
+                {activeModal === 'contact' && 'Contact & Showroom Location'}
+                {activeModal === 'privacy' && 'Privacy Policy & Official Warranty'}
               </h3>
               <button
                 onClick={() => setActiveModal(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {activeModal === 'about' && (
-              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
                 <p>
-                  <strong>श्री साई इंटरप्राइजेस (Shri Sai Enterprises)</strong> ही वर्धा शहरातील अग्रगण्य इलेक्ट्रॉनिक्स व घरगुती उपकरणे विक्री, इलेक्ट्रिकल वायरिंग आणि ३०-महिने साप्ताहिक बचत कार्ड योजना चालवणारी अधिकृत व नोंदणीकृत संस्था आहे.
+                  <strong>Shri Sai Enterprises</strong> is Wardha's established destination for contemporary living & bedroom furniture, branded home electronics, air coolers, and community-driven 30-month savings schemes.
                 </p>
                 <p>
-                  आमचे मुख्य ध्येय म्हणजे वर्धा व लगतच्या ग्रामीण भागातील प्रत्येक कुटुंबाला वाजवी दरात उच्च दर्जाचे ब्रँडेड इलेक्ट्रॉनिक्स साहित्य पुरवणे.
+                  Our showroom is committed to making high-quality, long-lasting furniture and energy-efficient appliances accessible to every family across Wardha district and surrounding towns with complete pricing transparency.
                 </p>
-                <div className="bg-slate-50 dark:bg-[#0F172A] p-3 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1 font-mono">
-                  <p>नोंदणीकृत नाव: Shri Sai Enterprises</p>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1 font-mono text-[11px]">
+                  <p>Registered Entity: Shri Sai Enterprises (श्री साई इंटरप्राइजेस)</p>
                   <p>GSTIN: 27ALOPL0030G2ZC</p>
-                  <p>उद्योग आधार: UDYAM-MH-33-0012948</p>
-                  <p>पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - 442001</p>
+                  <p>Udyam Registration: UDYAM-MH-33-0012948</p>
+                  <p>Address: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१ (Opp. Matoshree Sabhagruha, Arvi Road, Punjab Colony, Wardha)</p>
                 </div>
               </div>
             )}
 
             {activeModal === 'contact' && (
-              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                <p>आपण आम्हाला खालील पत्त्यावर किंवा फोनवर थेट संपर्क साधू शकता:</p>
-                <div className="space-y-2 font-mono text-slate-800 dark:text-slate-200">
-                  <p>📞 WhatsApp व कॉल 1: <strong>8766486915</strong></p>
-                  <p>📞 WhatsApp व कॉल 2: <strong>8600122798</strong></p>
-                  <p>📞 इतर फोन: 9175534365, 7822859073</p>
-                  <p>📍 पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - 442001</p>
-                  <p>⏰ वेळ: सकाळी ९:०० ते रात्री ९:०० (सर्व दिवस)</p>
+              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                <p>Reach out directly to our showroom team:</p>
+                <div className="space-y-2 font-mono text-slate-800 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <p>📞 Phone & WhatsApp 1: <strong>8766486915</strong></p>
+                  <p>📞 Phone & WhatsApp 2: <strong>8600122798</strong></p>
+                  <p>🌐 Website: <strong>shrisaient.in</strong></p>
+                  <p>📞 Alternative Desk: 9175534365, 7822859073</p>
+                  <p>📍 Address: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१</p>
+                  <p>⏰ Working Hours: 9:00 AM – 9:00 PM (All 7 Days)</p>
                 </div>
                 <a
                   href="https://maps.google.com/?q=Matoshree+Sabhagruha+Arvi+Road+Wardha+442001"
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2.5 rounded-xl bg-blue-700 hover:bg-blue-600 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 mt-2"
+                  className="w-full py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition flex items-center justify-center gap-1.5 mt-2"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  Google Maps वर पत्ता उघडा
+                  Open in Google Maps
                 </a>
               </div>
             )}
 
             {activeModal === 'privacy' && (
-              <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                <p className="font-bold text-slate-900 dark:text-white">१. गोपनीयता धोरण (Privacy Policy):</p>
+              <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+                <p className="font-semibold text-slate-900">1. Customer Privacy Policy:</p>
                 <p>
-                  ग्राहकाने दिलेले नाव, पत्ता आणि मोबाईल क्रमांक केवळ ऑर्डर डिलिव्हरी, वॉरंटी नोंद आणि बचत योजनेच्या पासबुक नोंदीसाठीच वापरले जातात. ग्राहकांची वैयक्तिक माहिती कोणत्याही तृतीय पक्षाला विकली जात नाही.
+                  Customer contact information and order details are strictly utilized for delivery coordination, warranty documentation, and 30-month savings scheme passbook verification. We never share customer data with third parties.
                 </p>
-                <p className="font-bold text-slate-900 dark:text-white pt-2">२. वॉरंटी व विक्री अटी (Official Disclaimer):</p>
-                <p className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-200 dark:border-amber-800/60 text-amber-950 dark:text-amber-200">
-                  दिलेली वॉरंटी ही दुकानदाराची नसून कंपनीची आहे. म्हणून वस्तूत काही बिघाड आल्यास त्याला दुकानदार जबाबदार नसून कंपनी आहे. तेव्हा कृपया वस्तू घेतेवेळेस कंपनीच्या सर्व्हिस सेण्टरचा मोबाईल नंबर घ्यावा.
-                </p>
-                <p>
-                  इलेक्ट्रॉनिक्स उत्पादनांच्या बिघाडाबाबत संबंधित कंपनीच्या अधिकृत सर्व्हिस सेंटरद्वारे दुरुस्ती किंवा बदल करून दिला जातो.
+                <p className="font-semibold text-slate-900 pt-2">2. Warranty Terms & Official Coverage:</p>
+                <p className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80 text-amber-950">
+                  All electronic appliances carry the official manufacturer warranty provided directly by the company brand. Furniture crafted by Shri Sai carries a 5-year structural warranty against seasoning and termite defects.
                 </p>
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setActiveModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-amber-400 text-white dark:text-slate-950 font-bold text-xs cursor-pointer"
+                className="px-5 py-2 rounded-full bg-slate-900 text-white font-medium text-xs cursor-pointer"
               >
-                बंद करा (Close)
+                Close
               </button>
             </div>
           </div>

@@ -23,7 +23,9 @@ import {
   Sparkles,
   Filter,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import {
   BusinessSettings,
@@ -33,12 +35,13 @@ import {
   CardMember,
   CardTransaction,
   Customer,
-  CardSchemeId,
-  TransactionEntry
+  StockItem,
+  TransactionEntry,
+  CardSchemeId
 } from '../types';
 import { CardPassbookModal } from './CardPassbookModal';
-import { CustomerLedgerModal } from './CustomerLedgerModal';
-import { StatementReviewModal, StatementParsedRow } from './StatementReviewModal';
+import { CsvExportModal } from './CsvExportModal';
+import { ScanDealerStatementModal } from './ScanDealerStatementModal';
 
 interface DealerLedgerViewProps {
   dealers: Dealer[];
@@ -48,6 +51,8 @@ interface DealerLedgerViewProps {
   cardTransactions?: CardTransaction[];
   customers?: Customer[];
   transactions?: TransactionEntry[];
+  stock?: StockItem[];
+  expenses?: any[];
   settings: BusinessSettings;
   onAddDealer: (dealer: Omit<Dealer, 'id'>) => void;
   onAddPurchase: (purchase: Omit<PurchaseEntry, 'id'>) => void;
@@ -66,6 +71,8 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   cardTransactions = [],
   customers = [],
   transactions = [],
+  stock = [],
+  expenses = [],
   settings,
   onAddDealer,
   onAddPurchase,
@@ -74,7 +81,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   initialDealerName,
 }) => {
   const [activeMainTab, setActiveMainTab] = useState<LedgerMainTab>('dealers');
-  const [selectedCustomerForLedger, setSelectedCustomerForLedger] = useState<Customer | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // DEALER TAB STATES
   const [selectedDealerId, setSelectedDealerId] = useState<string>(() => {
@@ -93,46 +100,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   const [showAddDealerModal, setShowAddDealerModal] = useState(false);
   const [showAddBillModal, setShowAddBillModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showStatementModal, setShowStatementModal] = useState(false);
-
-  // Handle Automated Statement Parser confirmation
-  const handleImportStatementEntries = (
-    dealerId: string,
-    dealerName: string,
-    entries: StatementParsedRow[]
-  ) => {
-    let importedPurchases = 0;
-    let importedPayments = 0;
-
-    entries.forEach((row, idx) => {
-      if (row.debit > 0) {
-        onAddPurchase({
-          billNo: row.vchNo || `STMT-PUR-${Date.now().toString().slice(-4)}-${idx + 1}`,
-          date: row.date || new Date().toISOString().split('T')[0],
-          supplierName: dealerName,
-          items: row.particulars || 'सामान खरेदी (Statement)',
-          totalAmount: row.debit,
-          paidAmount: 0,
-          status: 'Pending',
-          paymentMode: 'Online',
-        });
-        importedPurchases++;
-      } else if (row.credit > 0) {
-        onRecordDealerPayment({
-          dealerId,
-          dealerName,
-          date: row.date || new Date().toISOString().split('T')[0],
-          amount: row.credit,
-          paymentMode: 'Online',
-          voucherNo: row.vchNo || `VCH-STMT-${Date.now().toString().slice(-4)}-${idx + 1}`,
-          notes: row.particulars || 'Payment via Statement Import',
-        });
-        importedPayments++;
-      }
-    });
-
-    setSelectedDealerId(dealerId);
-  };
+  const [showScanStatementModal, setShowScanStatementModal] = useState(false);
 
   // New Dealer state
   const [newDealerName, setNewDealerName] = useState('');
@@ -406,41 +374,43 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
               Unified Khata & Ledgers (खाता बही)
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
               Complete Accounting
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Track all transactions in one place: Dealers (Manisha Enterprises), Card Scheme members, and Shop Customers.
           </p>
         </div>
 
         {/* Global Action */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Manual CSV Export launcher */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Download CSV for Schemes, Purchases, Dealers, and Customer Khata"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>CSV एक्सपोर्ट (Export)</span>
+          </button>
+
           {activeMainTab === 'dealers' && (
             <>
               <button
                 onClick={() => setShowAddDealerModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 + New Dealer
-              </button>
-              <button
-                onClick={() => setShowStatementModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition flex items-center gap-1.5 cursor-pointer"
-                title="डीलर / होलसेलर स्टेटमेंट अपलोड करा (PDF & PNG OCR)"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>📄 स्टेटमेंट अपलोड (OCR)</span>
               </button>
               {selectedDealer && (
                 <button
@@ -467,18 +437,18 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
       </div>
 
       {/* Main Ledger Category Navigation Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 overflow-x-auto">
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/70 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
         <button
           onClick={() => setActiveMainTab('dealers')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
             activeMainTab === 'dealers'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-700/50'
           }`}
         >
           <Building2 className="w-4 h-4 text-blue-600" />
           <span>🏢 Dealer Khata (डीलर - Manisha Enterprises आदि)</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 font-bold">
             {dealers.length}
           </span>
         </button>
@@ -487,13 +457,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           onClick={() => setActiveMainTab('cards')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
             activeMainTab === 'cards'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-700/50'
           }`}
         >
           <CreditCard className="w-4 h-4 text-emerald-600" />
           <span>💳 Card Customer Ledgers (कार्ड ग्राहक खाता)</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold">
             {cardMembers.length}
           </span>
         </button>
@@ -502,13 +472,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           onClick={() => setActiveMainTab('customers')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
             activeMainTab === 'customers'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-700/50'
           }`}
         >
           <Users className="w-4 h-4 text-purple-600" />
           <span>👥 Shop Customers Udhar (दुकान उधारी खाता)</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-purple-100 text-purple-800 font-bold">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 font-bold">
             {customers.length}
           </span>
         </button>
@@ -517,8 +487,8 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           onClick={() => setActiveMainTab('overview')}
           className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
             activeMainTab === 'overview'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-700/50'
           }`}
         >
           <BarChart3 className="w-4 h-4 text-amber-600" />
@@ -533,59 +503,70 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
         <div className="space-y-6">
           {/* Dealer Overall KPI Overview */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">Total Procured Purchases</span>
-                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Procured Purchases</span>
+                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300">
                   <Building2 className="w-4 h-4" />
                 </span>
               </div>
-              <p className="text-2xl font-bold text-slate-900 mt-2">₹{totalAllPurchases.toLocaleString()}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Across all {dealers.length} registered suppliers</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">₹{totalAllPurchases.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Across all {dealers.length} registered suppliers</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">Total Payments Given</span>
-                <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Payments Given</span>
+                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300">
                   <ArrowUpRight className="w-4 h-4" />
                 </span>
               </div>
-              <p className="text-2xl font-bold text-emerald-600 mt-2">₹{totalAllPaid.toLocaleString()}</p>
-              <p className="text-[11px] text-emerald-700/80 mt-1">Paid through Online / Cash / Cheque</p>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">₹{totalAllPaid.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">Paid through Online / Cash / Cheque</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">Total Pending Payable (देना बाकी)</span>
-                <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Pending Payable (देना बाकी)</span>
+                <span className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300">
                   <Wallet className="w-4 h-4" />
                 </span>
               </div>
-              <p className="text-2xl font-bold text-amber-600 mt-2">₹{totalAllDue.toLocaleString()}</p>
-              <p className="text-[11px] text-amber-700/80 mt-1">Net outstanding due to suppliers</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2">₹{totalAllDue.toLocaleString()}</p>
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1">Net outstanding due to suppliers</p>
             </div>
           </div>
 
           {/* 2-Column Layout: Left Dealer Directory, Right Selected Dealer's Ledger */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left: Dealer List (4 cols) */}
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-slate-900 text-sm">Dealer Directory</h3>
-                <span className="text-xs text-slate-500 font-medium">{dealers.length} Dealers</span>
+            <div className="lg:col-span-4 bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">Dealer Directory</h3>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{dealers.length} Dealers</span>
               </div>
 
               {/* Dealer Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={dealerSearchQuery}
-                  onChange={(e) => setDealerSearchQuery(e.target.value)}
-                  placeholder="Search dealer name or phone..."
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
-                />
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScanStatementModal(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>AI पार्टी बिल / स्टेटमेंट स्कॅन (PDF/फोटो)</span>
+                </button>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={dealerSearchQuery}
+                    onChange={(e) => setDealerSearchQuery(e.target.value)}
+                    placeholder="Search dealer name or phone..."
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-blue-500"
+                  />
+                </div>
               </div>
 
               {/* Dealer Item Cards */}
@@ -606,14 +587,14 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         onClick={() => setSelectedDealerId(dealer.id)}
                         className={`p-3 rounded-xl border transition cursor-pointer text-left ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50/50 shadow-xs'
-                            : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/40 shadow-xs'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/40'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                              <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                                 {dealer.name}
                               </span>
                               {isManisha && (
@@ -624,7 +605,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                               )}
                             </div>
                             {dealer.phone && (
-                              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
                                 <Phone className="w-3 h-3" />
                                 {dealer.phone}
                               </p>
@@ -635,7 +616,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                             <span className="text-[10px] text-slate-400 block font-medium">Payable Due</span>
                             <span
                               className={`text-xs font-bold ${
-                                (dealer.balanceDue ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'
+                                (dealer.balanceDue ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                               }`}
                             >
                               ₹{(dealer.balanceDue ?? 0).toLocaleString()}
@@ -643,7 +624,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                           </div>
                         </div>
 
-                        <div className="mt-2.5 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px] text-slate-500">
+                        <div className="mt-2.5 pt-2 border-t border-slate-100/80 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
                           <span>Purchases: ₹{(dealer.totalPurchases ?? 0).toLocaleString()}</span>
                           <span>Paid: ₹{(dealer.totalPaid ?? 0).toLocaleString()}</span>
                         </div>
@@ -656,24 +637,24 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
             {/* Right: Selected Dealer's Full Ledger Passbook (8 cols) */}
             <div className="lg:col-span-8 space-y-4">
               {selectedDealer ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-5">
+                <div id="printable-dealer-ledger" className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-5 print:border-none print:shadow-none print:p-0">
                   {/* Dealer Header Card */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="p-2 rounded-xl bg-blue-100 text-blue-700">
+                        <span className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
                           <Building2 className="w-5 h-5" />
                         </span>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-bold text-slate-900">{selectedDealer.name}</h2>
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">{selectedDealer.name}</h2>
                             {selectedDealer.name.toLowerCase().includes('manisha') && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                                 ⭐ Primary Dealer
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500 flex flex-wrap items-center gap-3 mt-0.5">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-3 mt-0.5">
                             {selectedDealer.phone && (
                               <span className="flex items-center gap-1">
                                 <Phone className="w-3 h-3" /> {selectedDealer.phone}
@@ -687,7 +668,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap no-print">
                       <button
                         onClick={handleShareDealerWhatsApp}
                         className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -697,7 +678,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                       </button>
                       <button
                         onClick={() => window.print()}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700"
                       >
                         <Printer className="w-3.5 h-3.5" />
                         Print
@@ -716,11 +697,20 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         <Plus className="w-3.5 h-3.5" />
                         Add Bill
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowScanStatementModal(true)}
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                        title="सप्लायर लेजर किंवा खरेदी बिल PDF/फोटो स्कॅन करा"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        AI स्टेटमेंट स्कॅन
+                      </button>
                     </div>
                   </div>
 
                   {/* Highlight notice regarding auto-entry */}
-                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center gap-2 text-xs text-blue-900">
+                  <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-xl flex items-center gap-2 text-xs text-blue-900 dark:text-blue-200">
                     <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                     <span>
                       <strong>Automated Dealer Ledger:</strong> All purchase invoices entered under{' '}
@@ -729,24 +719,24 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   </div>
 
                   {/* Dealer Specific KPI Ribbon */}
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                  <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-center">
                     <div>
-                      <span className="text-[11px] text-slate-500 font-medium block">Total Invoiced</span>
-                      <span className="text-base font-bold text-slate-900">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">Total Invoiced</span>
+                      <span className="text-base font-bold text-slate-900 dark:text-white">
                         ₹{(selectedDealer?.totalPurchases ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 font-medium block">Paid to Dealer</span>
-                      <span className="text-base font-bold text-emerald-600">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">Paid to Dealer</span>
+                      <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
                         ₹{(selectedDealer?.totalPaid ?? 0).toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 font-medium block">Balance Payable (देना बाकी)</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">Balance Payable (देना बाकी)</span>
                       <span
                         className={`text-base font-bold ${
-                          (selectedDealer?.balanceDue ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'
+                          (selectedDealer?.balanceDue ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                         }`}
                       >
                         ₹{(selectedDealer?.balanceDue ?? 0).toLocaleString()}
@@ -761,8 +751,8 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         onClick={() => setDealerEntryTypeFilter('all')}
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                           dealerEntryTypeFilter === 'all'
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
                         All Entries ({computedLedgerEntries.length})
@@ -771,8 +761,8 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         onClick={() => setDealerEntryTypeFilter('purchases')}
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                           dealerEntryTypeFilter === 'purchases'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
                         Bills Only ({dealerPurchases.length})
@@ -781,8 +771,8 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         onClick={() => setDealerEntryTypeFilter('payments')}
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                           dealerEntryTypeFilter === 'payments'
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
                         Payments Only ({dealerPaymentsList.length})
@@ -796,16 +786,16 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         value={dealerSearchQuery}
                         onChange={(e) => setDealerSearchQuery(e.target.value)}
                         placeholder="Search bill no or items..."
-                        className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
                       />
                     </div>
                   </div>
 
                   {/* Chronological Statement Table */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                        <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
                           <tr>
                             <th className="py-2.5 px-3">Date</th>
                             <th className="py-2.5 px-3">Type & Ref No</th>
@@ -816,41 +806,41 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                             <th className="py-2.5 px-3 text-right">Balance Due</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                           {filteredDealerLedger.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-slate-50 transition">
-                              <td className="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                            <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                              <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400 text-[11px]">
                                 {entry.date}
                               </td>
                               <td className="py-2.5 px-3">
                                 <span
                                   className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1.5 ${
                                     entry.type === 'Purchase Bill'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-emerald-100 text-emerald-800'
+                                      ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300'
+                                      : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300'
                                   }`}
                                 >
                                   {entry.type === 'Purchase Bill' ? 'BILL' : 'PAID'}
                                 </span>
-                                <span className="font-mono font-semibold text-slate-800">
+                                <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
                                   {entry.refNo}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 text-slate-700 max-w-[220px] truncate">
+                              <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 max-w-[220px] truncate">
                                 {entry.description}
                               </td>
                               <td className="py-2.5 px-3 text-center">
-                                <span className="text-[10px] text-slate-500 font-medium px-1.5 py-0.5 bg-slate-100 rounded">
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">
                                   {entry.mode}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                              <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
                                 {entry.purchaseAmount ? `₹${(entry.purchaseAmount ?? 0).toLocaleString()}` : '-'}
                               </td>
-                              <td className="py-2.5 px-3 text-right font-semibold text-emerald-600">
+                              <td className="py-2.5 px-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                                 {entry.paymentAmount ? `₹${(entry.paymentAmount ?? 0).toLocaleString()}` : '-'}
                               </td>
-                              <td className="py-2.5 px-3 text-right font-bold text-slate-900 font-mono">
+                              <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white font-mono">
                                 ₹{(entry.balanceAfter ?? 0).toLocaleString()}
                               </td>
                             </tr>
@@ -858,7 +848,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
 
                           {filteredDealerLedger.length === 0 && (
                             <tr>
-                              <td colSpan={7} className="py-8 text-center text-slate-400">
+                              <td colSpan={7} className="py-8 text-center text-slate-400 dark:text-slate-500">
                                 No entries recorded for this dealer yet.
                               </td>
                             </tr>
@@ -869,7 +859,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">
+                <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-400 dark:text-slate-500">
                   Select a dealer from the directory to inspect their full ledger.
                 </div>
               )}
@@ -885,35 +875,35 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
         <div className="space-y-6">
           {/* Card Schemes Summary Ribbon */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Active Card Members</span>
-              <p className="text-2xl font-bold text-slate-900 mt-1">{cardMembers.length}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Across Schemes 1, 2, and 3</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Active Card Members</span>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{cardMembers.length}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Across Schemes 1, 2, and 3</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Total Deposited Funds</span>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">₹{totalCardDeposited.toLocaleString()}</p>
-              <p className="text-[11px] text-emerald-700/80 mt-1">Weekly payments collected</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Deposited Funds</span>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalCardDeposited.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">Weekly payments collected</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Total Customer Refunds</span>
-              <p className="text-2xl font-bold text-rose-600 mt-1">₹{totalCardRefunded.toLocaleString()}</p>
-              <p className="text-[11px] text-rose-700/80 mt-1">Partial / settlement returns</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Customer Refunds</span>
+              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">₹{totalCardRefunded.toLocaleString()}</p>
+              <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1">Partial / settlement returns</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Net Card Balance Held</span>
-              <p className="text-2xl font-bold text-blue-600 mt-1">₹{totalCardNetBalance.toLocaleString()}</p>
-              <p className="text-[11px] text-blue-700/80 mt-1">Customer fund liability</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Net Card Balance Held</span>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">₹{totalCardNetBalance.toLocaleString()}</p>
+              <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80 mt-1">Customer fund liability</p>
             </div>
           </div>
 
           {/* Scheme Numbers Range Callout */}
-          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold text-[10px]">
+              <span className="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 font-bold text-[10px]">
                 3 ACTIVE SCHEMES
               </span>
               <span>
@@ -924,7 +914,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
             {onNavigateCardScheme && (
               <button
                 onClick={onNavigateCardScheme}
-                className="font-bold underline text-amber-800 hover:text-amber-900 cursor-pointer text-xs"
+                className="font-bold underline text-amber-800 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-200 cursor-pointer text-xs"
               >
                 Go to Card Management →
               </button>
@@ -932,7 +922,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           </div>
 
           {/* Filter Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs space-y-3">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               {/* Search */}
               <div className="sm:col-span-6 relative">
@@ -942,7 +932,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={cardSearchQuery}
                   onChange={(e) => setCardSearchQuery(e.target.value)}
                   placeholder="Search Card # (e.g. 4107), Name, Village (e.g. Bori, Hingni), Sheet No..."
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-blue-500"
                 />
               </div>
 
@@ -951,7 +941,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 <select
                   value={selectedSchemeFilter}
                   onChange={(e) => setSelectedSchemeFilter(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
                   <option value="all">All Schemes (सभी योजनाएं)</option>
                   <option value="scheme1">Scheme 1 (1001 - 2999)</option>
@@ -965,7 +955,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 <select
                   value={selectedVillageFilter}
                   onChange={(e) => setSelectedVillageFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
                   <option value="all">All Villages / Locations (सभी गांव)</option>
                   {uniqueVillages.map((v) => (
@@ -978,7 +968,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
             </div>
 
             {/* Quick Scheme Pills */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-100 flex-wrap">
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 flex-wrap">
               <span className="text-[11px] text-slate-400 font-medium">Quick Filter:</span>
               <button
                 onClick={() => {
@@ -986,40 +976,40 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   setSelectedVillageFilter('all');
                   setCardSearchQuery('');
                 }}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition ${
                   selectedSchemeFilter === 'all' && selectedVillageFilter === 'all' && !cardSearchQuery
-                    ? 'bg-slate-800 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 All Cards ({cardMembers.length})
               </button>
               <button
                 onClick={() => setSelectedSchemeFilter('scheme1')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition ${
                   selectedSchemeFilter === 'scheme1'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40'
                 }`}
               >
                 Scheme 1 ({cardMembers.filter((m) => m.schemeId === 'scheme1').length})
               </button>
               <button
                 onClick={() => setSelectedSchemeFilter('scheme2')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition ${
                   selectedSchemeFilter === 'scheme2'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40'
                 }`}
               >
                 Scheme 2 ({cardMembers.filter((m) => m.schemeId === 'scheme2').length})
               </button>
               <button
                 onClick={() => setSelectedSchemeFilter('scheme3')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition ${
                   selectedSchemeFilter === 'scheme3'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
                 }`}
               >
                 Scheme 3 ({cardMembers.filter((m) => m.schemeId === 'scheme3').length})
@@ -1028,10 +1018,10 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           </div>
 
           {/* Card Customer Members Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="py-3 px-4">Card # / Scheme</th>
                     <th className="py-3 px-4">Customer Name & Phone</th>
@@ -1043,24 +1033,24 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     <th className="py-3 px-4 text-center">Ledger Passbook</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredCardMembers.map((member) => (
-                    <tr key={member.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={member.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-mono font-bold text-xs border border-blue-200">
+                          <span className="px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-mono font-bold text-xs border border-blue-200 dark:border-blue-800">
                             #{member.cardNumber}
                           </span>
-                          <span className="text-[11px] text-slate-500 font-medium">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                             {member.schemeName}
                           </span>
                         </div>
                       </td>
 
                       <td className="py-3 px-4">
-                        <p className="font-bold text-slate-900">{member.customerName}</p>
+                        <p className="font-bold text-slate-900 dark:text-white">{member.customerName}</p>
                         {member.phone && (
-                          <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
                             <Phone className="w-2.5 h-2.5" />
                             {member.phone}
                           </p>
@@ -1070,15 +1060,15 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                       <td className="py-3 px-4">
                         <div className="flex flex-col gap-0.5">
                           {member.village ? (
-                            <span className="text-slate-800 font-semibold text-xs flex items-center gap-1">
+                            <span className="text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1">
                               <MapPin className="w-3 h-3 text-emerald-600" />
                               {member.village}
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-[11px]">-</span>
+                            <span className="text-slate-400 dark:text-slate-500 text-[11px]">-</span>
                           )}
                           {member.sheetNo && (
-                            <span className="text-[10px] font-mono text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded w-fit border border-blue-100">
+                            <span className="text-[10px] font-mono text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/40 px-1.5 py-0.2 rounded w-fit border border-blue-100 dark:border-blue-800">
                               Sheet #{member.sheetNo}
                             </span>
                           )}
@@ -1086,22 +1076,22 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           <CheckCircle2 className="w-3 h-3" />
                           ₹50 Paid
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-bold text-emerald-600">
+                      <td className="py-3 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
                         ₹{(member.totalDeposited ?? 0).toLocaleString()}
                       </td>
 
-                      <td className="py-3 px-4 text-right font-semibold text-rose-600">
+                      <td className="py-3 px-4 text-right font-semibold text-rose-600 dark:text-rose-400">
                         {(member.totalRefunded ?? 0) > 0 ? `₹${(member.totalRefunded ?? 0).toLocaleString()}` : '₹0'}
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        <span className="font-bold text-slate-900 text-sm">
+                        <span className="font-bold text-slate-900 dark:text-white text-sm">
                           ₹{(member.netBalance ?? 0).toLocaleString()}
                         </span>
                       </td>
@@ -1110,7 +1100,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => setSelectedCardForPassbook(member)}
-                            className="px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs transition cursor-pointer border border-blue-200 flex items-center gap-1"
+                            className="px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 font-bold text-xs transition cursor-pointer border border-blue-200 dark:border-blue-800 flex items-center gap-1"
                           >
                             <FileText className="w-3 h-3" />
                             Passbook
@@ -1122,7 +1112,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
 
                   {filteredCardMembers.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                      <td colSpan={8} className="py-8 text-center text-slate-400 dark:text-slate-500">
                         No card members found matching the search or scheme filter.
                       </td>
                     </tr>
@@ -1141,27 +1131,27 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
         <div className="space-y-6">
           {/* Shop Customers KPI Overview */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Total Billed Sales</span>
-              <p className="text-2xl font-bold text-slate-900 mt-1">₹{totalCustomerPurchases.toLocaleString()}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Across all retail customers</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Billed Sales</span>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">₹{totalCustomerPurchases.toLocaleString()}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Across all retail customers</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Total Amount Collected</span>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">₹{totalCustomerPaid.toLocaleString()}</p>
-              <p className="text-[11px] text-emerald-700/80 mt-1">Cash, UPI, and settlements</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Amount Collected</span>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalCustomerPaid.toLocaleString()}</p>
+              <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-1">Cash, UPI, and settlements</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
-              <span className="text-xs font-medium text-slate-500">Customer Udhar Due (उधारी लेना बाकी)</span>
-              <p className="text-2xl font-bold text-rose-600 mt-1">₹{totalCustomerDue.toLocaleString()}</p>
-              <p className="text-[11px] text-rose-700/80 mt-1">Outstanding store credit to collect</p>
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-2xs">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Customer Udhar Due (उधारी लेना बाकी)</span>
+              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">₹{totalCustomerDue.toLocaleString()}</p>
+              <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1">Outstanding store credit to collect</p>
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#0F172A] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <div className="relative w-full sm:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -1169,27 +1159,27 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 value={customerSearchQuery}
                 onChange={(e) => setCustomerSearchQuery(e.target.value)}
                 placeholder="Search customer name or phone..."
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-blue-500"
               />
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCustomerBalanceFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${
                   customerBalanceFilter === 'all'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 All Customers ({customers.length})
               </button>
               <button
                 onClick={() => setCustomerBalanceFilter('due')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition ${
                   customerBalanceFilter === 'due'
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40'
                 }`}
               >
                 Pending Udhar Only ({customers.filter((c) => c.balanceDue > 0).length})
@@ -1212,61 +1202,52 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     <th className="py-3 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredCustomers.map((cust) => (
-                    <tr key={cust.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">{cust.name}</td>
-                      <td className="py-3.5 px-4 text-slate-600 font-mono">
-                        {cust.phone || <span className="text-slate-400">No phone</span>}
+                    <tr key={cust.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{cust.name}</td>
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-mono">
+                        {cust.phone || <span className="text-slate-400 dark:text-slate-500">No phone</span>}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-bold text-slate-900">
+                      <td className="py-3.5 px-4 text-right font-bold text-slate-900 dark:text-white">
                         ₹{(cust.totalPurchased ?? cust.totalPurchases ?? 0).toLocaleString()}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-semibold text-emerald-600">
+                      <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
                         ₹{(cust.totalPaid ?? 0).toLocaleString()}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <span
                           className={`font-bold ${
-                            (cust.balanceDue ?? 0) > 0 ? 'text-rose-600' : 'text-slate-600'
+                            (cust.balanceDue ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300'
                           }`}
                         >
                           ₹{(cust.balanceDue ?? 0).toLocaleString()}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-center text-slate-500 font-mono text-[11px]">
+                      <td className="py-3.5 px-4 text-center text-slate-500 dark:text-slate-400 font-mono text-[11px]">
                         {cust.lastVisit}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        {cust.phone && (cust.balanceDue ?? 0) > 0 && (
                           <button
-                            onClick={() => setSelectedCustomerForLedger(cust)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            onClick={() => {
+                              const text = encodeURIComponent(
+                                `Namaste ${cust.name}, aapka ${settings.businessName} par baaki hisab ₹${(cust.balanceDue ?? 0).toLocaleString()} hai. Kripya dukan par aakar hisab clear kare. Dhanyawad!`
+                              );
+                              window.open(`https://wa.me/91${cust.phone}?text=${text}`, '_blank');
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer border border-emerald-200 dark:border-emerald-800"
                           >
-                            <FileText className="w-3 h-3 text-amber-300" />
-                            खातेवही / Ledger
+                            <Share2 className="w-3 h-3" />
+                            Reminder
                           </button>
-                          {cust.phone && (cust.balanceDue ?? 0) > 0 && (
-                            <button
-                              onClick={() => {
-                                const text = encodeURIComponent(
-                                  `Namaste ${cust.name}, aapka ${settings.businessName} par baaki hisab ₹${(cust.balanceDue ?? 0).toLocaleString()} hai. Kripya dukan par aakar hisab clear kare. Dhanyawad!`
-                                );
-                                window.open(`https://wa.me/91${cust.phone}?text=${text}`, '_blank');
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Share2 className="w-3 h-3" />
-                              Reminder
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </td>
                     </tr>
                   ))}
                   {filteredCustomers.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                      <td colSpan={7} className="py-8 text-center text-slate-400 dark:text-slate-500">
                         No customers found matching the search.
                       </td>
                     </tr>
@@ -1286,105 +1267,105 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           {/* Universal 3-Way Financial Balance Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Card 1: Suppliers / Dealers */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                   🏢 Suppliers & Dealers Khata
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] bg-blue-50 text-blue-700 font-semibold">
+                <span className="px-2 py-0.5 rounded text-[11px] bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800">
                   {dealers.length} Dealers
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Procurement bills from <strong>Manisha Enterprises</strong>, Polycab, and other vendors.
               </p>
-              <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Total Procured:</span>
-                  <span className="font-bold text-slate-900">₹{(totalAllPurchases ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Total Procured:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">₹{(totalAllPurchases ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Total Payments Issued:</span>
-                  <span className="font-bold text-emerald-600">₹{(totalAllPaid ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Total Payments Issued:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(totalAllPaid ?? 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between pt-1 border-t border-slate-100 text-sm">
-                  <span className="font-semibold text-slate-700">Payable Due (देना बाकी):</span>
-                  <span className="font-bold text-amber-600">₹{(totalAllDue ?? 0).toLocaleString()}</span>
+                <div className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-sm">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Payable Due (देना बाकी):</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">₹{(totalAllDue ?? 0).toLocaleString()}</span>
                 </div>
               </div>
               <button
                 onClick={() => setActiveMainTab('dealers')}
-                className="w-full mt-2 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full mt-2 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-blue-200 dark:border-blue-800/60"
               >
                 Inspect Dealer Ledgers <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Card 2: Card Customers */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                   💳 Scheme Card Members Khata
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-700 font-semibold">
+                <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800">
                   {cardMembers.length} Cards
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Weekly installments (₹100/200/500/1000) and card refund accounts across Schemes 1, 2, 3.
               </p>
-              <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Deposits Collected:</span>
-                  <span className="font-bold text-emerald-600">₹{(totalCardDeposited ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Deposits Collected:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(totalCardDeposited ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Refunds Returned:</span>
-                  <span className="font-bold text-rose-600">₹{(totalCardRefunded ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Refunds Returned:</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400">₹{(totalCardRefunded ?? 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between pt-1 border-t border-slate-100 text-sm">
-                  <span className="font-semibold text-slate-700">Net Balance in Hand:</span>
-                  <span className="font-bold text-blue-600">₹{(totalCardNetBalance ?? 0).toLocaleString()}</span>
+                <div className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-sm">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Net Balance in Hand:</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">₹{(totalCardNetBalance ?? 0).toLocaleString()}</span>
                 </div>
               </div>
               <button
                 onClick={() => setActiveMainTab('cards')}
-                className="w-full mt-2 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full mt-2 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-emerald-200 dark:border-emerald-800/60"
               >
                 Inspect Card Ledgers <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Card 3: Shop Udhar */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-purple-600">
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                   👥 Retail Shop Customers
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] bg-purple-50 text-purple-700 font-semibold">
+                <span className="px-2 py-0.5 rounded text-[11px] bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
                   {customers.length} Customers
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Counter sales, store billing, and outstanding credit balances to recover.
               </p>
-              <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Total Billed:</span>
-                  <span className="font-bold text-slate-900">₹{(totalCustomerPurchases ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Total Billed:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">₹{(totalCustomerPurchases ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Cash / Paid Collected:</span>
-                  <span className="font-bold text-emerald-600">₹{(totalCustomerPaid ?? 0).toLocaleString()}</span>
+                  <span className="text-slate-500 dark:text-slate-400">Cash / Paid Collected:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(totalCustomerPaid ?? 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between pt-1 border-t border-slate-100 text-sm">
-                  <span className="font-semibold text-slate-700">Udhar Due (लेना बाकी):</span>
-                  <span className="font-bold text-rose-600">₹{(totalCustomerDue ?? 0).toLocaleString()}</span>
+                <div className="flex justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-sm">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">Udhar Due (लेना बाकी):</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400">₹{(totalCustomerDue ?? 0).toLocaleString()}</span>
                 </div>
               </div>
               <button
                 onClick={() => setActiveMainTab('customers')}
-                className="w-full mt-2 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full mt-2 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-purple-200 dark:border-purple-800/60"
               >
                 Inspect Shop Customers <ArrowRight className="w-3.5 h-3.5" />
               </button>
@@ -1392,10 +1373,10 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
           </div>
 
           {/* Universal Quick Search Across All Khata */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-4">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Universal Account Finder</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Universal Account Finder</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Instantly find any Dealer (e.g. Manisha Enterprises), Scheme Card Holder, or Customer:
               </p>
             </div>
@@ -1407,7 +1388,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 value={universalSearch}
                 onChange={(e) => setUniversalSearch(e.target.value)}
                 placeholder="Type name (Manisha, Prakash, etc.), card number (#4107), village (Bori, Hingni)..."
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-blue-500"
               />
             </div>
 
@@ -1416,7 +1397,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 {/* Dealer matches */}
                 {dealers.some((d) => d.name.toLowerCase().includes(universalSearch.toLowerCase())) && (
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
                       Matched Dealers:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1429,13 +1410,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                               setSelectedDealerId(d.id);
                               setActiveMainTab('dealers');
                             }}
-                            className="p-3 border border-blue-200 bg-blue-50/50 rounded-xl cursor-pointer hover:bg-blue-100/50 flex items-center justify-between"
+                            className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/40 rounded-xl cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/40 flex items-center justify-between"
                           >
                             <div>
-                              <span className="font-bold text-xs text-slate-900 block">{d.name}</span>
-                              <span className="text-[10px] text-slate-500">Dealer / Supplier</span>
+                              <span className="font-bold text-xs text-slate-900 dark:text-white block">{d.name}</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">Dealer / Supplier</span>
                             </div>
-                            <span className="text-xs font-bold text-amber-600">
+                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
                               Due: ₹{(d.balanceDue ?? 0).toLocaleString()}
                             </span>
                           </div>
@@ -1452,7 +1433,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     (m.village && m.village.toLowerCase().includes(universalSearch.toLowerCase()))
                 ) && (
                   <div>
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
                       Matched Scheme Card Members:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1468,17 +1449,17 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                           <div
                             key={m.id}
                             onClick={() => setSelectedCardForPassbook(m)}
-                            className="p-3 border border-emerald-200 bg-emerald-50/50 rounded-xl cursor-pointer hover:bg-emerald-100/50 flex items-center justify-between"
+                            className="p-3 border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/40 rounded-xl cursor-pointer hover:bg-emerald-100/50 dark:hover:bg-emerald-900/40 flex items-center justify-between"
                           >
                             <div>
-                              <span className="font-bold text-xs text-slate-900 block">
+                              <span className="font-bold text-xs text-slate-900 dark:text-white block">
                                 #{m.cardNumber} - {m.customerName}
                               </span>
-                              <span className="text-[10px] text-slate-500">
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
                                 {m.schemeName} {m.village ? `• ${m.village}` : ''}
                               </span>
                             </div>
-                            <span className="text-xs font-bold text-emerald-700">
+                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                               Balance: ₹{(m.netBalance ?? 0).toLocaleString()}
                             </span>
                           </div>
@@ -1501,38 +1482,28 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
         <CardPassbookModal
           member={selectedCardForPassbook}
           transactions={cardTransactions}
+          salesTransactions={transactions}
           settings={settings}
           onClose={() => setSelectedCardForPassbook(null)}
         />
       )}
 
-      {/* Modal: Customer Ledger Statement (खातेवही) */}
-      {selectedCustomerForLedger && (
-        <CustomerLedgerModal
-          customer={selectedCustomerForLedger}
-          transactions={transactions}
-          cardTransactions={cardTransactions}
-          settings={settings}
-          onClose={() => setSelectedCustomerForLedger(null)}
-        />
-      )}
-
       {/* Modal: Add New Dealer */}
       {showAddDealerModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-900 text-base">Add New Dealer / Supplier</h3>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Add New Dealer / Supplier</h3>
               <button
                 onClick={() => setShowAddDealerModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold"
               >
                 ✕
               </button>
             </div>
             <form onSubmit={handleAddDealerSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Dealer / Supplier Business Name *
                 </label>
                 <input
@@ -1541,12 +1512,12 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={newDealerName}
                   onChange={(e) => setNewDealerName(e.target.value)}
                   placeholder="e.g. Manisha Enterprises"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Phone / Mobile Number
                 </label>
                 <input
@@ -1554,12 +1525,12 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={newDealerPhone}
                   onChange={(e) => setNewDealerPhone(e.target.value)}
                   placeholder="e.g. 9823019876"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Dealer GSTIN (Optional)
                 </label>
                 <input
@@ -1567,12 +1538,12 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={newDealerGstin}
                   onChange={(e) => setNewDealerGstin(e.target.value)}
                   placeholder="e.g. 27AABCM7612E1Z4"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Address / City
                 </label>
                 <input
@@ -1580,15 +1551,15 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={newDealerAddress}
                   onChange={(e) => setNewDealerAddress(e.target.value)}
                   placeholder="e.g. Wholesale Market Yard, Pune"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddDealerModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1606,16 +1577,16 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
 
       {/* Modal: Add Purchase Bill under this Dealer */}
       {showAddBillModal && selectedDealer && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">New Purchase Bill</h3>
-                <p className="text-xs text-blue-600 font-bold">Supplier: {selectedDealer.name}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">New Purchase Bill</h3>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-bold">Supplier: {selectedDealer.name}</p>
               </div>
               <button
                 onClick={() => setShowAddBillModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -1624,7 +1595,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
             <form onSubmit={handleAddBillSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Bill / Invoice No *
                   </label>
                   <input
@@ -1632,11 +1603,11 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     required
                     value={billNo}
                     onChange={(e) => setBillNo(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Bill Date *
                   </label>
                   <input
@@ -1644,13 +1615,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     required
                     value={billDate}
                     onChange={(e) => setBillDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Items Purchased / Description *
                 </label>
                 <textarea
@@ -1659,13 +1630,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={billItems}
                   onChange={(e) => setBillItems(e.target.value)}
                   placeholder="e.g. Copper wire 50 coils, 100 pcs switches"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Total Bill Amount (₹) *
                   </label>
                   <input
@@ -1673,11 +1644,11 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     required
                     value={billTotal || ''}
                     onChange={(e) => setBillTotal(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Amount Paid Now (₹)
                   </label>
                   <input
@@ -1685,19 +1656,19 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     value={billPaid || ''}
                     onChange={(e) => setBillPaid(parseFloat(e.target.value) || 0)}
                     placeholder="0"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold text-emerald-600"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-emerald-600 dark:text-emerald-400"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Payment Mode
                 </label>
                 <select
                   value={billMode}
                   onChange={(e) => setBillMode(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                 >
                   <option value="Online">Online / NEFT / UPI</option>
                   <option value="Cash">Cash</option>
@@ -1705,11 +1676,11 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                 </select>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddBillModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1727,31 +1698,31 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
 
       {/* Modal: Record Payment Voucher to Dealer */}
       {showPaymentModal && selectedDealer && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Record Payment to Dealer</h3>
-                <p className="text-xs text-emerald-700 font-bold">Payee: {selectedDealer.name}</p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Record Payment to Dealer</h3>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">Payee: {selectedDealer.name}</p>
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handlePaymentSubmit} className="space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <span className="text-xs text-amber-800">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl">
+                <span className="text-xs text-amber-800 dark:text-amber-200">
                   Current Pending Payable: <strong>₹{(selectedDealer?.balanceDue ?? 0).toLocaleString()}</strong>
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Voucher No *
                   </label>
                   <input
@@ -1759,11 +1730,11 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     required
                     value={voucherNo}
                     onChange={(e) => setVoucherNo(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono font-bold"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Date Paid *
                   </label>
                   <input
@@ -1771,13 +1742,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     required
                     value={voucherDate}
                     onChange={(e) => setVoucherDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Payment Amount (₹) *
                 </label>
                 <input
@@ -1785,19 +1756,19 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   required
                   value={voucherAmount || ''}
                   onChange={(e) => setVoucherAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-emerald-300 rounded-lg text-sm font-bold text-emerald-700"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-emerald-300 dark:border-emerald-700 rounded-lg text-sm font-bold text-emerald-700 dark:text-emerald-400"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Payment Mode
                   </label>
                   <select
                     value={voucherMode}
                     onChange={(e) => setVoucherMode(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                   >
                     <option value="Online">Online (NEFT / UPI)</option>
                     <option value="Cash">Cash</option>
@@ -1805,7 +1776,7 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     UTR / Cheque Ref #
                   </label>
                   <input
@@ -1813,13 +1784,13 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                     value={voucherRef}
                     onChange={(e) => setVoucherRef(e.target.value)}
                     placeholder="e.g. UTR-984712"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Payment Notes / Remarks
                 </label>
                 <input
@@ -1827,15 +1798,15 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
                   value={voucherNotes}
                   onChange={(e) => setVoucherNotes(e.target.value)}
                   placeholder="e.g. Part payment against monthly bill"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1851,14 +1822,35 @@ export const DealerLedgerView: React.FC<DealerLedgerViewProps> = ({
         </div>
       )}
 
-      {/* Automated Party Statement Parser Modal */}
-      <StatementReviewModal
-        isOpen={showStatementModal}
-        onClose={() => setShowStatementModal(false)}
-        dealers={dealers}
-        onAddDealer={onAddDealer}
-        onImportStatementEntries={handleImportStatementEntries}
-      />
+      {/* CSV Export Modal */}
+      {showExportModal && (
+        <CsvExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          cardMembers={cardMembers}
+          cardTransactions={cardTransactions}
+          purchases={purchases}
+          dealers={dealers}
+          dealerPayments={dealerPayments}
+          transactions={transactions}
+          customers={customers}
+          stock={stock}
+          expenses={expenses}
+        />
+      )}
+
+      {/* AI Dealer Bill & Statement Scanner Modal */}
+      {showScanStatementModal && (
+        <ScanDealerStatementModal
+          isOpen={showScanStatementModal}
+          onClose={() => setShowScanStatementModal(false)}
+          dealers={dealers}
+          onAddDealer={onAddDealer}
+          onAddPurchase={onAddPurchase}
+          onRecordDealerPayment={onRecordDealerPayment}
+          settings={settings}
+        />
+      )}
     </div>
   );
 };

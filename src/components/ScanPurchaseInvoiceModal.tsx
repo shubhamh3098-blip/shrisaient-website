@@ -68,7 +68,7 @@ export const ScanPurchaseInvoiceModal: React.FC<ScanPurchaseInvoiceModalProps> =
 
   const [buyerName, setBuyerName] = useState(`${settings.businessName}-LG-WARDHA[NEW]`);
   const [buyerGstin, setBuyerGstin] = useState(settings.gstin || '27ALOPL0030G2ZC');
-  const [buyerAddress, setBuyerAddress] = useState(settings.address || 'Arvi Road, Wardha 442001 Maharashtra');
+  const [buyerAddress, setBuyerAddress] = useState(settings.address || 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१');
 
   const [billNo, setBillNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);

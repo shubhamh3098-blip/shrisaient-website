@@ -1,34 +1,39 @@
 import { CardMember, CardTransaction, TransactionEntry, AgentAdvance, BillReceiptEntry } from '../types';
 
 /**
- * Calculates the next auto-incrementing Receipt Number (हप्ते पावती क्रमांक).
- * User rule: baseline is 1078, next is 1079, then 1080...
+ * Calculates the next auto-incrementing Receipt Number for Card Scheme Weekly Collections.
+ * NOTE: Regular Against-Bill receipts use numbers 1078, 1079, 1080...
+ * Weekly Card Collection uses its own dedicated series: CR-0001, CR-0002, CR-0003...
+ * to ensure it NEVER collides with or consumes Against-Bill (1078, 1079, 1080) numbers.
  */
 export function getNextReceiptNumber(cardTransactions: CardTransaction[]): string {
-  const BASELINE_RECEIPT = 1078;
-  let maxFound = BASELINE_RECEIPT;
+  let maxFound = 0;
 
   if (Array.isArray(cardTransactions)) {
     for (const tx of cardTransactions) {
       if (!tx.receiptNo) continue;
-      // Match standalone numeric or suffix digits e.g. "1078", "REC-1078", "CS-1078"
-      const match = tx.receiptNo.match(/(\d+)/g);
-      if (match) {
-        // Look through extracted number chunks
-        for (const numStr of match) {
-          const val = parseInt(numStr, 10);
-          // Only consider numbers in reasonable receipt sequence range (>= 1000 and <= 999999)
-          if (!isNaN(val) && val >= 1000 && val < 10000000) {
-            if (val > maxFound) {
-              maxFound = val;
-            }
+      const rawNo = tx.receiptNo.trim();
+
+      // If it is plain numeric 1078-1090 from prior accidental reuse, skip it
+      if (/^10[7-9]\d$/.test(rawNo) || rawNo === '1080' || rawNo === '1079' || rawNo === '1078') {
+        continue;
+      }
+
+      // Check for CR-xxx, CARD-xxx, W-xxx or any card receipt sequence
+      const match = rawNo.match(/(?:CR|CARD|WREC|RCP|REC)?[-_ ]*(\d+)/i);
+      if (match && match[1]) {
+        const val = parseInt(match[1], 10);
+        if (!isNaN(val) && val < 1000000) {
+          if (val > maxFound) {
+            maxFound = val;
           }
         }
       }
     }
   }
 
-  return (maxFound + 1).toString();
+  const nextNum = maxFound > 0 ? maxFound + 1 : 1;
+  return `CR-${nextNum.toString().padStart(4, '0')}`;
 }
 
 /**
@@ -280,4 +285,30 @@ export function calculateAgentEarnings(
     newCardsList,
     advancesList,
   };
+}
+
+/**
+ * Sanitizes phone numbers and generates valid WhatsApp URLs.
+ * If the phone number is invalid (e.g. "0", "0000000000", less than 10 digits),
+ * returns a general WhatsApp link without prefilled recipient so WhatsApp does not crash.
+ */
+export function getSafeWhatsAppUrl(rawPhone: string | undefined | null, text: string): string {
+  // If text is already URI encoded, don't double encode
+  let encodedText: string;
+  try {
+    encodedText = decodeURIComponent(text) !== text ? text : encodeURIComponent(text);
+  } catch {
+    encodedText = encodeURIComponent(text);
+  }
+
+  if (!rawPhone) return `https://wa.me/?text=${encodedText}`;
+
+  const cleanDigits = rawPhone.toString().replace(/\D/g, '');
+  // Valid Indian mobile numbers have at least 10 digits, and are not all identical digits (like 0000000000)
+  if (cleanDigits.length < 10 || /^(\d)\1{9,}$/.test(cleanDigits)) {
+    return `https://wa.me/?text=${encodedText}`;
+  }
+
+  const tenDigits = cleanDigits.slice(-10);
+  return `https://wa.me/91${tenDigits}?text=${encodedText}`;
 }

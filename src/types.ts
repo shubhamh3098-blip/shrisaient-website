@@ -1,4 +1,4 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5' | 'scheme6' | string;
+export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5';
 
 export interface CardSchemeConfig {
   id: CardSchemeId;
@@ -29,7 +29,8 @@ export interface CardMember {
   registrationFeePaid: boolean;
   totalDeposited: number;
   totalRefunded: number;
-  netBalance: number; // totalDeposited - totalRefunded
+  totalGoodsTaken?: number;
+  netBalance: number; // totalDeposited - (totalRefunded + (totalGoodsTaken || 0))
   status: 'Active' | 'Completed' | 'Closed';
   notes?: string;
 }
@@ -41,14 +42,17 @@ export interface CardTransaction {
   schemeId: CardSchemeId;
   customerName: string;
   customerPhone?: string;
+  village?: string;
   receiptNo: string;
   date: string;
-  type: 'WeeklyPayment' | 'Refund' | 'Fee';
+  type: 'WeeklyPayment' | 'Refund' | 'Fee' | 'GoodsTaken' | 'Deposit';
   weekNumber?: number;
   amount: number;
   paymentMode: 'Cash' | 'Online';
   agentName?: string;
   remarks?: string;
+  goodsDetail?: string;
+  billNo?: string;
   balanceAfter: number;
   createdAt: string;
 }
@@ -78,19 +82,19 @@ export interface DealerPayment {
   createdAt: string;
 }
 
-export interface InvoiceLineItem {
-  id?: string;
-  srNo: number;
-  description: string;
-  modelNo?: string;
-  serialNo?: string;
-  hsn?: string;
-  qty: number;
-  rate: number;
-  per?: string; // default "nos"
-  amount: number;
+export interface SaleItemDetail {
+  id: string;
   stockItemId?: string;
+  productName: string;
+  modelNumber?: string;
+  serialNumber?: string;
+  serialNumbers?: string[];
+  quantity: number;
+  unitPrice: number;
+  total: number;
 }
+
+export type OrderStatus = 'pending' | 'confirmed' | 'dispatched' | 'delivered' | 'cancelled';
 
 export interface TransactionEntry {
   id: string;
@@ -105,32 +109,44 @@ export interface TransactionEntry {
   stockItemId?: string;
   stockItemName?: string;
   quantity?: number;
-  unitPrice?: number;
-  category?: string;
+  modelNumber?: string;
+  model?: string;
+  serialNumber?: string;
+  docType?: 'invoice' | 'quotation';
+  agentName?: string;
   itemDetails: string;
-  lineItems?: InvoiceLineItem[];
+  itemsDetail?: SaleItemDetail[];
   totalAmount: number;
   payingNow: number;
   dueAmount: number; // totalAmount - payingNow
+  paymentMode: 'Cash' | 'Online' | string;
+  notes?: string;
+  orderStatus?: OrderStatus;
+  source?: 'pos' | 'online_cart';
+  deliveryType?: 'local' | 'outer';
+  deliveryFee?: number;
+  deliveryAddress?: string;
+  dispatchLocation?: 'Godown' | 'Shop';
+  confirmedAt?: string;
+  confirmedBy?: string;
+  createdAt: string;
+}
+
+export interface BillReceiptEntry {
+  id: string;
+  receiptNo: string; // Sequence: 1078, 1079, 1080...
+  date: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerVillage?: string;
+  againstInvoiceNo?: string; // Reference bill number e.g. "3848", "B-201"
+  billTotal?: number;
+  previousBalance: number; // आधीची बाकी
+  amountPaid: number; // आज जमा केलेली रक्कम
+  remainingBalance: number; // शिल्लक बाकी
   paymentMode: 'Cash' | 'Online';
-  refBillNo?: string;
-  againstBillNo?: string;
-  entryType?: 'Bill' | 'Receipt';
-  modelNo?: string;
-  serialNo?: string;
-  isQuotation?: boolean;
-  quotationValidity?: string;
-  hsnCode?: string;
-  buyerAddress?: string;
-  deliveryTerms?: string;
-  despatchThrough?: string;
-  destination?: string;
-  deliveryNote?: string;
-  supplierRef?: string;
-  buyersOrderNo?: string;
-  salesConsultant?: string;
-  warrantyMonths?: number;
-  warrantyExpiryDate?: string;
+  agentName?: string; // Shubham Shende, Bhushan Lidbe, Suraj Pendam, Ninad Hole, Counter
   notes?: string;
   createdAt: string;
 }
@@ -145,13 +161,10 @@ export interface Customer {
   totalPurchases?: number; // alias for totalPurchased
   totalPaid: number;
   balanceDue: number;
-  creditLimit?: number; // Maximum credit allowed (default e.g. 10000)
-  openingBalance?: number;
-  openingBalanceDate?: string;
   linkedCardNumber?: number;
   linkedSchemeId?: CardSchemeId;
   lastVisit?: string;
-  lastTransactionDate?: string;
+  createdAt?: string;
 }
 
 export interface StockItem {
@@ -159,36 +172,51 @@ export interface StockItem {
   name: string;
   code: string;
   category: string;
-  modelNo?: string;
-  brand?: string;
-  hsnCode?: string;
   quantity: number;
   unit: string;
   sellingPrice: number;
   purchasePrice: number;
   minStockLevel: number;
-  serialNumbers?: string[];
   imageUrl?: string;
   description?: string;
+  godownQty?: number; // मुख्य गोडावून मधील साठा (Godown / Warehouse Qty)
+  shopQty?: number; // दुकान / शोरूम मधील साठा (Shop / Showroom Qty)
+  godownLocation?: string; // गोडावून नाव / लोकेशन (उदा. मुख्य गोडावून, आर्वी रोड)
+  rackLocation?: string; // रॅक / कपाट क्रमांक
 }
 
-export interface PurchaseLineItem {
-  id?: string;
-  description: string;
-  modelNo?: string;
-  hsn?: string;
+export interface StockTransferRecord {
+  id: string;
+  date: string;
+  stockItemId: string;
+  itemName: string;
+  itemCode: string;
+  fromLocation: 'Godown' | 'Shop';
+  toLocation: 'Godown' | 'Shop';
   quantity: number;
+  transferredBy: string;
+  notes?: string;
+  timestamp: string;
+}
+
+export interface PurchaseItemDetail {
+  id: string;
+  description: string;
+  hsn: string;
+  qty: number;
   rate: number;
-  discount?: number;
+  discount: number;
   taxableAmount: number;
-  cgstRate?: number;
-  cgstAmount?: number;
-  sgstRate?: number;
-  sgstAmount?: number;
+  taxRate: number;
+  cgstRate: number;
+  cgstAmount: number;
+  sgstRate: number;
+  sgstAmount: number;
   igstRate?: number;
   igstAmount?: number;
+  taxAmount: number;
   totalAmount: number;
-  serialNumbers?: string[]; // e.g. ["JWH6512NRKA188661IN", "JWH6512NRKA188662IN"]
+  serialNumbers?: string[];
 }
 
 export interface PurchaseEntry {
@@ -199,38 +227,50 @@ export interface PurchaseEntry {
   supplierAddress?: string;
   supplierPhone?: string;
   supplierGstin?: string;
+  supplierState?: string;
+  
+  // Buyer Details
+  buyerName?: string;
+  buyerGstin?: string;
+  buyerAddress?: string;
+  
+  // Order & Logistics
   poNo?: string;
   poDate?: string;
+  location?: string;
   salesConsultant?: string;
   approvedBy?: string;
-  location?: string;
-  items: string;
-  lineItems?: PurchaseLineItem[];
-  taxableAmount?: number;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  totalAmount: number;
-  paidAmount: number;
-  status: 'Paid' | 'Partial' | 'Pending';
-  paymentMode: 'Cash' | 'Online' | 'Cheque';
-  dueDate?: string; // Credit payment due date
-  chequeNo?: string;
-  chequeDate?: string;
-  chequeStatus?: 'Pending' | 'Cleared' | 'Bounced';
   transporter?: string;
   vehicleNo?: string;
   ewayBillNo?: string;
   irn?: string;
-  ackDate?: string;
-  bankDetails?: {
-    bankName?: string;
+
+  // Items
+  items: string;
+  itemsDetail?: PurchaseItemDetail[];
+
+  // Financials & Tax
+  subtotal?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  totalTax?: number;
+  totalAmount: number;
+  paidAmount: number;
+  status: 'Paid' | 'Partial' | 'Pending';
+  paymentMode: 'Cash' | 'Online' | 'Cheque';
+  
+  // Supplier Bank Details
+  supplierBank?: {
     accountName?: string;
     accountNo?: string;
-    ifsc?: string;
+    ifscCode?: string;
+    bankName?: string;
     branch?: string;
   };
+
   notes?: string;
+  autoUpdateStock?: boolean;
 }
 
 export interface StaffMember {
@@ -242,10 +282,9 @@ export interface StaffMember {
   advancePaid: number;
   attendanceToday: 'Present' | 'Absent' | 'Half Day';
   email?: string;
-  password?: string;
-  status?: 'active' | 'pending_approval' | 'rejected';
-  registeredAt?: string;
-  approvedAt?: string;
+  status?: 'Active' | 'Pending Approval' | 'Inactive';
+  isApprovedByAdmin?: boolean;
+  approvalDate?: string;
   approvedBy?: string;
 }
 
@@ -256,6 +295,16 @@ export interface ExpenseEntry {
   description: string;
   amount: number;
   paymentMode: 'Cash' | 'Online';
+}
+
+export interface AgentAdvance {
+  id: string;
+  agentName: string;
+  date: string;
+  amount: number;
+  paymentMode: 'Cash' | 'Online';
+  notes?: string;
+  createdAt: string;
 }
 
 export interface DeliveryRatesConfig {
@@ -296,11 +345,9 @@ export interface BusinessSettings {
   whatsappSecondaryNumber?: string;
   bankDetails?: BusinessBankDetails;
   warrantyDisclaimer?: string;
-  upiId?: string;
-  upiPayeeName?: string;
-  whatsappGroupLink?: string;
   adminPassword?: string;
   staffPassword?: string;
+  whatsappGroupLink?: string;
 }
 
 export type UserRole = 'admin' | 'staff';
@@ -315,111 +362,103 @@ export interface AuthUser {
   loggedInAt: string;
 }
 
-export interface AgentAdvanceEntry {
-  id: string;
-  agentName: string;
-  date: string; // YYYY-MM-DD
-  amount: number;
-  paymentMode: 'Cash' | 'Online';
-  notes?: string;
-  createdAt: string;
-}
-
-export interface AgentDaySummary {
-  date: string;
-  agentName: string;
-  collectionAmount: number;
-  collectionCount: number;
-  collectionCommission: number; // 4%
-  newCardsCount: number;
-  newCardsBonus: number; // ₹50 per card
-  grossEarnings: number; // 4% comm + bonus
-  advancesPaid: number;
-  netPayable: number;
-}
-
 export type ActiveTab = 
   | 'dashboard'
   | 'add-entry'
+  | 'online-orders'
   | 'all-entries'
+  | 'bill-receipts'
   | 'card-scheme'
-  | 'agent-hisab'
+  | 'card-passbook'
   | 'customers'
-  | 'finance-calc'
   | 'stock'
   | 'purchases'
   | 'dealer-ledger'
   | 'csv-import'
   | 'uploaded-data'
   | 'staff'
+  | 'agent-commission'
   | 'expenses'
+  | 'finance-calc'
+  | 'furniture-job-cards'
+  | 'furniture-jobs'
+  | 'finance-do-register'
+  | 'finance-do'
+  | 'daily-reconciliation'
+  | 'daily-collection-log'
+  | 'village-khata'
   | 'settings';
 
-export interface DailyCashClosing {
+export interface FurnitureJobCard {
   id: string;
-  date: string;
-  expectedCash: number;
-  countedCash: number;
-  difference: number; // countedCash - expectedCash
-  denominations: {
-    note500: number;
-    note200: number;
-    note100: number;
-    note50: number;
-    note20: number;
-    note10: number;
-    coins: number;
-  };
-  cashSales: number;
-  cardCashPayments: number;
-  cashExpenses: number;
-  cashAdvances: number;
-  cashDealerPayments: number;
-  cashRefunds: number;
-  closedBy?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-export interface AgentDaySettlement {
-  id: string;
-  date: string;
-  agentName: string;
-  totalCollection: number;
-  collectionCount: number;
-  commissionEarned: number;
-  newCardsCount: number;
-  cardBonusEarned: number;
-  grossEarnings: number;
-  advancesDeducted: number;
-  netCommissionPayable: number;
-  cashHandedOverToShop: number;
-  settlementStatus: 'Settled' | 'Pending';
-  settledBy?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-export interface CardPrizeDeliveryChallan {
-  id: string;
-  challanNo: string;
-  date: string;
-  cardNumber: number;
+  jobNo: string;
   customerName: string;
   customerPhone: string;
-  village: string;
-  deliveryAddress: string;
-  schemeType: 'Scheme Complete (30 Months)' | 'Lucky Draw Winner';
-  itemsDelivered: string; // e.g. "LG 43-inch Smart LED TV + Godrej 185L Refrigerator"
-  modelNumber?: string;
-  serialNumber?: string;
-  deliveredByStaff?: string;
-  agentName?: string;
-  vehicleNumber?: string;
-  status: 'Delivered' | 'In Transit' | 'Pending Delivery';
+  itemType: 'Sofa Set' | 'Teak Bed' | 'Dining Table' | 'Wardrobe' | 'Dressing Table' | 'Mandir' | 'Custom Teak Item';
+  woodType: 'Pure Teak (सागवान)' | 'Engineered Teak' | 'Rosewood Polish';
+  dimensionOrSpecs: string;
+  totalAmount: number;
+  advancePaid: number;
+  balanceDue: number;
+  artisanName?: string;
+  orderDate: string;
+  targetDeliveryDate: string;
+  stage: 'Seasoning' | 'Cutting' | 'Carving' | 'Polishing' | 'Cushioning' | 'QC' | 'Ready' | 'Delivered';
+  notes?: string;
+  updatedAt: string;
+}
+
+export interface FinanceDORecord {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  invoiceNo: string;
+  itemName: string;
+  financeCompany: 'Bajaj Finserv' | 'TVS Credit' | 'HDB Financial' | 'IDFC First' | 'Shriram Finance' | 'Other';
+  doNumber: string;
+  sanctionedAmount: number;
+  customerDownPayment: number;
+  processingFee: number;
+  payoutStatus: 'Pending DO Verification' | 'Disbursed to Bank' | 'UTR Received' | 'Claim Rejected';
+  utrNumber?: string;
+  disbursedDate?: string;
   notes?: string;
   createdAt: string;
 }
 
+export interface DailyCashReconciliation {
+  id: string;
+  date: string;
+  openingCash: number;
+  cashSales: number;
+  cashSchemeDeposits: number;
+  cashKhataReceipts: number;
+  cashExpenses: number;
+  expectedCash: number;
+  physicalCash: number;
+  discrepancy: number;
+  denominations: {
+    c500: number;
+    c200: number;
+    c100: number;
+    c50: number;
+    c20: number;
+    c10: number;
+    coins: number;
+  };
+  closedBy: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface MergedCustomerRecord {
+  secondaryId: string;
+  secondaryName: string;
+  secondaryPhone?: string;
+  primaryId: string;
+  primaryName: string;
+  primaryPhone?: string;
+  mergedAt: string;
+}
 
 

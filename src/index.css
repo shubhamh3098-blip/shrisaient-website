@@ -3,197 +3,200 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Day Mode (Crisp High-Precision Professional Slate & Deep Emerald ERP Theme) */
-  --tactile-bg: #F8FAFC;
-  --tactile-bg-canvas: #F1F5F9;
-  --tactile-surface: #FFFFFF;
-  --tactile-surface-raised: #FFFFFF;
-  --tactile-surface-inset: #F8FAFC;
-  --tactile-border: #E2E8F0;
-  --tactile-border-subtle: #EDF2F7;
-  --tactile-border-focus: #0D5C4D;
-  --tactile-shadow-light: #FFFFFF;
-  --tactile-shadow-dark: rgba(15, 23, 42, 0.04);
-  --tactile-text-main: #1E293B;
-  --tactile-text-heading: #0F172A;
-  --tactile-text-muted: #64748B;
-  --tactile-text-dim: #94A3B8;
-  --tactile-primary: #0D5C4D;
-  --tactile-primary-hover: #084337;
-  --tactile-primary-text: #FFFFFF;
-  --tactile-accent-teal: #0D5C4D;
-  --tactile-accent-gold: #D97706;
-  --tactile-success: #059669;
-  --tactile-danger: #DC2626;
-  --tactile-warning: #D97706;
-}
+  /* Warm Sand & Minimalist Editorial Tokens (from Style Guide) */
+  --bg-app: #F5EFEB;
+  --bg-surface: #F9F5F0;
+  --bg-raised: #FAF7F2;
+  --bg-inset: #EDE7DE;
+  --card-surface: #FDFBF8;
+  --border-subtle: #E2DACF;
+  --border-prominent: #C8BDAE;
+  --brand-navy: #0F1D32;
+  --tech-teal: #0D7A70;
+  --accent-cyan: #0E7490;
+  --text-primary: #1F2937;
+  --text-secondary: #57534E;
+  --text-muted: #78716C;
 
-.dark, [data-theme="night"], body.dark {
-  /* Night Mode (Tactile Obsidian Slate / Professional Emerald ERP Claymorphism) */
-  --tactile-bg: #0F172A;
-  --tactile-bg-canvas: #090D16;
-  --tactile-surface: #1E293B;
-  --tactile-surface-raised: #243044;
-  --tactile-surface-inset: #0F172A;
-  --tactile-border: rgba(255, 255, 255, 0.1);
-  --tactile-border-subtle: rgba(255, 255, 255, 0.06);
-  --tactile-border-focus: #10B981;
-  --tactile-shadow-light: rgba(255, 255, 255, 0.05);
-  --tactile-shadow-dark: rgba(0, 0, 0, 0.6);
-  --tactile-text-main: #E2E8F0;
-  --tactile-text-heading: #F8FAFC;
-  --tactile-text-muted: #94A3B8;
-  --tactile-text-dim: #64748B;
-  --tactile-primary: #0D5C4D;
-  --tactile-primary-hover: #107562;
-  --tactile-primary-text: #FFFFFF;
-  --tactile-accent-teal: #10B981;
-  --tactile-accent-gold: #F59E0B;
-  --tactile-success: #10B981;
-  --tactile-danger: #EF4444;
-  --tactile-warning: #F59E0B;
-}
-
-/* Global transitions for theme toggling */
-body {
-  background-color: var(--tactile-bg);
-  color: var(--tactile-text-main);
-  transition: background-color 0.25s ease, color 0.25s ease;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  /* Tactile Shadows */
+  --shadow-raised: 4px 4px 10px rgba(180, 168, 150, 0.35), -4px -4px 10px rgba(255, 255, 255, 0.9);
+  --shadow-inset: inset 2px 2px 5px rgba(170, 158, 140, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.85);
+  --shadow-flat: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 html {
-  overflow-x: hidden;
-  -webkit-text-size-adjust: 100%;
-}
-
-/* FIX: Ensure input text is ALWAYS crisp, high-contrast, and visible on mobile and desktop */
-input, select, textarea {
-  color: #111827;
-  background-color: #ffffff;
-}
-
-.dark input, .dark select, .dark textarea {
-  color: #F8FAFC !important;
-  background-color: #1E2533 !important;
-}
-
-/* Tactile Input Class for perfect visibility in light and dark mode */
-.tactile-input {
-  background-color: var(--tactile-surface-raised) !important;
-  color: var(--tactile-text-main) !important;
-  border: 1px solid var(--tactile-border) !important;
-  box-shadow: inset 1px 1px 3px var(--tactile-shadow-dark);
-}
-.tactile-input:focus {
-  border-color: var(--tactile-border-focus) !important;
-  box-shadow: 0 0 0 3px rgba(15, 76, 92, 0.2) !important;
-}
-.tactile-input::placeholder {
-  color: var(--tactile-text-muted) !important;
-  opacity: 0.85;
-}
-
-/* Typography pairing */
-.font-display {
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  letter-spacing: -0.02em;
-}
-
-.font-serif-luxury {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Yantramanav', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.font-mono-num {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
+/* Day Mode (Soft Warm Sand & Pure Tactile Surfaces) */
+body {
+  background-color: #F5EFEB;
+  color: #1F2937;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Tactile Foundations Classes */
-.tactile-canvas {
-  background-color: var(--tactile-bg);
-  color: var(--tactile-text-main);
+/* Night Mode (Deep Obsidian Slate & Rich Teal Glow) */
+.dark body {
+  background-color: #0B1120;
+  color: #E2E8F0;
 }
 
-.tactile-card {
-  background-color: var(--tactile-surface);
-  border: 1px solid var(--tactile-border);
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
-  border-radius: 1rem;
+.dark {
+  --bg-app: #0B1120;
+  --bg-surface: #0F172A;
+  --bg-raised: #152238;
+  --bg-inset: #090E17;
+  --card-surface: #0F172A;
+  --border-subtle: #1E293B;
+  --border-prominent: #334155;
+  --brand-navy: #F1F5F9;
+  --tech-teal: #14B8A6;
+  --accent-cyan: #38BDF8;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+
+  --shadow-raised: 4px 4px 12px rgba(0, 0, 0, 0.5), -2px -2px 8px rgba(255, 255, 255, 0.03);
+  --shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.7), inset -2px -2px 6px rgba(255, 255, 255, 0.04);
+  --shadow-flat: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.tactile-card-raised {
-  background-color: var(--tactile-surface-raised);
-  border: 1px solid var(--tactile-border);
-  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
-  border-radius: 1rem;
+/* Refined Typography for Marathi & Devanagari numerals/text */
+.font-marathi {
+  font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;
+  letter-spacing: 0.01em;
 }
 
-.tactile-card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.tactile-card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+/* High Contrast & Clear Visibility for all Inputs & Search Boxes */
+input, select, textarea {
+  color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+  font-weight: 600;
+  caret-color: #00523f;
 }
 
-.tactile-card-modal {
-  background-color: var(--tactile-surface);
-  border: 1px solid var(--tactile-border);
-  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.06);
-  border-radius: 1.25rem;
+/* In Dark Mode: dark inputs get light text, while white/light inputs ALWAYS keep dark text */
+.dark input, .dark select, .dark textarea {
+  color: #f8fafc;
+  -webkit-text-fill-color: #f8fafc;
+  caret-color: #38bdf8;
+}
+
+/* Explicit overrides to prevent white-on-white invisible text in modals and search boxes */
+input.bg-white,
+input[class*="bg-white"],
+select.bg-white,
+textarea.bg-white,
+.bg-white input,
+.bg-white select,
+.bg-white textarea,
+.dark input.bg-white:not([class*="dark:bg-slate"]),
+.dark input[class*="bg-white"]:not([class*="dark:bg-slate"]),
+.dark select.bg-white:not([class*="dark:bg-slate"]),
+.dark textarea.bg-white:not([class*="dark:bg-slate"]) {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #00523f !important;
+}
+
+/* Dark themed input fields */
+.dark input[class*="dark:bg-slate-900"],
+.dark input[class*="dark:bg-slate-800"],
+.dark textarea[class*="dark:bg-slate-900"],
+.dark textarea[class*="dark:bg-slate-800"],
+.dark select[class*="dark:bg-slate-900"] {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #38bdf8 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #64748b !important; /* Clear Slate-500 placeholder */
+  -webkit-text-fill-color: #64748b !important;
+  font-weight: 400 !important;
+  opacity: 1 !important;
+}
+
+/* On mobile devices, ensure inputs are at least 16px to prevent iOS auto-zoom latency & lag */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="email"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* Tactile Soft Neumorphic Layer Utility Classes matching Style Guide */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tactile-raised {
+  background-color: var(--card-surface);
+  box-shadow: 5px 5px 12px rgba(185, 172, 155, 0.38), -5px -5px 12px rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(226, 218, 207, 0.6);
+}
+
+.dark .tactile-raised {
+  background-color: #111A2E;
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.6), -2px -2px 8px rgba(255, 255, 255, 0.03);
+  border: 1px solid #1E2B45;
 }
 
 .tactile-inset {
-  background-color: var(--tactile-surface-inset);
-  border: 1px solid var(--tactile-border-subtle);
+  background-color: #EDE6DC;
+  box-shadow: inset 3px 3px 6px rgba(175, 163, 145, 0.4), inset -3px -3px 6px rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(215, 205, 190, 0.7);
 }
 
-.tactile-pressed {
-  background-color: var(--tactile-surface-inset);
+.dark .tactile-inset {
+  background-color: #0A0F1D;
+  box-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.75), inset -2px -2px 6px rgba(255, 255, 255, 0.03);
+  border: 1px solid #162035;
 }
 
 .tactile-btn-primary {
-  background-color: var(--tactile-primary);
-  color: var(--tactile-primary-text);
-  box-shadow: 0 1px 2px 0 rgba(13, 92, 77, 0.2);
-  transition: all 0.15s ease;
+  background: linear-gradient(135deg, #0D7A70 0%, #08564F 100%);
+  box-shadow: 3px 3px 8px rgba(13, 122, 112, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.8);
+  color: #FFFFFF;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.tactile-btn-primary:hover {
-  background-color: var(--tactile-primary-hover);
-  box-shadow: 0 4px 6px -1px rgba(13, 92, 77, 0.25);
-  transform: translateY(-1px);
-}
+
 .tactile-btn-primary:active {
-  transform: translateY(0);
+  transform: scale(0.98);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+.dark .tactile-btn-primary {
+  background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%);
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.3);
+  color: #042F2E;
+  font-weight: 700;
 }
 
 .tactile-btn-secondary {
-  background-color: var(--tactile-surface);
-  color: var(--tactile-text-main);
-  border: 1px solid var(--tactile-border);
-  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
-  transition: all 0.15s ease;
-}
-.tactile-btn-secondary:hover {
-  background-color: var(--tactile-surface-inset);
-  transform: translateY(-1px);
-}
-.tactile-btn-secondary:active {
-  transform: translateY(0);
+  background-color: var(--card-surface);
+  box-shadow: 3px 3px 7px rgba(185, 172, 155, 0.35), -3px -3px 7px rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(226, 218, 207, 0.7);
+  transition: all 0.18s ease;
 }
 
-.tactile-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 9999px;
-  font-weight: 600;
-  box-shadow: 2px 2px 5px var(--tactile-shadow-dark), -1px -1px 3px var(--tactile-shadow-light);
+.dark .tactile-btn-secondary {
+  background-color: #152238;
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.5);
+  border: 1px solid #1E2D4A;
 }
 
 @keyframes fadeIn {
@@ -212,133 +215,150 @@ input, select, textarea {
 }
 
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 6mm 8mm 6mm 8mm;
-  }
-
-  body {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    font-size: 10pt;
+  * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
-  /* When printing any modal (passbook, invoice, receipt, quotation, order, finance), HIDE #root completely to prevent background page printing */
-  body.has-passbook-modal #root,
-  body.printing-passbook #root,
-  body.has-invoice-modal #root,
-  body.printing-invoice #root,
-  body.has-finance-modal #root,
-  body.printing-finance #root,
-  body.printing-isolated #root {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 6mm 8mm;
   }
 
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide app shell, navigation, modals backdrop, background views, and non-print elements */
   .no-print,
   #app-sidebar,
   header,
   nav,
-  .tactile-mobile-nav,
-  .quick-action-bar,
-  #bottom-mobile-nav {
+  footer,
+  aside,
+  button,
+  .mobile-bottom-nav,
+  .toaster,
+  [data-sonner-toaster] {
     display: none !important;
   }
 
-  #printable-passbook,
-  #printable-finance-slip {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
+  /*
+   * UNIVERSAL PRINTABLE MODAL ISOLATION:
+   * When any printable document is present in the DOM:
+   * 1. Make the body and background views invisible so background ERP views and other components don't bleed or create extra pages.
+   * 2. Make ONLY the printable document and its children visible.
+   * 3. Position the printable document at the top-left of the printed page in natural flow.
+   */
+  body:has([id^="printable-"]),
+  body.is-printing-modal,
+  body.is-printing-ledger {
+    visibility: hidden !important;
+    background: transparent !important;
   }
 
-  #printable-invoice {
+  body:has([id^="printable-"]) [id^="printable-"],
+  body:has([id^="printable-"]) [id^="printable-"] *,
+  body.is-printing-modal [id^="printable-"],
+  body.is-printing-modal [id^="printable-"] *,
+  body.is-printing-ledger #printable-ledger,
+  body.is-printing-ledger #printable-ledger * {
+    visibility: visible !important;
+  }
+
+  /* Reset fixed backdrop and modal wrappers in print so content is never clipped or trapped */
+  .fixed.inset-0,
+  div[class*="fixed inset-0"] {
+    position: static !important;
+    background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
     box-shadow: none !important;
     border: none !important;
   }
 
-  .gst-invoice-sheet {
-    box-shadow: none !important;
-    border: 2px solid #000 !important;
+  /* Ensure modal dialog boxes don't constrain height during print */
+  div[class*="h-[95vh]"],
+  div[class*="max-h-[92vh]"],
+  div[class*="overflow-y-auto"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* All printable document containers take full printable width at the top */
+  #printable-invoice,
+  #printable-ledger,
+  #printable-receipt,
+  #printable-passbook,
+  #printable-order-bill,
+  #printable-dealer-ledger,
+  [id^="printable-"] {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Force ledger table to be visible on mobile print, and hide mobile feed */
+  #printable-ledger .ledger-table-container {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  #printable-ledger .ledger-mobile-cards {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Single-page documents should never create extra trailing pages */
+  #printable-invoice,
+  #printable-receipt,
+  #printable-order-bill {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   table {
-    page-break-inside: auto;
-  }
-
-  thead {
-    display: table-header-group;
+    page-break-inside: auto !important;
+    width: 100% !important;
   }
 
   tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
-}
-
-/* Mobile Fit & Performance Enhancements */
-:root {
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
-}
-
-@supports (padding: env(safe-area-inset-bottom)) {
-  .safe-area-bottom,
-  .safe-area-pb {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
-  }
-  .safe-area-bottom-nav {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* Hide scrollbar for clean swipeable mobile action bars */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-@media (max-width: 768px) {
-  /* Prevent horizontal scrolling on mobile */
-  .mobile-fit-container {
-    max-width: 100vw;
-    overflow-x: hidden;
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
   }
 
-  /* Fast, responsive touch targets */
-  button, a, input, select {
-    min-height: 40px;
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
   }
 }
-
-/* Laptop Density (1366x768 to 1920x1080 at 100%-125% Windows scaling) */
-@media (min-width: 1024px) and (max-height: 900px) {
-  .tactile-card {
-    padding: 1rem !important;
-  }
-  table th,
-  table td {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-  }
-  .summary-metric-card {
-    padding: 0.75rem 1rem !important;
-  }
-}
-

@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  MapPin
 } from 'lucide-react';
 import { CardTransaction, TransactionEntry, CardMember, StaffMember, AgentAdvance, BusinessSettings } from '../types';
 
@@ -481,6 +482,32 @@ export const AgentCollectionDashboardSection: React.FC<AgentCollectionDashboardS
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Direct Action Hub for Detailed Register & Village-wise Khata */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>तपशीलवार वसुली याद्या, पावती प्रिंट व गावांच्या याद्या:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate('daily-collection-log')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>📋 दैनिक वसुली रजिस्टर व प्रिंट</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('village-khata')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>📍 गाववार उधारी व कार्ड (Route Sheet)</span>
+          </button>
         </div>
       </div>
 

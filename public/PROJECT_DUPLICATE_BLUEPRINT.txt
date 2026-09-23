@@ -1,0 +1,177 @@
+================================================================================
+SHRI SAI ENTERPRISES - ERP & BUSINESS MANAGEMENT SYSTEM
+CLEAN PROJECT DUPLICATE BLUEPRINT & CODE SETUP GUIDE (EXCLUDING CSV DATA)
+================================================================================
+
+या डॉक्युमेंटमध्ये तुमच्या 'Shri Sai Enterprises' ॲप्लिकेशनची संपूर्ण नवीन / डुप्लिकेट 
+कॉपी तयार करण्यासाठी लागणारे सर्व आवश्यक कॉन्फिगरेशन, पॅकेजेस, फोल्डर स्ट्रक्चर आणि 
+सेटअप स्टेप्स दिलेल्या आहेत. यामध्ये कोणताही जुना CSV किंवा प्रायव्हेट डेटा समाविष्ट नाही.
+
+--------------------------------------------------------------------------------
+1. DIRECT DOWNLOAD LINKS (थेट डाऊनलोड लिंक्स)
+--------------------------------------------------------------------------------
+तुमच्या या चालू प्रोजेक्टमधून तुम्ही थेट संपूर्ण कोड व TXT फाईल खालील लिंक्सवरून डाऊनलोड करू शकता:
+
+A. संपूर्ण क्लीन सोर्स कोड ZIP (Without CSV data):
+   https://ais-dev-ux56jf2kjbzj3vjnasguts-479913568859.asia-east1.run.app/shri-sai-enterprises-clean-source.zip
+
+B. ही ब्लूप्रिंट TXT फाईल:
+   https://ais-dev-ux56jf2kjbzj3vjnasguts-479913568859.asia-east1.run.app/PROJECT_DUPLICATE_BLUEPRINT.txt
+
+C. AI Studio मधील मेन्यू पर्याय:
+   AI Studio च्या वरच्या उजव्या कोपऱ्यातील Settings / More (⋮) मेन्यूवर क्लिक करून 
+   'Export to ZIP' किंवा 'Export to GitHub' द्वारे तुम्ही एका क्लिकमध्ये संपूर्ण प्रोजेक्ट एक्सपोर्ट करू शकता.
+
+
+--------------------------------------------------------------------------------
+2. PROJECT TECH STACK & ARCHITECTURE (प्रोजेक्ट तंत्रज्ञान)
+--------------------------------------------------------------------------------
+- Frontend: React 19 + TypeScript + Vite + Tailwind CSS
+- Animation: Motion (Framer Motion v12)
+- Icons: Lucide React
+- Backend: Node.js + Express (Full-stack API proxy for Google Gemini AI)
+- PWA: Vite PWA (Offline Service Worker, Installable Mobile Web App)
+- Database & Sync:
+  * Local: IndexedDB (Client-side offline-first persistence) + LocalStorage
+  * Cloud: Google Cloud Firestore (Realtime sync & multi-device sync)
+- AI Vision: Google Gemini 2.5 Flash / Gemini Multimodal for Purchase Invoice Scanning
+
+
+--------------------------------------------------------------------------------
+3. PROJECT DIRECTORY STRUCTURE (फोल्डर रचना)
+--------------------------------------------------------------------------------
+shri-sai-enterprises/
+├── package.json               # सर्व लायब्ररी आणि रन/बिल्ड स्क्रिप्ट्स
+├── tsconfig.json              # TypeScript कंपायलर कॉन्फिगरेशन
+├── vite.config.ts             # Vite + Tailwind + PWA बंडलर कॉन्फिग
+├── index.html                 # मुख्य HTML एंट्री पॉईंट (SEO & PWA मेटा टॅग्ज)
+├── server.ts                  # Express बॅकएंड (Gemini API & स्टॅटिक होस्टिंग)
+├── metadata.json              # AI Studio ॲप मेटाडेटा व परवानग्या
+├── .env.example               # आवश्यक Environment Variables
+├── public/                    # PWA आयकॉन्स, मॅनिफेस्ट आणि पब्लिक ॲसेट्स
+│   ├── favicon.png
+│   ├── icon.svg
+│   ├── pwa-192x192.png
+│   ├── pwa-512x512.png
+│   ├── pwa-maskable-512x512.png
+│   └── PROJECT_DUPLICATE_BLUEPRINT.txt
+└── src/
+    ├── main.tsx               # React DOM माउंट आणि PWA SW रजिस्ट्रेशन
+    ├── App.tsx                # मुख्य ॲप कंट्रोलर, स्टेट मॅनेजमेंट आणि टॅब स्विचिंग
+    ├── index.css              # ग्लोबल Tailwind स्टाईल्स
+    ├── types.ts               # सर्व TypeScript मॉडेल्स व डेटा स्ट्रक्चर्स
+    ├── context/
+    │   └── ThemeContext.tsx   # डार्क / लाईट थीम प्रोव्हायडर
+    ├── lib/
+    │   └── firebase.ts        # Firestore क्लाउड डेटाबेस सिंक आणि ऑथेंटिकेशन
+    ├── utils/
+    │   ├── storage.ts         # लोकल डेटाबेस लोडिंग, सेव्हिंग व डीफॉल्ट सेटिंग्स
+    │   ├── indexedDb.ts       # मोठ्या डेटासाठी जलद IndexedDB इंजिन
+    │   ├── numbering.ts       # स्वयंचलित बिल व पावती क्रमांक जनरेटर
+    │   ├── customerDeduplication.ts # डुप्लिकेट ग्राहक शोध व मर्ज टूल
+    │   └── exportUtils.ts     # PDF, Excel, JSON आणि CSV एक्सपोर्ट मेकॅनिझम
+    └── components/
+        ├── Sidebar.tsx        # मुख्य नेव्हिगेशन मेन्यू
+        ├── DashboardView.tsx  # बिझनेस समरी, आकडेवारी, चार्ट्स
+        ├── AddEntryView.tsx   # नवीन विक्री, जमा, खर्च आणि परचेस एंट्री
+        ├── AllEntriesView.tsx # संपूर्ण व्यवहारांची दैनिक नोंदवही
+        ├── CustomersView.tsx  # ग्राहक यादी, उधारी हिशोब, लेजर आणि व्हॉट्सॲप
+        ├── CardSchemeView.tsx # ३० महिन्यांची साप्ताहिक/मासिक कार्ड बचत योजना
+        ├── InventoryView.tsx  # इलेक्ट्रॉनिक्स व फर्निचर स्टॉक मॅनेजमेंट
+        ├── StaffManagementView.tsx # कर्मचारी पगार, उचल (Advance), हजेरी
+        ├── ReportsView.tsx    # नफा-तोटा, विक्री अहवाल आणि ऑडिट
+        ├── SettingsView.tsx   # दुकान प्रोफाइल, बिल प्रिंटर सेटिंग्स, बॅकअप
+        └── ScanPurchaseInvoiceModal.tsx # AI द्वारे खरेदी बिल स्कॅनिंग
+
+
+--------------------------------------------------------------------------------
+4. EXACT PACKAGE.JSON (डिपेंडन्सीज व स्क्रिप्ट्स)
+--------------------------------------------------------------------------------
+{
+  "name": "shri-sai-enterprises",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Shri Sai Enterprises Wardha - Electronics & Furniture ERP",
+  "type": "module",
+  "main": "dist/server.cjs",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
+    "esbuild": "^0.25.0",
+    "express": "^4.21.2",
+    "firebase": "^12.19.0",
+    "jszip": "^3.10.2",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3",
+    "vite-plugin-pwa": "^1.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jszip": "^3.4.1",
+    "@types/node": "^22.14.0"
+  }
+}
+
+
+--------------------------------------------------------------------------------
+5. ENVIRONMENT VARIABLES (.env.example)
+--------------------------------------------------------------------------------
+# Google Gemini API Key for AI Invoice Scanning
+GEMINI_API_KEY=
+
+# Firebase Client Configuration (Cloud Firestore Real-time Sync साठी)
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+
+
+--------------------------------------------------------------------------------
+6. HOW TO RUN / SETUP A FRESH COPY (नवीन डुप्लिकेट कसे सुरू करावे)
+--------------------------------------------------------------------------------
+स्टेप १: ZIP फाईल डाऊनलोड करून नवीन फोल्डरमध्ये Unzip करा:
+   `unzip shri-sai-enterprises-clean-source.zip -d shri-sai-enterprises`
+   `cd shri-sai-enterprises`
+
+स्टेप २: आवश्यक लायब्ररी इन्स्टॉल करा:
+   `npm install`
+
+स्टेप ३: डेव्हलपमेंट मोडमध्ये ॲप चालवा:
+   `npm run dev`
+   (हे http://localhost:3000 वर सुरू होईल)
+
+स्टेप ४: प्रॉडक्शन बिल्ड तयार करा:
+   `npm run build`
+
+स्टेप ५: प्रॉडक्शन सर्व्हर सुरू करा:
+   `npm start`
+
+
+--------------------------------------------------------------------------------
+7. CLEAN STATE & ZERO CSV DATA POLICY
+--------------------------------------------------------------------------------
+- या तयार केलेल्या क्लीन सोर्स कोडमध्ये कोणत्याही जुन्या कस्टमर्सचा अथवा विक्रीचा CSV डेटा 
+  (sales_data.csv) नाही.
+- ॲप प्रथमच उघडल्यावर सुरुवातीला स्वच्छ फ्रेश डेटाबेससह लोड होते.
+- दुकान मालक 'सेटिंग्ज' टॅबमधून स्वतःचा नवीन डेटा जोडू शकतात किंवा त्यांच्या 
+  आवश्यकतेनुसार स्वतःचा बॅकअप JSON इम्पोर्ट करू शकतात.
+================================================================================

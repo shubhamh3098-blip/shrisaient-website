@@ -15,20 +15,6 @@ import {
 import { BusinessSettings } from '../types';
 import { AppLogo } from './AppLogo';
 
-export interface OrderFinanceDetails {
-  provider: 'bajaj' | 'tvs' | 'idfc' | 'hdb' | 'shri_sai_card';
-  providerName: string;
-  tenureMonths: number;
-  schemeName: string;
-  downPayment: number;
-  monthlyEmi: number;
-  advanceEmis: number;
-  processingFee: number;
-  customerDocType?: string;
-  customerDocNumber?: string;
-  employmentType?: string;
-}
-
 export interface OrderBillData {
   invoiceNo: string;
   date: string;
@@ -46,8 +32,6 @@ export interface OrderBillData {
   deliveryFee: number;
   grandTotal: number;
   notes?: string;
-  paymentMode?: 'Cash on Delivery' | 'UPI' | 'Finance EMI';
-  financeDetails?: OrderFinanceDetails;
 }
 
 interface OrderBillModalProps {
@@ -69,19 +53,9 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
     const itemsList = order.items
       .map(
         (it, idx) =>
-          `${idx + 1}. *${it.name}* x ${it.quantity} = ₹${(Number(it.total) || 0).toLocaleString()}`
+          `${idx + 1}. *${it.name}* x ${it.quantity} = ₹${it.total.toLocaleString()}`
       )
       .join('\n');
-
-    const financeText = order.financeDetails
-      ? `*पेमेंट प्रकार:* ⚡ फायनान्स ईएमआय (${order.financeDetails.providerName})\n` +
-        `*योजना:* ${order.financeDetails.schemeName}\n` +
-        `*कालावधी:* ${order.financeDetails.tenureMonths} महिने\n` +
-        `*मासिक हप्ता (Monthly EMI):* ₹${(Number(order.financeDetails.monthlyEmi) || 0).toLocaleString()} / महिना\n` +
-        `*डाऊन पेमेंट:* ₹${(Number(order.financeDetails.downPayment) || 0).toLocaleString()}\n` +
-        (order.financeDetails.customerDocNumber ? `*केवायसी/कार्ड नंबर:* ${order.financeDetails.customerDocNumber}\n` : '') +
-        (order.financeDetails.employmentType ? `*रोजगार प्रकार:* ${order.financeDetails.employmentType}\n` : '')
-      : `*पेमेंट प्रकार:* ${order.paymentMode || 'कॅश ऑन डिलिव्हरी (COD) / UPI'}\n`;
 
     return (
       `*श्री साई इंटरप्राइजेस - अधिकृत ऑनलाइन ऑर्डर बिल*\n` +
@@ -95,10 +69,10 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
       `--------------------------------\n` +
       `*खरेदी केलेल्या वस्तू (Items):*\n${itemsList}\n` +
       `--------------------------------\n` +
-      `*एकूण वस्तू मूल्य (Subtotal):* ₹${(Number(order.subtotal) || 0).toLocaleString()}\n` +
+      `*एकूण वस्तू मूल्य (Subtotal):* ₹${order.subtotal.toLocaleString()}\n` +
       `*डिलिव्हरी शुल्क (Delivery Charge):* ${order.deliveryFee === 0 ? 'मोफत (FREE)' : `₹${order.deliveryFee}`}\n` +
-      `*एकूण देय रक्कम (Grand Total):* ₹${(Number(order.grandTotal) || 0).toLocaleString()}\n` +
-      financeText +
+      `*एकूण देय रक्कम (Grand Total):* ₹${order.grandTotal.toLocaleString()}\n` +
+      `*पेमेंट प्रकार:* कॅश ऑन डिलिव्हरी (COD) / UPI\n` +
       (order.notes ? `*टीप:* ${order.notes}\n` : '') +
       `--------------------------------\n` +
       `*दुकान:* श्री साई इंटरप्राइजेस\n` +
@@ -141,8 +115,8 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-fade-in my-auto">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:static print:bg-white">
+      <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-fade-in my-auto print:my-0 print:border-none print:shadow-none print:rounded-none print:max-w-none">
         {/* Top Control Bar (Hidden when printing) */}
         <div className="no-print bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
@@ -295,10 +269,10 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
                       {item.quantity}
                     </td>
                     <td className="py-2 px-3 text-right text-slate-600">
-                      ₹{(Number(item.unitPrice) || 0).toLocaleString()}
+                      ₹{item.unitPrice.toLocaleString()}
                     </td>
                     <td className="py-2 px-3 text-right font-bold text-slate-900">
-                      ₹{(Number(item.total) || 0).toLocaleString()}
+                      ₹{item.total.toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -310,49 +284,14 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-1">
             {/* Payment Mode and Bank Info */}
             <div className="w-full sm:w-1/2 space-y-2 text-xs">
-              {order.financeDetails ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-900 text-xs flex items-center gap-1">
-                      ⚡ फायनान्स: {order.financeDetails.providerName}
-                    </span>
-                    <span className="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.2 rounded">
-                      मंजूर (Approved)
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-800">
-                    योजना: {order.financeDetails.schemeName}
-                  </p>
-                  <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] font-mono">
-                    <div className="bg-white/80 p-1 rounded border border-blue-100">
-                      <span className="text-slate-500 block">मासिक हप्ता (EMI):</span>
-                      <strong className="text-blue-700 text-xs">
-                        ₹{(Number(order.financeDetails.monthlyEmi) || 0).toLocaleString()}/महिना
-                      </strong>
-                    </div>
-                    <div className="bg-white/80 p-1 rounded border border-blue-100">
-                      <span className="text-slate-500 block">डाऊन पेमेंट (DP):</span>
-                      <strong className="text-emerald-700 text-xs">
-                        ₹{(Number(order.financeDetails.downPayment) || 0).toLocaleString()}
-                      </strong>
-                    </div>
-                  </div>
-                  {order.financeDetails.customerDocNumber && (
-                    <p className="text-[10px] text-slate-600 pt-0.5 font-mono">
-                      दस्तऐवज/कार्ड: {order.financeDetails.customerDocNumber}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
-                  <span className="font-bold text-emerald-900 text-xs block">
-                    पेमेंट पद्धत: {order.paymentMode || 'कॅश ऑन डिलिव्हरी (COD) / UPI'}
-                  </span>
-                  <p className="text-[10px] text-emerald-700 mt-0.5">
-                    वस्तू घरात पोहोचल्यावर रोख किंवा फोनपे/गुगलपे द्वारे भरा.
-                  </p>
-                </div>
-              )}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
+                <span className="font-bold text-emerald-900 text-xs block">
+                  पेमेंट पद्धत: कॅश ऑन डिलिव्हरी (COD) / UPI
+                </span>
+                <p className="text-[10px] text-emerald-700 mt-0.5">
+                  वस्तू घरात पोहोचल्यावर रोख किंवा फोनपे/गुगलपे द्वारे भरा.
+                </p>
+              </div>
 
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-[10px] font-mono space-y-0.5">
                 <span className="font-bold text-slate-700 block font-sans">
@@ -368,7 +307,7 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
             <div className="w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 font-mono">
               <div className="flex justify-between text-slate-600">
                 <span>उप-एकूण (Subtotal):</span>
-                <span className="font-bold text-slate-900">₹{(Number(order.subtotal) || 0).toLocaleString()}</span>
+                <span className="font-bold text-slate-900">₹{order.subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>होम डिलिव्हरी शुल्क:</span>
@@ -378,7 +317,7 @@ export const OrderBillModal: React.FC<OrderBillModalProps> = ({
               </div>
               <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
                 <span>एकूण देय रक्कम:</span>
-                <span className="text-base text-blue-700">₹{(Number(order.grandTotal) || 0).toLocaleString()}</span>
+                <span className="text-base text-blue-700">₹{order.grandTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
