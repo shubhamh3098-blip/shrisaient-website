@@ -476,7 +476,7 @@ export const ServiceComplaintSection: React.FC<ServiceComplaintSectionProps> = (
           {selectedTicket ? (
             <div className="space-y-4">
               {/* Job Card Box */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-5 shadow-xl relative overflow-hidden text-slate-900 dark:text-white space-y-4">
+              <div id="printable-service-jobsheet" className="bg-white dark:bg-slate-900 border-2 border-amber-500/40 rounded-3xl p-5 shadow-xl relative overflow-hidden text-slate-900 dark:text-white space-y-4 print:border-none print:shadow-none print:p-0">
                 <div className="border-b border-amber-100 dark:border-slate-800 pb-3 flex items-start justify-between">
                   <div>
                     <span className="px-2 py-0.5 rounded-md bg-amber-600 text-white font-black text-[9px] uppercase tracking-widest">

@@ -961,7 +961,7 @@ export const VillageKhataRouteView: React.FC<VillageKhataRouteViewProps> = ({
             </div>
 
             {/* Printable Area (A4 layout) */}
-            <div className="p-6 sm:p-8 overflow-y-auto flex-1 bg-white print:p-0">
+            <div id="printable-village-route" className="p-6 sm:p-8 overflow-y-auto flex-1 bg-white print:p-0 print:border-none print:shadow-none">
               <div className="max-w-3xl mx-auto space-y-6 text-slate-900 border border-slate-300 p-6 rounded-xl shadow-xs print:border-none print:p-0">
                 {/* Header */}
                 <div className="text-center border-b-2 border-slate-900 pb-4">

@@ -250,18 +250,18 @@ input::placeholder, textarea::placeholder {
     display: none !important;
   }
 
-  /*
+  /* 
    * UNIVERSAL PRINTABLE MODAL ISOLATION:
    * When any printable document is present in the DOM:
    * 1. Make the body and background views invisible so background ERP views and other components don't bleed or create extra pages.
    * 2. Make ONLY the printable document and its children visible.
-   * 3. Position the printable document at the top-left of the printed page in natural flow.
+   * 3. Position the printable document at the top of the printed page with relative flow for multi-page pagination.
    */
   body:has([id^="printable-"]),
   body.is-printing-modal,
   body.is-printing-ledger {
     visibility: hidden !important;
-    background: transparent !important;
+    background: #ffffff !important;
   }
 
   body:has([id^="printable-"]) [id^="printable-"],
@@ -271,6 +271,12 @@ input::placeholder, textarea::placeholder {
   body.is-printing-ledger #printable-ledger,
   body.is-printing-ledger #printable-ledger * {
     visibility: visible !important;
+  }
+
+  /* When printing from a modal dialog, completely suppress all background page contents */
+  body:has(.fixed [id^="printable-"]) #root > div > *:not(.fixed) {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* Reset fixed backdrop and modal wrappers in print so content is never clipped or trapped */
@@ -292,33 +298,42 @@ input::placeholder, textarea::placeholder {
   /* Ensure modal dialog boxes don't constrain height during print */
   div[class*="h-[95vh]"],
   div[class*="max-h-[92vh]"],
+  div[class*="max-h-[95vh]"],
   div[class*="overflow-y-auto"] {
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
   }
 
-  /* All printable document containers take full printable width at the top */
+  /* All printable document containers take full printable width with multi-page flow */
   #printable-invoice,
   #printable-ledger,
   #printable-receipt,
   #printable-passbook,
   #printable-order-bill,
   #printable-dealer-ledger,
+  #printable-wedding-quotation,
+  #printable-daily-collection,
+  #printable-stock-challan,
+  #printable-purchase-invoice,
+  #printable-cash-reconciliation,
+  #printable-whatsapp-standee,
+  #printable-village-route,
+  #printable-agent-commission,
+  #printable-service-jobsheet,
+  #printable-dashboard-sheet,
   [id^="printable-"] {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
     display: block !important;
     box-shadow: none !important;
-    border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
   }
@@ -337,7 +352,8 @@ input::placeholder, textarea::placeholder {
   /* Single-page documents should never create extra trailing pages */
   #printable-invoice,
   #printable-receipt,
-  #printable-order-bill {
+  #printable-order-bill,
+  #printable-purchase-invoice {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: avoid !important;

@@ -85,7 +85,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div id="printable-dashboard-sheet" className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Top Banner */}
       <div className="bg-white dark:bg-[#0F172A] text-slate-900 dark:text-white rounded-2xl p-6 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors duration-200">
         <div className="space-y-1">

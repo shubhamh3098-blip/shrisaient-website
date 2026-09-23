@@ -34,6 +34,7 @@ import {
   FinanceCalculationInput,
   generateEmiScheduleWhatsAppText,
 } from '../utils/financeCalculator';
+import { getSafeWhatsAppUrl } from '../utils/numbering';
 
 interface FinanceCalculatorViewProps {
   settings: BusinessSettings;
@@ -66,7 +67,9 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
   const [interestRate, setInterestRate] = useState<number>(0);
   const [extraDownPayment, setExtraDownPayment] = useState<number>(0);
   const [processingFee, setProcessingFee] = useState<number>(FINANCE_PARTNERS[initialPartnerId]?.defaultProcessingFee || 799);
+  const [insuranceAmount, setInsuranceAmount] = useState<number>(0);
   const [dbdPercent, setDbdPercent] = useState<number>(0);
+  const [dbdAmount, setDbdAmount] = useState<number>(0);
 
   // Customer details for formal quotation & direct schedule sending
   const [customerName, setCustomerName] = useState<string>(initialCustomerName);
@@ -127,7 +130,9 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
       interestRate: Number(interestRate) || 0,
       extraDownPayment: Math.max(0, Number(extraDownPayment) || 0),
       processingFee: Math.max(0, Number(processingFee) || 0),
+      insuranceAmount: Math.max(0, Number(insuranceAmount) || 0),
       dbdPercent: Math.max(0, Number(dbdPercent) || 0),
+      dbdAmount: Math.max(0, Number(dbdAmount) || 0),
       customerName,
       customerPhone,
       startDate,
@@ -144,7 +149,9 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
     interestRate,
     extraDownPayment,
     processingFee,
+    insuranceAmount,
     dbdPercent,
+    dbdAmount,
     customerName,
     customerPhone,
     startDate,
@@ -187,9 +194,10 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
       `--------------------------------\n` +
       `💰 *मासिक हप्ता (Monthly EMI): ₹${result.monthlyEmi.toLocaleString('en-IN')} / महिना*\n` +
       `💳 *सुरुवातीला डाऊन पेमेंट: ₹${result.totalDownPayment.toLocaleString('en-IN')}*\n` +
-      `   (हप्ता ॲडव्हान्स: ₹${result.advanceEmisTotal.toLocaleString('en-IN')} + फाईल चार्ज: ₹${processingFee})\n` +
+      `   (हप्ता ॲडव्हान्स: ₹${result.advanceEmisTotal.toLocaleString('en-IN')} + प्रोसेसिंग फी: ₹${processingFee}${insuranceAmount > 0 ? ` + इन्शुरन्स: ₹${insuranceAmount.toLocaleString('en-IN')}` : ''})\n` +
       `📄 *कर्ज रक्कम (Financed): ₹${result.loanAmount.toLocaleString('en-IN')}*\n` +
       `⏱️ *एकूण उरलेले हप्ते: ${result.remainingMonths} महिने*\n` +
+      (result.dbdAmount > 0 ? `🏷️ *DBD / डीलर सबव्हेन्शन सवलत: ₹${result.dbdAmount.toLocaleString('en-IN')}*\n` : '') +
       `--------------------------------\n` +
       `📋 *आवश्यक कागदपत्रे (KYC Documents):*\n` +
       `1. आधार कार्ड (Aadhaar Card)\n` +
@@ -202,8 +210,7 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
       `संपर्क: ${settings.phone} / 8766486915\n` +
       `*फायनान्स त्वरित व खात्रीशीर मंजूर केले जाईल!*`
     );
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
+    const url = getSafeWhatsAppUrl(customerPhone, decodeURIComponent(text));
     window.open(url, '_blank');
   };
 
@@ -225,9 +232,7 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
       dueDay: emiDueDay,
     });
 
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    const encoded = encodeURIComponent(msgText);
-    const url = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+    const url = getSafeWhatsAppUrl(customerPhone, msgText);
     window.open(url, '_blank');
   };
 
@@ -537,6 +542,49 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    इन्शुरन्स / डिव्हाईस प्रोटेक्शन (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={insuranceAmount || ''}
+                    onChange={(e) => setInsuranceAmount(Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400">बजाज/कंपनी इन्शुरन्स डाऊन पेमेंटमध्ये</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    DBD / सबव्हेन्शन (₹ किंवा %)
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      value={dbdAmount || ''}
+                      onChange={(e) => {
+                        setDbdAmount(Number(e.target.value));
+                        setDbdPercent(0);
+                      }}
+                      placeholder="रक्कम ₹"
+                      className="w-1/2 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                    />
+                    <input
+                      type="number"
+                      value={dbdPercent || ''}
+                      onChange={(e) => {
+                        setDbdPercent(Number(e.target.value));
+                        setDbdAmount(0);
+                      }}
+                      placeholder="% टक्के"
+                      className="w-1/2 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400">दुकानदाराला मिळणाऱ्या रकमेतून वजावट</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                     व्याजदर (% Annual)
                   </label>
                   <input
@@ -640,7 +688,7 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
           </div>
 
           {/* Right Column: Hero Calculation Results & Quotation Slip (5 cols) */}
-          <div className="lg:col-span-5 space-y-5">
+          <div id="printable-finance-quote" className="lg:col-span-5 space-y-5 print:w-full print:m-0 print:p-0">
             {/* Primary Hero EMI Card */}
             <div className="bg-gradient-to-br from-[#0c1a30] via-[#091527] to-[#040914] rounded-2xl p-6 text-white shadow-2xl border border-slate-800 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
@@ -694,6 +742,22 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
                   <div className="flex justify-between">
                     <span>फाईल चार्ज / प्रोसेसिंग फी:</span>
                     <span className="font-mono">₹{processingFee.toLocaleString('en-IN')}</span>
+                  </div>
+                  {insuranceAmount > 0 && (
+                    <div className="flex justify-between text-blue-300">
+                      <span>इन्शुरन्स / डिव्हाईस कव्हर:</span>
+                      <span className="font-mono">+₹{insuranceAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {result.dbdAmount > 0 && (
+                    <div className="flex justify-between text-amber-300 pt-1 border-t border-white/5">
+                      <span>DBD सबव्हेन्शन वजावट:</span>
+                      <span className="font-mono">-₹{result.dbdAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-emerald-300 font-semibold pt-1 border-t border-white/5">
+                    <span>दुकानदाराला येणारे नेट डिस्बर्समेंट:</span>
+                    <span className="font-mono">₹{result.netStoreDisbursal.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>
@@ -901,7 +965,7 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
 
       {/* VIEW 3: MONTH-BY-MONTH SCHEDULE */}
       {activeTab === 'schedule' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in">
+        <div id="printable-emi-schedule" className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in print:p-0 print:border-none print:shadow-none">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1288,6 +1352,18 @@ export const FinanceCalculatorView: React.FC<FinanceCalculatorViewProps> = ({
               <td className="p-2">प्रोसेसिंग फी / फाईल चार्ज</td>
               <td className="p-2 text-right font-mono">₹{processingFee.toLocaleString('en-IN')}</td>
             </tr>
+            {insuranceAmount > 0 && (
+              <tr className="border-b border-slate-200">
+                <td className="p-2">इन्शुरन्स / डिव्हाईस प्रोटेक्शन</td>
+                <td className="p-2 text-right font-mono">₹{insuranceAmount.toLocaleString('en-IN')}</td>
+              </tr>
+            )}
+            {result.dbdAmount > 0 && (
+              <tr className="border-b border-slate-200">
+                <td className="p-2">डीलर सबव्हेन्शन सवलत (DBD)</td>
+                <td className="p-2 text-right font-mono">-₹{result.dbdAmount.toLocaleString('en-IN')}</td>
+              </tr>
+            )}
             <tr className="bg-slate-100 font-bold text-sm">
               <td className="p-2">दुकानात सुरुवातीला भरायची एकूण रक्कम:</td>
               <td className="p-2 text-right font-mono">₹{result.totalDownPayment.toLocaleString('en-IN')}</td>

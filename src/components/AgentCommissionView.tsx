@@ -1203,7 +1203,7 @@ export const AgentCommissionView: React.FC<AgentCommissionViewProps> = ({
             </div>
 
             {/* Printable Slip Content */}
-            <div className="py-4 space-y-4 text-slate-800 dark:text-slate-200">
+            <div id="printable-agent-commission" className="py-4 space-y-4 text-slate-800 dark:text-slate-200 print:text-black print:bg-white print:p-0">
               <div className="text-center border-b border-slate-100 dark:border-slate-800 pb-3">
                 <h2 className="text-lg font-black text-slate-900 dark:text-white">
                   {settings.businessNameHindi || 'श्री साई इंटरप्राइजेस'}

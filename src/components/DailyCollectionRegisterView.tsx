@@ -1040,7 +1040,7 @@ export const DailyCollectionRegisterView: React.FC<DailyCollectionRegisterViewPr
             </div>
 
             {/* Printable Preview Area */}
-            <div className="p-6 sm:p-8 overflow-y-auto flex-1 bg-white print:p-0">
+            <div id="printable-daily-collection" className="p-6 sm:p-8 overflow-y-auto flex-1 bg-white print:p-0 print:border-none print:shadow-none">
               {printTemplate === 'day-sheet' ? (
                 /* TEMPLATE 1: Comprehensive A4 Collection Day Sheet */
                 <div className="max-w-3xl mx-auto space-y-6 text-slate-900 border border-slate-300 p-6 rounded-xl shadow-xs print:border-none print:p-0">

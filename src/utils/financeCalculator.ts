@@ -36,7 +36,9 @@ export interface FinanceCalculationInput {
   interestRate: number; // annual %
   extraDownPayment: number;
   processingFee: number;
+  insuranceAmount?: number; // Device/Health Insurance / Extended protection fee
   dbdPercent: number; // dealer business discount / subvention %
+  dbdAmount?: number; // dealer business discount direct amount
   customerName?: string;
   customerPhone?: string;
   startDate?: string; // YYYY-MM-DD
@@ -63,13 +65,17 @@ export interface FinanceCalculationResult {
   advanceEmis: number;
   monthlyEmi: number;
   advanceEmisTotal: number;
-  totalDownPayment: number; // Advance EMIs + Extra Cash DP + Processing Fee
+  processingFee: number;
+  insuranceAmount: number;
+  dbdPercent: number;
+  dbdAmount: number;
+  totalDownPayment: number; // Advance EMIs + Extra Cash DP + Processing Fee + Insurance
   loanAmount: number; // Product Price - (Advance EMIs + Extra Cash DP)
   remainingMonths: number; // tenureMonths - advanceEmis
   totalPaidByCustomer: number; // totalDownPayment + (monthlyEmi * remainingMonths)
   totalInterestPaid: number;
   totalExtraCost: number; // totalPaidByCustomer - productPrice
-  netStoreDisbursal: number; // Product price - (productPrice * dbdPercent / 100)
+  netStoreDisbursal: number; // Product price - DBD deduction
   schedule: AmortizationRow[];
 }
 
@@ -279,12 +285,15 @@ export function calculateFinanceTerms(input: FinanceCalculationInput): FinanceCa
     interestRate,
     extraDownPayment = 0,
     processingFee = 0,
+    insuranceAmount = 0,
     dbdPercent = 0,
+    dbdAmount: directDbdAmount,
   } = input;
 
   const validTenure = Math.max(1, tenureMonths);
   const validAdvance = Math.min(validTenure, Math.max(0, advanceEmis));
   const remainingMonths = Math.max(0, validTenure - validAdvance);
+  const validInsurance = Math.max(0, Number(insuranceAmount) || 0);
 
   let monthlyEmi = 0;
   let totalInterestPaid = 0;
@@ -311,13 +320,16 @@ export function calculateFinanceTerms(input: FinanceCalculationInput): FinanceCa
   }
 
   const advanceEmisTotal = monthlyEmi * validAdvance;
-  const totalDownPayment = advanceEmisTotal + extraDownPayment + processingFee;
+  // Total Down Payment paid by customer at the counter: Advance EMIs + Extra Cash DP + Processing Fee + Insurance
+  const totalDownPayment = advanceEmisTotal + extraDownPayment + processingFee + validInsurance;
   const totalPaidByCustomer = totalDownPayment + (monthlyEmi * remainingMonths);
   const totalExtraCost = Math.max(0, totalPaidByCustomer - productPrice);
 
-  // Net Disbursal to the Store
-  const dbdDeduction = (productPrice * Math.max(0, dbdPercent)) / 100;
-  const netStoreDisbursal = Math.round(productPrice - dbdDeduction);
+  // Net Disbursal to the Store: Product price minus Dealer Business Discount (DBD)
+  const calculatedDbdAmount = directDbdAmount !== undefined
+    ? Math.max(0, Number(directDbdAmount) || 0)
+    : Math.round((productPrice * Math.max(0, dbdPercent)) / 100);
+  const netStoreDisbursal = Math.round(productPrice - calculatedDbdAmount);
 
   // Generate Amortization Schedule
   const schedule: AmortizationRow[] = [];
@@ -394,6 +406,10 @@ export function calculateFinanceTerms(input: FinanceCalculationInput): FinanceCa
     advanceEmis: validAdvance,
     monthlyEmi,
     advanceEmisTotal,
+    processingFee,
+    insuranceAmount: validInsurance,
+    dbdPercent,
+    dbdAmount: calculatedDbdAmount,
     totalDownPayment,
     loanAmount: Math.max(0, loanAmount),
     remainingMonths,

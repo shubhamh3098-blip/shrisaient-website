@@ -560,7 +560,7 @@ export const WhatsAppCardGroupInviteModal: React.FC<WhatsAppCardGroupInviteModal
         {/* Tab 3: QR Code & Showroom Poster */}
         {activeTab === 'qr' && (
           <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-center">
-            <div className="max-w-md mx-auto bg-slate-50 dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-4 shadow-xs">
+            <div id="printable-whatsapp-standee" className="max-w-md mx-auto bg-white dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-4 shadow-xs print:border-none print:shadow-none print:p-4">
               <div>
                 <span className="text-xs font-black uppercase tracking-wider text-emerald-600">
                   श्री साई एंटरप्रायझेस • वर्धा
@@ -591,7 +591,15 @@ export const WhatsAppCardGroupInviteModal: React.FC<WhatsAppCardGroupInviteModal
                 </p>
               </div>
 
-              <div className="flex items-center justify-center gap-2 pt-2">
+              <div className="flex items-center justify-center gap-2 pt-2 flex-wrap no-print">
+                <button
+                  type="button"
+                  onClick={handlePrintQrStandee}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>स्टँडी प्रिंट</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => window.open(groupLink, '_blank')}

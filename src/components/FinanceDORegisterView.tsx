@@ -50,6 +50,8 @@ export const FinanceDORegisterView: React.FC<FinanceDORegisterViewProps> = ({
     sanctionedAmount: 22000,
     customerDownPayment: 4000,
     processingFee: 750,
+    dbdAmount: 0,
+    insuranceAmount: 0,
     payoutStatus: 'Pending DO Verification',
     notes: '',
   });
@@ -95,6 +97,9 @@ export const FinanceDORegisterView: React.FC<FinanceDORegisterViewProps> = ({
       sanctionedAmount: Number(form.sanctionedAmount || 0),
       customerDownPayment: Number(form.customerDownPayment || 0),
       processingFee: Number(form.processingFee || 0),
+      dbdAmount: Number(form.dbdAmount || 0),
+      insuranceAmount: Number(form.insuranceAmount || 0),
+      netDisbursalAmount: Math.max(0, Number(form.sanctionedAmount || 0) - Number(form.dbdAmount || 0)),
       payoutStatus: 'Pending DO Verification',
       notes: form.notes || '',
       createdAt: new Date().toISOString(),
@@ -112,6 +117,8 @@ export const FinanceDORegisterView: React.FC<FinanceDORegisterViewProps> = ({
       sanctionedAmount: 20000,
       customerDownPayment: 4000,
       processingFee: 750,
+      dbdAmount: 0,
+      insuranceAmount: 0,
       payoutStatus: 'Pending DO Verification',
       notes: '',
     });
@@ -272,7 +279,12 @@ export const FinanceDORegisterView: React.FC<FinanceDORegisterViewProps> = ({
                   </td>
 
                   <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
-                    ₹{rec.customerDownPayment.toLocaleString('en-IN')}
+                    <div>₹{rec.customerDownPayment.toLocaleString('en-IN')}</div>
+                    <div className="text-[10px] text-slate-400 font-normal space-x-1">
+                      {rec.processingFee > 0 && <span>फी: ₹{rec.processingFee}</span>}
+                      {rec.insuranceAmount ? <span>• इन्शुरन्स: ₹{rec.insuranceAmount}</span> : null}
+                      {rec.dbdAmount ? <span className="text-amber-600 block">• DBD: -₹{rec.dbdAmount}</span> : null}
+                    </div>
                   </td>
 
                   <td className="p-3">
@@ -445,6 +457,57 @@ export const FinanceDORegisterView: React.FC<FinanceDORegisterViewProps> = ({
                     onChange={(e) => setForm({ ...form, customerDownPayment: Number(e.target.value) })}
                     className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
                   />
+                </div>
+              </div>
+
+              {/* Bajaj & Finance Special Charges: Processing Fee, Insurance & DBD */}
+              <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/50 space-y-2.5">
+                <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider block">
+                  फायनान्स चार्जेस व सवलत (बजाज / टीव्हीएस)
+                </span>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      प्रोसेसिंग फी (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={form.processingFee}
+                      onChange={(e) => setForm({ ...form, processingFee: Number(e.target.value) })}
+                      placeholder="750"
+                      className="w-full p-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      इन्शुरन्स (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={form.insuranceAmount || ''}
+                      onChange={(e) => setForm({ ...form, insuranceAmount: Number(e.target.value) })}
+                      placeholder="0"
+                      className="w-full p-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      DBD वजावट (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={form.dbdAmount || ''}
+                      onChange={(e) => setForm({ ...form, dbdAmount: Number(e.target.value) })}
+                      placeholder="0"
+                      className="w-full p-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-blue-200/60 dark:border-blue-800/40">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">बँकेत येणारे अंदाजित डिस्बर्समेंट:</span>
+                  <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                    ₹{Math.max(0, Number(form.sanctionedAmount || 0) - Number(form.dbdAmount || 0)).toLocaleString('en-IN')}
+                  </span>
                 </div>
               </div>
 

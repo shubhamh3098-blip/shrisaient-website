@@ -306,7 +306,7 @@ export const WeddingPackageQuotationModal: React.FC<WeddingPackageQuotationModal
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {showPrintView ? (
             /* Printable Formal A4 Sheet */
-            <div className="max-w-3xl mx-auto bg-white text-slate-950 p-6 sm:p-8 rounded-2xl border-2 border-slate-300 shadow-lg space-y-5">
+            <div id="printable-wedding-quotation" className="max-w-3xl mx-auto bg-white text-slate-950 p-6 sm:p-8 rounded-2xl border-2 border-slate-300 shadow-lg space-y-5 print:border-none print:shadow-none print:p-0 print:m-0">
               <div className="border-b-2 border-rose-600 pb-4 text-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
                   अधिकृत विवाह बस्ता व कॉम्बो पॅकेज कोटेशन
@@ -436,7 +436,7 @@ export const WeddingPackageQuotationModal: React.FC<WeddingPackageQuotationModal
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex items-center justify-end gap-3 pt-3 no-print">
                 <button
                   type="button"
                   onClick={() => window.print()}

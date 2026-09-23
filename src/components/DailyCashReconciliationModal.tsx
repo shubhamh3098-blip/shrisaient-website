@@ -211,7 +211,7 @@ ${statusText}
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <div id="printable-cash-reconciliation" className="flex-1 overflow-y-auto p-4 space-y-4 text-xs bg-white dark:bg-[#0C1425] text-slate-900 dark:text-white print:overflow-visible print:p-0 print:border-none print:shadow-none">
           {/* Top Parameters */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <div>
@@ -386,6 +386,14 @@ ${statusText}
           </button>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs shadow-2xs transition cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>प्रिंट (Print)</span>
+            </button>
             <button
               type="button"
               onClick={handleWhatsAppReport}

@@ -419,6 +419,9 @@ export interface FinanceDORecord {
   sanctionedAmount: number;
   customerDownPayment: number;
   processingFee: number;
+  dbdAmount?: number;
+  insuranceAmount?: number;
+  netDisbursalAmount?: number;
   payoutStatus: 'Pending DO Verification' | 'Disbursed to Bank' | 'UTR Received' | 'Claim Rejected';
   utrNumber?: string;
   disbursedDate?: string;

@@ -125,7 +125,7 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
         </div>
 
         {/* Printable Purchase Tax Invoice Layout (Exact replica of Manisha Enterprises format) */}
-        <div className="p-6 sm:p-8 bg-white print:p-4 text-[11px] leading-tight text-black border border-slate-300 print:border-black">
+        <div id="printable-purchase-invoice" className="p-6 sm:p-8 bg-white print:p-4 text-[11px] leading-tight text-black border border-slate-300 print:border-black print:border-none">
           
           {/* Supplier Header Block */}
           <div className="flex justify-between items-start border-b border-black pb-3">

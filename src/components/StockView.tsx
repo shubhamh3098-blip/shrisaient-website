@@ -1168,7 +1168,7 @@ export const StockView: React.FC<StockViewProps> = ({
             </div>
 
             {/* Printable Challan Sheet */}
-            <div className="p-6 sm:p-8 space-y-5 bg-white">
+            <div id="printable-stock-challan" className="p-6 sm:p-8 space-y-5 bg-white print:p-0 print:border-none print:shadow-none">
               {/* Company Header */}
               <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
                 <span className="text-[10px] tracking-widest uppercase font-black text-slate-500 block">
