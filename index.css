@@ -1,0 +1,430 @@
+@import "tailwindcss";
+
+/* Global Box-Sizing & Viewport Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Typography & Layout Defaults */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.011em;
+  scroll-behavior: smooth;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mobile Padding Optimization */
+@media (max-width: 768px) {
+  .main-container, .page-wrapper, .dashboard-container {
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+    padding-top: max(10px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+  }
+  .card, .modal-content {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* Laptop Adaptive Density (Compact View for 1-Screen Visibility) */
+@media (min-width: 769px) and (max-width: 1440px) {
+  :root {
+    font-size: 14px;
+  }
+  .main-container, .page-wrapper {
+    padding: 14px 18px !important;
+    max-width: 100% !important;
+  }
+  .table th, .table td {
+    padding: 6px 10px !important;
+    font-size: 0.85rem;
+  }
+  .stats-grid, .client-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .modal-dialog {
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+}
+
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-playfair {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+/* Safe-area insets for mobile & in-app webview containers */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-area-padding {
+  padding-top: max(14px, env(safe-area-inset-top));
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+
+/* Mobile ergonomics & touch target guarantees */
+@media (max-width: 768px) {
+  .touch-target-mobile {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* =========================================================
+   GALAXY GLOW BUTTONS & COSMIC THEME SYSTEM
+   Inspired by User Galaxy Glow Capsule Reference
+   ========================================================= */
+
+@keyframes galaxy-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px -3px rgba(56, 189, 248, 0.45), 0 0 10px rgba(14, 165, 233, 0.3);
+    border-color: rgba(56, 189, 248, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 32px -1px rgba(56, 189, 248, 0.75), 0 0 16px rgba(14, 165, 233, 0.55);
+    border-color: rgba(125, 211, 252, 0.95);
+  }
+}
+
+@keyframes stardust-twinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) translateY(-2px);
+  }
+}
+
+@keyframes cosmic-nebula-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes galaxy-border-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* =========================================================
+   APPLE UI FROSTED GLASS & LIQUID GLASSMORPHISM SYSTEM
+   Smooth Spring Animations, Specular Rim Highlights,
+   Fluid Sheen Sweep & Responsive Touch Targets
+   ========================================================= */
+
+@keyframes apple-sheen-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+@keyframes apple-glass-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.apple-glass-base {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.15),
+    0 4px 16px -2px rgba(0, 0, 0, 0.25);
+}
+
+.apple-glass-base:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.2),
+    0 8px 24px -3px rgba(0, 0, 0, 0.35);
+}
+
+.apple-glass-base:active {
+  transform: translateY(0.5px) scale(0.96);
+  transition-duration: 0.1s;
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 8px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Light Mode Apple Glass */
+.light .apple-glass-base {
+  box-shadow: 
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.06),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
+}
+
+.light .apple-glass-base:hover {
+  box-shadow: 
+    inset 0 1.5px 2.5px 0 rgba(255, 255, 255, 1),
+    0 8px 20px -3px rgba(15, 23, 42, 0.12);
+}
+
+/* =========================================================
+   SIMPLE HIGH-CONTRAST THEME SYSTEM (DAY: WHITE+BLACK | NIGHT: FULL BLACK+WHITE)
+   Guarantees all customer names, numbers & buttons are 100% visible everywhere
+   ========================================================= */
+
+/* Dark Mode: Full Black Background + Pure White Text */
+.dark,
+.dark body,
+.dark .cosmic-bg,
+.dark .apple-wallpaper-bg {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: #ffffff !important;
+}
+
+/* Guard: Prevent customer names, labels or numbers from becoming dark/invisible on black */
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #ffffff !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+.dark .bg-white {
+  background-color: #090d16 !important;
+  color: #ffffff !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: #111827 !important;
+}
+
+/* Light Mode: Full White Background + Solid Black Text */
+.light,
+body,
+.light body,
+.light .apple-wallpaper-bg {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.light h1,
+.light h2,
+.light h3,
+.light h4,
+.light h5,
+.light h6 {
+  color: #000000 !important;
+}
+
+.light .text-slate-950,
+.light .text-slate-900,
+.light .text-slate-800 {
+  color: #000000 !important;
+}
+
+.light .text-slate-700,
+.light .text-slate-600 {
+  color: #1e293b !important;
+}
+
+/* Enterprise Frosted Glass Card / Panel */
+.apple-glass-panel {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .apple-glass-panel {
+  background: #090d16 !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.light .apple-glass-panel {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Apple Sub-Navigation Segment Capsule */
+.apple-segment-item {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-segment-item:hover {
+  transform: translateY(-1px);
+}
+
+.apple-segment-item:active {
+  transform: translateY(0.5px) scale(0.98);
+}
+
+/* Galaxy Glow Pill Button Utility */
+.galaxy-pill-glow {
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #060a17 0%, #0c1429 50%, #060a17 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 22px -3px rgba(56, 189, 248, 0.5), 0 0 10px rgba(14, 165, 233, 0.35);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.05em;
+}
+
+.galaxy-pill-glow:hover {
+  border-color: rgba(125, 211, 252, 0.95);
+  box-shadow: 0 0 32px -2px rgba(56, 189, 248, 0.8), 0 0 18px rgba(14, 165, 233, 0.6);
+  transform: translateY(-1px) scale(1.02);
+}
+
+.galaxy-pill-glow:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+/* Cosmic Surface Cards */
+.dark .galaxy-card {
+  background-color: #080d1e;
+  border-color: rgba(56, 189, 248, 0.15);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 15px -4px rgba(56, 189, 248, 0.1);
+}
+
+.dark .galaxy-card-hover:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.7), 0 0 25px -2px rgba(56, 189, 248, 0.25);
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Hide navigation, sidebars, buttons, modal backdrops */
+  aside,
+  header,
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ensure printable elements are visible and properly formatted */
+  #printable-tax-invoice,
+  #printable-money-receipt,
+  #printable-scheme-receipt,
+  #printable-customer-ledger,
+  #printable-thermal-receipt,
+  #printable-beat-sheet,
+  #printable-vip-poster,
+  #printable-finance-quotation,
+  #printable-agent-collection-slip,
+  #printable-agent-collection-sheet,
+  #printable-barcode-sheet,
+  #printable-delivery-challan,
+  #printable-draw-certificate {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 15px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Special format for thermal 58mm / 80mm receipts */
+  #printable-thermal-receipt,
+  #printable-agent-collection-slip {
+    max-width: 80mm !important;
+    padding: 4mm !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+  }
+}
