@@ -1,61 +1,59 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type ThemeMode = 'light' | 'dark';
+export type AppTheme = 'day' | 'night';
 
 interface ThemeContextType {
-  theme: ThemeMode;
+  theme: AppTheme;
+  isDayMode: boolean;
   toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
-  isDark: boolean;
+  setTheme: (theme: AppTheme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'night', // Default to Cosmic Galaxy Glow theme requested by user
+  isDayMode: false,
+  toggleTheme: () => {},
+  setTheme: () => {},
+});
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (typeof window === 'undefined') return 'light';
-    const saved = localStorage.getItem('shri_sai_theme') as ThemeMode;
-    if (saved === 'dark' || saved === 'light') return saved;
-    // Default to clean light theme so backgrounds are not black beforehand
-    return 'light';
+  const [theme, setThemeState] = useState<AppTheme>(() => {
+    const saved = localStorage.getItem('sse_app_theme');
+    // If not explicitly set to day, default to cosmic night mode
+    return saved === 'day' ? 'day' : 'night';
   });
 
   useEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      body.classList.add('dark');
-      root.style.colorScheme = 'dark';
-      root.setAttribute('data-theme', 'dark');
+    localStorage.setItem('sse_app_theme', theme);
+    if (theme === 'day') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
     } else {
-      root.classList.remove('dark');
-      body.classList.remove('dark');
-      root.style.colorScheme = 'light';
-      root.setAttribute('data-theme', 'light');
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
     }
-    localStorage.setItem('shri_sai_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setThemeState((prev) => (prev === 'day' ? 'night' : 'day'));
   };
 
-  const setTheme = (newTheme: ThemeMode) => {
+  const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, isDark: theme === 'dark' }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        isDayMode: theme === 'day',
+        toggleTheme,
+        setTheme,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useTheme = (): ThemeContextType => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
+export const useTheme = () => useContext(ThemeContext);

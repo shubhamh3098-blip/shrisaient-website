@@ -1,4 +1,19 @@
+# Robots.txt for Shri Sai Enterprises - Electronics & Furniture Showroom, Wardha
+# https://shrisaient.in
+
 User-agent: *
 Allow: /
+Disallow: /api/
 
+# Priority Google Search & Image Crawlers for Rapid Indexing
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap Location for Fast Google Crawling
 Sitemap: https://shrisaient.in/sitemap.xml

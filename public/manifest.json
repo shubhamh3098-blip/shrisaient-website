@@ -1,0 +1,26 @@
+{
+  "name": "श्री साई एंटरप्रायजेस - एजंट वसुली व व्यापारी हिशोब",
+  "short_name": "Shri Sai ERP",
+  "description": "श्री साई एंटरप्रायजेस वर्धा - ३०-महिने साप्ताहिक योजना वसुली, ग्राहक खातेवही आणि काउंटर बिलिंग ॲप",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090d1f",
+  "theme_color": "#090d1f",
+  "lang": "mr",
+  "icons": [
+    {
+      "src": "/shri-sai-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

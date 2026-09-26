@@ -1,39 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <!-- Homepage & Main Showroom -->
   <url>
     <loc>https://shrisaient.in/</loc>
-    <lastmod>2026-09-10</lastmod>
+    <lastmod>2026-09-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://shrisaient.in/shri-sai-logo.svg</image:loc>
+      <image:title>Shri Sai Enterprises Wardha - Best Electronics &amp; Furniture Showroom</image:title>
+      <image:caption>Smart LED TVs, Inverter Refrigerators, Washing Machines, Teakwood Sofas, Beds &amp; Cupboards in Wardha</image:caption>
+    </image:image>
   </url>
+
+  <!-- Electronics in Wardha (TV, Fridge, Washing Machine, AC) -->
   <url>
-    <loc>https://shrisaient.in/#products</loc>
-    <lastmod>2026-09-10</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://shrisaient.in/#services</loc>
-    <lastmod>2026-09-10</lastmod>
+    <loc>https://shrisaient.in/#electronics</loc>
+    <lastmod>2026-09-24</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- Furniture in Wardha (Sofa, Bed, Cupboard, Dining) -->
   <url>
-    <loc>https://shrisaient.in/#schemes</loc>
-    <lastmod>2026-09-10</lastmod>
+    <loc>https://shrisaient.in/#furniture</loc>
+    <lastmod>2026-09-24</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
   </url>
+
+  <!-- 30-Month Weekly Lucky Draw Savings Scheme -->
   <url>
-    <loc>https://shrisaient.in/#enquiry</loc>
-    <lastmod>2026-09-10</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <loc>https://shrisaient.in/#scheme</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
+
+  <!-- Store Address, Phone Numbers & Google Map -->
   <url>
     <loc>https://shrisaient.in/#contact</loc>
-    <lastmod>2026-09-10</lastmod>
+    <lastmod>2026-09-24</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
 </urlset>

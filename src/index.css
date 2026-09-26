@@ -1,380 +1,386 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
-:root {
-  /* Warm Sand & Minimalist Editorial Tokens (from Style Guide) */
-  --bg-app: #F5EFEB;
-  --bg-surface: #F9F5F0;
-  --bg-raised: #FAF7F2;
-  --bg-inset: #EDE7DE;
-  --card-surface: #FDFBF8;
-  --border-subtle: #E2DACF;
-  --border-prominent: #C8BDAE;
-  --brand-navy: #0F1D32;
-  --tech-teal: #0D7A70;
-  --accent-cyan: #0E7490;
-  --text-primary: #1F2937;
-  --text-secondary: #57534E;
-  --text-muted: #78716C;
-
-  /* Tactile Shadows */
-  --shadow-raised: 4px 4px 10px rgba(180, 168, 150, 0.35), -4px -4px 10px rgba(255, 255, 255, 0.9);
-  --shadow-inset: inset 2px 2px 5px rgba(170, 158, 140, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.85);
-  --shadow-flat: 0 1px 3px rgba(0, 0, 0, 0.05);
+/* Global Box-Sizing & Viewport Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-html {
-  font-family: 'Inter', 'Noto Sans Devanagari', 'Yantramanav', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  letter-spacing: -0.01em;
+/* Typography & Layout Defaults */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.011em;
+  scroll-behavior: smooth;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Day Mode (Soft Warm Sand & Pure Tactile Surfaces) */
-body {
-  background-color: #F5EFEB;
-  color: #1F2937;
-  transition: background-color 0.25s ease, color 0.25s ease;
-}
-
-/* Night Mode (Deep Obsidian Slate & Rich Teal Glow) */
-.dark body {
-  background-color: #0B1120;
-  color: #E2E8F0;
-}
-
-.dark {
-  --bg-app: #0B1120;
-  --bg-surface: #0F172A;
-  --bg-raised: #152238;
-  --bg-inset: #090E17;
-  --card-surface: #0F172A;
-  --border-subtle: #1E293B;
-  --border-prominent: #334155;
-  --brand-navy: #F1F5F9;
-  --tech-teal: #14B8A6;
-  --accent-cyan: #38BDF8;
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-
-  --shadow-raised: 4px 4px 12px rgba(0, 0, 0, 0.5), -2px -2px 8px rgba(255, 255, 255, 0.03);
-  --shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.7), inset -2px -2px 6px rgba(255, 255, 255, 0.04);
-  --shadow-flat: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-
-/* Refined Typography for Marathi & Devanagari numerals/text */
-.font-marathi {
-  font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;
-  letter-spacing: 0.01em;
-}
-
-/* High Contrast & Clear Visibility for all Inputs & Search Boxes */
-input, select, textarea {
-  color: #0f172a;
-  -webkit-text-fill-color: #0f172a;
-  font-weight: 600;
-  caret-color: #00523f;
-}
-
-/* In Dark Mode: dark inputs get light text, while white/light inputs ALWAYS keep dark text */
-.dark input, .dark select, .dark textarea {
-  color: #f8fafc;
-  -webkit-text-fill-color: #f8fafc;
-  caret-color: #38bdf8;
-}
-
-/* Explicit overrides to prevent white-on-white invisible text in modals and search boxes */
-input.bg-white,
-input[class*="bg-white"],
-select.bg-white,
-textarea.bg-white,
-.bg-white input,
-.bg-white select,
-.bg-white textarea,
-.dark input.bg-white:not([class*="dark:bg-slate"]),
-.dark input[class*="bg-white"]:not([class*="dark:bg-slate"]),
-.dark select.bg-white:not([class*="dark:bg-slate"]),
-.dark textarea.bg-white:not([class*="dark:bg-slate"]) {
-  color: #0f172a !important;
-  -webkit-text-fill-color: #0f172a !important;
-  caret-color: #00523f !important;
-}
-
-/* Dark themed input fields */
-.dark input[class*="dark:bg-slate-900"],
-.dark input[class*="dark:bg-slate-800"],
-.dark textarea[class*="dark:bg-slate-900"],
-.dark textarea[class*="dark:bg-slate-800"],
-.dark select[class*="dark:bg-slate-900"] {
-  color: #f8fafc !important;
-  -webkit-text-fill-color: #f8fafc !important;
-  caret-color: #38bdf8 !important;
-}
-
-input::placeholder, textarea::placeholder {
-  color: #64748b !important; /* Clear Slate-500 placeholder */
-  -webkit-text-fill-color: #64748b !important;
-  font-weight: 400 !important;
-  opacity: 1 !important;
-}
-
-/* On mobile devices, ensure inputs are at least 16px to prevent iOS auto-zoom latency & lag */
-@media screen and (max-width: 768px) {
-  input[type="text"],
-  input[type="search"],
-  input[type="number"],
-  input[type="tel"],
-  input[type="email"],
-  select,
-  textarea {
-    font-size: 16px !important;
-    line-height: 1.4 !important;
+/* Mobile Padding Optimization */
+@media (max-width: 768px) {
+  .main-container, .page-wrapper, .dashboard-container {
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+    padding-top: max(10px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+  }
+  .card, .modal-content {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
   }
 }
 
-/* Tactile Soft Neumorphic Layer Utility Classes matching Style Guide */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.tactile-raised {
-  background-color: var(--card-surface);
-  box-shadow: 5px 5px 12px rgba(185, 172, 155, 0.38), -5px -5px 12px rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(226, 218, 207, 0.6);
-}
-
-.dark .tactile-raised {
-  background-color: #111A2E;
-  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.6), -2px -2px 8px rgba(255, 255, 255, 0.03);
-  border: 1px solid #1E2B45;
-}
-
-.tactile-inset {
-  background-color: #EDE6DC;
-  box-shadow: inset 3px 3px 6px rgba(175, 163, 145, 0.4), inset -3px -3px 6px rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(215, 205, 190, 0.7);
+/* Laptop Adaptive Density (Compact View for 1-Screen Visibility) */
+@media (min-width: 769px) and (max-width: 1440px) {
+  :root {
+    font-size: 14px;
+  }
+  .main-container, .page-wrapper {
+    padding: 14px 18px !important;
+    max-width: 100% !important;
+  }
+  .table th, .table td {
+    padding: 6px 10px !important;
+    font-size: 0.85rem;
+  }
+  .stats-grid, .client-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .modal-dialog {
+    max-height: 88vh;
+    overflow-y: auto;
+  }
 }
 
-.dark .tactile-inset {
-  background-color: #0A0F1D;
-  box-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.75), inset -2px -2px 6px rgba(255, 255, 255, 0.03);
-  border: 1px solid #162035;
+.font-cinzel {
+  font-family: 'Cinzel', serif;
 }
 
-.tactile-btn-primary {
-  background: linear-gradient(135deg, #0D7A70 0%, #08564F 100%);
-  box-shadow: 3px 3px 8px rgba(13, 122, 112, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.8);
-  color: #FFFFFF;
+.font-playfair {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+/* Safe-area insets for mobile & in-app webview containers */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-area-padding {
+  padding-top: max(14px, env(safe-area-inset-top));
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+
+/* Mobile ergonomics & touch target guarantees */
+@media (max-width: 768px) {
+  .touch-target-mobile {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* =========================================================
+   GALAXY GLOW BUTTONS & COSMIC THEME SYSTEM
+   Inspired by User Galaxy Glow Capsule Reference
+   ========================================================= */
+
+@keyframes galaxy-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px -3px rgba(56, 189, 248, 0.45), 0 0 10px rgba(14, 165, 233, 0.3);
+    border-color: rgba(56, 189, 248, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 32px -1px rgba(56, 189, 248, 0.75), 0 0 16px rgba(14, 165, 233, 0.55);
+    border-color: rgba(125, 211, 252, 0.95);
+  }
+}
+
+@keyframes stardust-twinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) translateY(-2px);
+  }
+}
+
+@keyframes cosmic-nebula-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes galaxy-border-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* =========================================================
+   APPLE UI FROSTED GLASS & LIQUID GLASSMORPHISM SYSTEM
+   Smooth Spring Animations, Specular Rim Highlights,
+   Fluid Sheen Sweep & Responsive Touch Targets
+   ========================================================= */
+
+@keyframes apple-sheen-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+@keyframes apple-glass-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.apple-glass-base {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.15),
+    0 4px 16px -2px rgba(0, 0, 0, 0.25);
+}
+
+.apple-glass-base:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.2),
+    0 8px 24px -3px rgba(0, 0, 0, 0.35);
+}
+
+.apple-glass-base:active {
+  transform: translateY(0.5px) scale(0.96);
+  transition-duration: 0.1s;
+  box-shadow: 
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 8px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Light Mode Apple Glass */
+.light .apple-glass-base {
+  box-shadow: 
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.06),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
+}
+
+.light .apple-glass-base:hover {
+  box-shadow: 
+    inset 0 1.5px 2.5px 0 rgba(255, 255, 255, 1),
+    0 8px 20px -3px rgba(15, 23, 42, 0.12);
+}
+
+/* =========================================================
+   APPLE macOS SEQUOIA / SONOMA DYNAMIC AMBIENT WALLPAPER
+   Pristine Frosted Acrylic & Liquid Glass Surface System
+   ========================================================= */
+
+/* Dark Mode: Deep Midnight Slate Obsidian Wallpaper */
+.dark body,
+.dark .cosmic-bg,
+.dark .apple-wallpaper-bg {
+  background-color: #070b16;
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(14, 165, 233, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 50%);
+  background-attachment: fixed;
+  color: #f1f5f9;
+}
+
+/* Light Mode: Pristine Clean Neutral Enterprise Canvas (दिवस - स्पष्ट व स्वच्छ थीम) */
+body,
+.light body,
+.light .apple-wallpaper-bg {
+  background-color: #f8fafc;
+  background-image: 
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  background-attachment: fixed;
+  color: #0f172a;
+}
+
+/* Enterprise Frosted Glass Card / Panel */
+.apple-glass-panel {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .apple-glass-panel {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 4px 20px -2px rgba(0, 0, 0, 0.5);
+}
+
+.light .apple-glass-panel {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e2e8f0;
+  box-shadow: 
+    0 1px 3px 0 rgba(15, 23, 42, 0.04),
+    0 6px 16px -4px rgba(15, 23, 42, 0.04);
+}
+
+/* Apple Sub-Navigation Segment Capsule */
+.apple-segment-item {
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tactile-btn-primary:active {
-  transform: scale(0.98);
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.35);
+.apple-segment-item:hover {
+  transform: translateY(-1px);
 }
 
-.dark .tactile-btn-primary {
-  background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%);
-  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.3);
-  color: #042F2E;
-  font-weight: 700;
+.apple-segment-item:active {
+  transform: translateY(0.5px) scale(0.98);
 }
 
-.tactile-btn-secondary {
-  background-color: var(--card-surface);
-  box-shadow: 3px 3px 7px rgba(185, 172, 155, 0.35), -3px -3px 7px rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(226, 218, 207, 0.7);
-  transition: all 0.18s ease;
+/* Galaxy Glow Pill Button Utility */
+.galaxy-pill-glow {
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #060a17 0%, #0c1429 50%, #060a17 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 22px -3px rgba(56, 189, 248, 0.5), 0 0 10px rgba(14, 165, 233, 0.35);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.05em;
 }
 
-.dark .tactile-btn-secondary {
-  background-color: #152238;
-  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.5);
-  border: 1px solid #1E2D4A;
+.galaxy-pill-glow:hover {
+  border-color: rgba(125, 211, 252, 0.95);
+  box-shadow: 0 0 32px -2px rgba(56, 189, 248, 0.8), 0 0 18px rgba(14, 165, 233, 0.6);
+  transform: translateY(-1px) scale(1.02);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.galaxy-pill-glow:active {
+  transform: translateY(1px) scale(0.97);
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Cosmic Surface Cards */
+.dark .galaxy-card {
+  background-color: #080d1e;
+  border-color: rgba(56, 189, 248, 0.15);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 15px -4px rgba(56, 189, 248, 0.1);
+}
+
+.dark .galaxy-card-hover:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.7), 0 0 25px -2px rgba(56, 189, 248, 0.25);
 }
 
 @media print {
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
+  body {
+    background-color: white !important;
+    color: black !important;
   }
 
-  @page {
-    size: A4 portrait;
-    margin: 6mm 8mm;
-  }
-
-  html, body {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  /* Hide app shell, navigation, modals backdrop, background views, and non-print elements */
-  .no-print,
-  #app-sidebar,
+  /* Hide navigation, sidebars, buttons, modal backdrops */
+  aside,
   header,
   nav,
-  footer,
-  aside,
   button,
-  .mobile-bottom-nav,
-  .toaster,
-  [data-sonner-toaster] {
+  .no-print {
     display: none !important;
   }
 
-  /* 
-   * UNIVERSAL PRINTABLE MODAL ISOLATION:
-   * When any printable document is present in the DOM:
-   * 1. Make the body and background views invisible so background ERP views and other components don't bleed or create extra pages.
-   * 2. Make ONLY the printable document and its children visible.
-   * 3. Position the printable document at the top of the printed page with relative flow for multi-page pagination.
-   */
-  body:has([id^="printable-"]),
-  body.is-printing-modal,
-  body.is-printing-ledger {
-    visibility: hidden !important;
-    background: #ffffff !important;
-  }
-
-  body:has([id^="printable-"]) [id^="printable-"],
-  body:has([id^="printable-"]) [id^="printable-"] *,
-  body.is-printing-modal [id^="printable-"],
-  body.is-printing-modal [id^="printable-"] *,
-  body.is-printing-ledger #printable-ledger,
-  body.is-printing-ledger #printable-ledger * {
-    visibility: visible !important;
-  }
-
-  /* When printing from a modal dialog, completely suppress all background page contents */
-  body:has(.fixed [id^="printable-"]) #root > div > *:not(.fixed) {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Reset fixed backdrop and modal wrappers in print so content is never clipped or trapped */
-  .fixed.inset-0,
-  div[class*="fixed inset-0"] {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
+  /* Ensure printable elements are visible and properly formatted */
+  #printable-tax-invoice,
+  #printable-money-receipt,
+  #printable-scheme-receipt,
+  #printable-customer-ledger,
+  #printable-thermal-receipt,
+  #printable-beat-sheet,
+  #printable-vip-poster,
+  #printable-finance-quotation,
+  #printable-agent-collection-slip,
+  #printable-agent-collection-sheet,
+  #printable-barcode-sheet,
+  #printable-delivery-challan,
+  #printable-draw-certificate {
     display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 15px !important;
     box-shadow: none !important;
     border: none !important;
+    background: white !important;
+    color: black !important;
   }
 
-  /* Ensure modal dialog boxes don't constrain height during print */
-  div[class*="h-[95vh]"],
-  div[class*="max-h-[92vh]"],
-  div[class*="max-h-[95vh]"],
-  div[class*="overflow-y-auto"] {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  /* All printable document containers take full printable width with multi-page flow */
-  #printable-invoice,
-  #printable-ledger,
-  #printable-receipt,
-  #printable-passbook,
-  #printable-order-bill,
-  #printable-dealer-ledger,
-  #printable-wedding-quotation,
-  #printable-daily-collection,
-  #printable-stock-challan,
-  #printable-purchase-invoice,
-  #printable-cash-reconciliation,
-  #printable-whatsapp-standee,
-  #printable-village-route,
-  #printable-agent-commission,
-  #printable-service-jobsheet,
-  #printable-dashboard-sheet,
-  [id^="printable-"] {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    display: block !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  /* Force ledger table to be visible on mobile print, and hide mobile feed */
-  #printable-ledger .ledger-table-container {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  #printable-ledger .ledger-mobile-cards {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  /* Single-page documents should never create extra trailing pages */
-  #printable-invoice,
-  #printable-receipt,
-  #printable-order-bill,
-  #printable-purchase-invoice {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-
-  table {
-    page-break-inside: auto !important;
-    width: 100% !important;
-  }
-
-  tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
-
-  thead {
-    display: table-header-group !important;
-  }
-
-  tfoot {
-    display: table-footer-group !important;
+  /* Special format for thermal 58mm / 80mm receipts */
+  #printable-thermal-receipt,
+  #printable-agent-collection-slip {
+    max-width: 80mm !important;
+    padding: 4mm !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
   }
 }

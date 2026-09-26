@@ -1,0 +1,256 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">
+  <defs>
+    <!-- Background Radial Gradient -->
+    <radialGradient id="bgRadial" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#0f1626"/>
+      <stop offset="45%" stop-color="#090e18"/>
+      <stop offset="80%" stop-color="#04060a"/>
+      <stop offset="100%" stop-color="#020306"/>
+    </radialGradient>
+
+    <!-- Metallic 3D Gold Gradient for Outer Rings -->
+    <linearGradient id="goldMetallicRing" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#fffae5"/>
+      <stop offset="12%" stop-color="#f8dc7e"/>
+      <stop offset="28%" stop-color="#d99f2e"/>
+      <stop offset="44%" stop-color="#805411"/>
+      <stop offset="58%" stop-color="#f3cb62"/>
+      <stop offset="72%" stop-color="#fffae6"/>
+      <stop offset="85%" stop-color="#caa03a"/>
+      <stop offset="100%" stop-color="#73470b"/>
+    </linearGradient>
+
+    <!-- Bevel Shading Gradient for Outer Ring Inner Lip -->
+    <linearGradient id="goldBevelRim" x1="85%" y1="85%" x2="15%" y2="15%">
+      <stop offset="0%" stop-color="#fff5cc"/>
+      <stop offset="30%" stop-color="#caa03a"/>
+      <stop offset="70%" stop-color="#6e450b"/>
+      <stop offset="100%" stop-color="#f8dc7e"/>
+    </linearGradient>
+
+    <!-- Monogram 3D Gold Gradient -->
+    <linearGradient id="goldMonogram" x1="20%" y1="10%" x2="80%" y2="90%">
+      <stop offset="0%" stop-color="#fffce8"/>
+      <stop offset="15%" stop-color="#fce28b"/>
+      <stop offset="35%" stop-color="#e2ab39"/>
+      <stop offset="60%" stop-color="#936214"/>
+      <stop offset="75%" stop-color="#fbe087"/>
+      <stop offset="90%" stop-color="#d19c2f"/>
+      <stop offset="100%" stop-color="#7d4e0b"/>
+    </linearGradient>
+
+    <!-- Top Feather Gradient -->
+    <linearGradient id="featherGrad" x1="0%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#b67f1e"/>
+      <stop offset="35%" stop-color="#fedc7d"/>
+      <stop offset="70%" stop-color="#fffce8"/>
+      <stop offset="100%" stop-color="#d99f2e"/>
+    </linearGradient>
+
+    <!-- Typography Gold Gradient -->
+    <linearGradient id="textGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fffceb"/>
+      <stop offset="30%" stop-color="#fae188"/>
+      <stop offset="65%" stop-color="#d9a334"/>
+      <stop offset="100%" stop-color="#825410"/>
+    </linearGradient>
+
+    <!-- Soft Drop Shadow Filter for 3D Emblems -->
+    <filter id="medallionShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000000" flood-opacity="0.9"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#f59e0b" flood-opacity="0.2"/>
+    </filter>
+
+    <filter id="glowSubtle" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Lens Flare Radial Glow -->
+    <radialGradient id="flareCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="25%" stop-color="#fff3b0"/>
+      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Deep Dark Background Canvas -->
+  <rect width="1000" height="1000" fill="url(#bgRadial)"/>
+
+  <!-- Subtle Ambient Glow Behind Central Medallion -->
+  <circle cx="500" cy="500" r="410" fill="#f59e0b" fill-opacity="0.04" filter="url(#glowSubtle)"/>
+
+  <!-- Group for Whole Central Circular Emblem with Realistic 3D Shadow -->
+  <g filter="url(#medallionShadow)">
+    
+    <!-- Central Dark Disc Backplate -->
+    <circle cx="500" cy="500" r="395" fill="#070a12" stroke="#0e1526" stroke-width="4"/>
+
+    <!-- OUTER HEAVY 3D BEVELED GOLD RING -->
+    <!-- Outer rim shadow ring -->
+    <circle cx="500" cy="500" r="392" fill="none" stroke="#2a1a05" stroke-width="26" opacity="0.6"/>
+    <!-- Main outer gold ring -->
+    <circle cx="500" cy="500" r="388" fill="none" stroke="url(#goldMetallicRing)" stroke-width="22"/>
+    <!-- Outer ring inner specular bevel rim -->
+    <circle cx="500" cy="500" r="378" fill="none" stroke="url(#goldBevelRim)" stroke-width="2.5" opacity="0.9"/>
+
+    <!-- DARK GAP BETWEEN RINGS -->
+    <circle cx="500" cy="500" r="364" fill="none" stroke="#04060c" stroke-width="8"/>
+
+    <!-- INNER THIN GOLD RING -->
+    <circle cx="500" cy="500" r="352" fill="none" stroke="url(#goldMetallicRing)" stroke-width="6"/>
+    <circle cx="500" cy="500" r="349" fill="none" stroke="#fffceb" stroke-width="1.2" opacity="0.6"/>
+
+    <!-- Medallion Interior Subtle Vignette -->
+    <radialGradient id="innerVignette" cx="50%" cy="50%" r="50%">
+      <stop offset="50%" stop-color="#060911" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#030408" stop-opacity="0.85"/>
+    </radialGradient>
+    <circle cx="500" cy="500" r="348" fill="url(#innerVignette)"/>
+
+    <!-- ========================================================================= -->
+    <!-- CENTRAL MONOGRAM: INTERLOCKING 'S' & 'E' WITH PEACOCK FEATHER CREST        -->
+    <!-- ========================================================================= -->
+
+    <!-- 1. STYLIZED PEACOCK FEATHER / SACRED FLAME MOTIF (Emerging above S & E) -->
+    <g transform="translate(0, -10)">
+      <!-- Main Upright Plume -->
+      <path d="M495,210 C485,260 472,310 470,360 C474,340 488,290 515,245 C525,230 528,218 522,212 C516,206 502,204 495,210 Z" 
+            fill="url(#featherGrad)" 
+            filter="url(#glowSubtle)"/>
+      
+      <!-- Center Vein / Cutout in Main Plume -->
+      <path d="M495,225 C490,260 480,300 476,335 C484,300 498,265 512,232 C504,226 498,223 495,225 Z" 
+            fill="#090e18"/>
+
+      <!-- Left Secondary Feather Vane -->
+      <path d="M472,330 C465,305 464,280 468,260 C462,275 461,295 465,320 C468,340 470,350 472,355 Z" 
+            fill="url(#featherGrad)"/>
+      
+      <!-- Right Floating Accent Leaf -->
+      <path d="M518,255 C508,285 496,325 488,360 C496,330 512,295 524,270 C526,262 522,256 518,255 Z" 
+            fill="url(#featherGrad)"/>
+    </g>
+
+    <!-- 2. LUXURY 3D CAPITAL LETTER 'S' -->
+    <!-- Drop Shadow for S -->
+    <path d="M455,320 C445,295 420,270 375,270 C310,270 268,312 268,375 C268,445 352,458 352,510 C352,548 318,568 274,568 C228,568 190,538 180,488 L232,482 C238,510 254,528 276,528 C300,528 315,512 315,492 C315,432 232,416 232,352 C232,290 282,246 362,246 C416,246 456,275 468,318 Z"
+          fill="#020306"
+          opacity="0.8"
+          transform="translate(4, 6)"/>
+
+    <!-- Main Letter 'S' Body with Polished Metallic Bevels -->
+    <path d="M465,320 C454,290 424,264 374,264 C304,264 262,308 262,374 C262,448 350,460 350,512 C350,550 318,572 274,572 C225,572 186,540 174,488 L228,482 C234,512 252,532 276,532 C302,532 318,515 318,494 C318,432 230,416 230,350 C230,286 280,242 362,242 C420,242 464,272 478,318 Z" 
+          fill="url(#goldMonogram)" 
+          filter="url(#glowSubtle)"/>
+
+    <!-- S Top Serif Terminal & Highlight Edge -->
+    <path d="M478,318 L465,320 C454,290 424,264 374,264 C304,264 262,308 262,374 C262,382 264,390 268,398 C266,388 268,374 274,360 C290,324 326,298 376,298 C424,298 460,314 478,318 Z" 
+          fill="#fffaea" 
+          opacity="0.6"/>
+
+    <!-- 3. LUXURY 3D CAPITAL LETTER 'E' -->
+    <!-- Drop Shadow for E -->
+    <g transform="translate(4, 6)" opacity="0.8" fill="#020306">
+      <path d="M506,268 L678,268 L678,328 L642,328 L642,302 L572,302 L572,385 L648,385 L648,430 L572,430 L572,532 L652,532 L652,498 L690,498 L690,564 L506,564 Z"/>
+    </g>
+
+    <!-- Main Letter 'E' Body -->
+    <g fill="url(#goldMonogram)" filter="url(#glowSubtle)">
+      <!-- Vertical Stem with Serif Brackets -->
+      <path d="M506,264 L676,264 L676,326 L642,326 C642,308 638,298 574,298 L574,385 L648,385 L648,430 L574,430 L574,534 C638,534 644,524 644,500 L680,500 L680,564 L506,564 L506,500 L540,500 L540,326 L506,326 Z"/>
+      
+      <!-- Top Right Downward Serif Accent -->
+      <polygon points="676,264 688,264 688,335 668,335 676,310"/>
+      <!-- Bottom Right Upward Serif Accent -->
+      <polygon points="680,564 692,564 692,492 672,492 680,518"/>
+    </g>
+
+    <!-- Specular Highlight Sheen on E -->
+    <path d="M506,264 L676,264 L676,272 L548,272 L548,326 L540,326 L540,500 L532,500 L532,272 L506,272 Z" 
+          fill="#fffaec" 
+          opacity="0.6"/>
+
+    <!-- ========================================================================= -->
+    <!-- BRAND TYPOGRAPHY: EXACT TEXT AS IN LOGO (SHREE SAI & — ENTERPRISES —)    -->
+    <!-- ========================================================================= -->
+
+    <!-- Main Brand Name: SHREE SAI (Bold High-End Serif with 3D Depth) -->
+    <text x="500" y="650" 
+          font-family="'Playfair Display', 'Cinzel', 'Times New Roman', 'Georgia', serif" 
+          font-size="62" 
+          font-weight="900" 
+          letter-spacing="9" 
+          fill="url(#textGold)" 
+          text-anchor="middle"
+          filter="url(#glowSubtle)">
+      SHREE SAI
+    </text>
+
+    <!-- Gold Text Drop Shadow Layer -->
+    <text x="501" y="652" 
+          font-family="'Playfair Display', 'Cinzel', 'Times New Roman', 'Georgia', serif" 
+          font-size="62" 
+          font-weight="900" 
+          letter-spacing="9" 
+          fill="#000000" 
+          opacity="0.5"
+          text-anchor="middle"
+          style="mix-blend-mode: overlay;">
+      SHREE SAI
+    </text>
+
+    <!-- Subtitle: — ENTERPRISES — flanked by delicate horizontal rules -->
+    <g transform="translate(0, 686)">
+      <!-- Left Horizontal Rule -->
+      <line x1="305" y1="0" x2="345" y2="0" stroke="url(#goldMetallicRing)" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Text: ENTERPRISES -->
+      <text x="500" y="5.5" 
+            font-family="'Plus Jakarta Sans', 'Montserrat', 'Helvetica', 'Arial', sans-serif" 
+            font-size="23" 
+            font-weight="800" 
+            letter-spacing="9" 
+            fill="url(#goldMetallicRing)" 
+            text-anchor="middle">
+        ENTERPRISES
+      </text>
+
+      <!-- Right Horizontal Rule -->
+      <line x1="655" y1="0" x2="695" y2="0" stroke="url(#goldMetallicRing)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- ========================================================================= -->
+    <!-- SPECULAR LENS FLARES & SPARKLES ON THE GOLD OUTER RING                     -->
+    <!-- ========================================================================= -->
+
+    <!-- Top-Right Brilliant Lens Flare (at approx 1:30 position ~ X:765, Y:235) -->
+    <g transform="translate(768, 232)">
+      <!-- Radial Halo -->
+      <circle cx="0" cy="0" r="45" fill="url(#flareCore)" opacity="0.85"/>
+      <!-- Vertical Diamond Spike -->
+      <path d="M0,-35 L4,0 L0,35 L-4,0 Z" fill="#ffffff" filter="url(#glowSubtle)"/>
+      <!-- Horizontal Diamond Spike -->
+      <path d="M-35,0 L0,4 L35,0 L0,-4 Z" fill="#ffffff" filter="url(#glowSubtle)"/>
+      <!-- Diagonal Shimmer Spikes -->
+      <path d="M-18,-18 L0,0 L18,18 L0,0 Z" stroke="#fffceb" stroke-width="2"/>
+      <path d="M18,-18 L0,0 L-18,18 L0,0 Z" stroke="#fffceb" stroke-width="2"/>
+      <!-- Brilliant Core Spot -->
+      <circle cx="0" cy="0" r="5" fill="#ffffff"/>
+    </g>
+
+    <!-- Bottom-Left Warm Specular Gleam (at approx 7:45 position ~ X:232, Y:768) -->
+    <g transform="translate(235, 765)">
+      <!-- Radial Halo -->
+      <circle cx="0" cy="0" r="38" fill="url(#flareCore)" opacity="0.75"/>
+      <!-- Vertical Spike -->
+      <path d="M0,-24 L3,0 L0,24 L-3,0 Z" fill="#ffffff"/>
+      <!-- Horizontal Spike -->
+      <path d="M-24,0 L0,3 L24,0 L0,-3 Z" fill="#ffffff"/>
+      <!-- Core Spot -->
+      <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+    </g>
+
+  </g>
+</svg>

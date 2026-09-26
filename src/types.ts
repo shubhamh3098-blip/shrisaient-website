@@ -1,467 +1,671 @@
-export type CardSchemeId = 'scheme1' | 'scheme2' | 'scheme3' | 'scheme4' | 'scheme5';
+/**
+ * Shri Sai Enterprises - Cash & Business Manager
+ * Schema definitions matching StoreData Firestore & Local entity structure
+ */
 
-export interface CardSchemeConfig {
-  id: CardSchemeId;
+export interface SchemeDefinition {
+  id: string;
   name: string;
   code: string;
   startCardNo: number;
   endCardNo: number;
-  registrationFee: number; // default 50
+  registrationFee: number; // e.g. 50
   description: string;
   color: string;
 }
 
-export interface CardMember {
-  id: string;
-  uniqueId?: string; // e.g. SAI-SCH1-4107
-  cardNumber: number;
-  schemeId: CardSchemeId;
-  schemeName: string;
-  customerName: string;
-  phone: string;
-  village?: string;
-  address?: string;
-  sheetNo?: string;
-  agentName?: string;
-  openingAmt?: number;
-  joiningDate: string;
-  registrationFee: number;
-  registrationFeePaid: boolean;
-  totalDeposited: number;
-  totalRefunded: number;
-  totalGoodsTaken?: number;
-  netBalance: number; // totalDeposited - (totalRefunded + (totalGoodsTaken || 0))
-  status: 'Active' | 'Completed' | 'Closed';
-  notes?: string;
-}
-
-export interface CardTransaction {
-  id: string;
-  cardId: string;
-  cardNumber: number;
-  schemeId: CardSchemeId;
-  customerName: string;
-  customerPhone?: string;
-  village?: string;
-  receiptNo: string;
-  date: string;
-  type: 'WeeklyPayment' | 'Refund' | 'Fee' | 'GoodsTaken' | 'Deposit';
-  weekNumber?: number;
-  amount: number;
-  paymentMode: 'Cash' | 'Online';
-  agentName?: string;
-  remarks?: string;
-  goodsDetail?: string;
-  billNo?: string;
-  balanceAfter: number;
-  createdAt: string;
-}
-
-export interface Dealer {
-  id: string;
+export interface FinanceProviderConfig {
+  id: 'bajaj' | 'tvs' | 'hdb' | 'idbi' | 'other';
   name: string;
+  color: string;
+  badge: string;
+  defaultDbdPercent?: number;
+  defaultProcessingFee?: number;
+}
+
+export interface StoreSettings {
+  storeName: string;
+  businessNameHindi?: string;
+  domainName?: string;
+  ownerName?: string;
+  role?: string;
+  tagline: string;
+  address: string;
+  addressHindi?: string;
+  city: string;
+  pincode: string;
+  state: string;
   phone: string;
-  address?: string;
-  gstin?: string;
-  totalPurchases: number;
-  totalPaid: number;
-  balanceDue: number; // totalPurchases - totalPaid
-  lastTransactionDate?: string;
+  additionalPhones?: string[];
+  email: string;
+  gstin: string;
+  panNumber: string;
+  bankDetails: {
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+    branch: string;
+    upiId: string;
+  };
+  invoicePrefix: string;
+  nextInvoiceNo?: number;
+  nextReceiptNo: number; // Begins from 1079
+  currencySymbol: string;
+  deliveryRates?: {
+    freeDeliveryMinAmount: number;
+    localDeliveryFee: number;
+    outerDeliveryFee: number;
+    estimatedDeliveryTime: string;
+    deliveryAreas: string;
+    deliveryNote: string;
+  };
+  shopNotice?: string;
+  whatsappGroupLink?: string;
+  whatsappOrderNumber?: string;
+  whatsappSecondaryNumber?: string;
+  warrantyDisclaimer?: string;
+  schemeDefaults: {
+    schemeName: string;
+    durationMonths: number; // 30
+    monthlyAmount: number; // 1000
+    totalBenefit: string;
+  };
+  schemesList?: SchemeDefinition[];
+  termsAndConditions: string[];
 }
 
-export interface DealerPayment {
+export interface StockItem {
   id: string;
-  dealerId: string;
-  dealerName: string;
-  voucherNo: string;
-  date: string;
-  amount: number;
-  paymentMode: 'Cash' | 'Online' | 'Cheque';
-  referenceNo?: string;
-  notes?: string;
-  createdAt: string;
+  code: string; // SKU or barcode
+  name: string;
+  category: 'Electronics' | 'Furniture' | 'Home Appliances' | 'Kitchen Appliances' | 'Other';
+  brand: string;
+  model: string;
+  serialNo?: string;
+  purchasePrice: number;
+  salePrice: number;
+  mrp: number;
+  stockQty: number;
+  minAlertQty: number;
+  unit: string; // Pcs, Sets, Units
+  location?: string; // Floor / Rack
+  warrantyMonths?: number;
+  description?: string;
+  specs?: string[];
+  imageUrl?: string;
+  updatedAt: string;
+  // Landing Page Showroom extensions
+  isFeaturedOnLanding?: boolean;
+  landingBadge?: string;
+  schemeWeeklyAmount?: number;
+  hideOnLanding?: boolean;
 }
 
-export interface SaleItemDetail {
+export interface LandingHeroSlide {
   id: string;
-  stockItemId?: string;
-  productName: string;
-  modelNumber?: string;
-  serialNumber?: string;
-  serialNumbers?: string[];
-  quantity: number;
-  unitPrice: number;
-  total: number;
+  tag: string;
+  titleLead: string;
+  titleHighlight: string;
+  subtitle: string;
+  imageUrl: string;
+  primaryBtnText: string;
+  primaryBtnTarget?: 'catalog' | 'scheme' | 'whatsapp' | 'passbook';
+  secondaryBtnText: string;
+  secondaryBtnTarget?: 'catalog' | 'scheme' | 'whatsapp' | 'passbook';
+  cardBadge: string;
+  cardMetric: string;
+  cardMetric2: string;
+  themeColor: string;
+  active: boolean;
 }
 
-export type OrderStatus = 'pending' | 'confirmed' | 'dispatched' | 'delivered' | 'cancelled';
-
-export interface TransactionEntry {
+export interface LandingOffer {
   id: string;
-  invoiceNo: string;
-  date: string;
-  customerName: string;
-  customerPhone?: string;
-  customerId?: string;
-  village?: string;
-  cardNumber?: number;
-  schemeId?: CardSchemeId;
-  stockItemId?: string;
-  stockItemName?: string;
-  quantity?: number;
-  modelNumber?: string;
-  model?: string;
-  serialNumber?: string;
-  docType?: 'invoice' | 'quotation';
-  agentName?: string;
-  itemDetails: string;
-  itemsDetail?: SaleItemDetail[];
-  totalAmount: number;
-  payingNow: number;
-  dueAmount: number; // totalAmount - payingNow
-  paymentMode: 'Cash' | 'Online' | string;
-  notes?: string;
-  orderStatus?: OrderStatus;
-  source?: 'pos' | 'online_cart';
-  deliveryType?: 'local' | 'outer';
-  deliveryFee?: number;
-  deliveryAddress?: string;
-  dispatchLocation?: 'Godown' | 'Shop';
-  confirmedAt?: string;
-  confirmedBy?: string;
-  createdAt: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  discount: string;
+  couponCode?: string;
+  validTill: string;
+  category: string;
+  imageUrl?: string;
+  whatsappMessage?: string;
+  active: boolean;
 }
 
-export interface BillReceiptEntry {
-  id: string;
-  receiptNo: string; // Sequence: 1078, 1079, 1080...
-  date: string;
-  customerId: string;
-  customerName: string;
-  customerPhone?: string;
-  customerVillage?: string;
-  againstInvoiceNo?: string; // Reference bill number e.g. "3848", "B-201"
-  billTotal?: number;
-  previousBalance: number; // आधीची बाकी
-  amountPaid: number; // आज जमा केलेली रक्कम
-  remainingBalance: number; // शिल्लक बाकी
-  paymentMode: 'Cash' | 'Online';
-  agentName?: string; // Shubham Shende, Bhushan Lidbe, Suraj Pendam, Ninad Hole, Counter
-  notes?: string;
-  createdAt: string;
+export interface LandingAnnouncement {
+  enabled: boolean;
+  badge: string;
+  text: string;
+  highlightText?: string;
+  whatsappButtonText?: string;
+}
+
+export interface LandingContactInfo {
+  helpline1: string;
+  helpline2: string;
+  helpline3: string;
+  whatsappNumber: string;
+  addressHindi: string;
+  landmark: string;
+  googleMapLink: string;
+  timings: string;
+}
+
+export interface LandingSchemeBanner {
+  title: string;
+  subtitle: string;
+  badge: string;
+  weeklyBadge1: string;
+  weeklyBadge2: string;
+  highlightNote: string;
+}
+
+export interface LandingPageConfig {
+  announcement: LandingAnnouncement;
+  heroSlides: LandingHeroSlide[];
+  offers: LandingOffer[];
+  contactInfo: LandingContactInfo;
+  schemeBanner: LandingSchemeBanner;
+  enableOffersSection: boolean;
+  enableAnnouncementBar: boolean;
+  showHeroSection?: boolean;
+  showSchemeBanner?: boolean;
+  showReviewsSection?: boolean;
+  showElectronicsSection?: boolean;
+  showFurnitureSection?: boolean;
+  showAddressBanner?: boolean;
+  showPassbookSection?: boolean;
 }
 
 export interface Customer {
   id: string;
   name: string;
   phone: string;
+  altPhone?: string;
+  address: string;
+  city: string;
   village?: string;
-  address?: string;
+  creditLimit: number;
+  maxDueDays?: number; // Credit validity (default 60 days)
+  currentBalance: number; // Unpaid dues
   totalPurchased: number;
-  totalPurchases?: number; // alias for totalPurchased
-  totalPaid: number;
-  balanceDue: number;
-  linkedCardNumber?: number;
-  linkedSchemeId?: CardSchemeId;
-  lastVisit?: string;
-  createdAt?: string;
-}
-
-export interface StockItem {
-  id: string;
-  name: string;
-  code: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  sellingPrice: number;
-  purchasePrice: number;
-  minStockLevel: number;
-  imageUrl?: string;
-  description?: string;
-  godownQty?: number; // मुख्य गोडावून मधील साठा (Godown / Warehouse Qty)
-  shopQty?: number; // दुकान / शोरूम मधील साठा (Shop / Showroom Qty)
-  godownLocation?: string; // गोडावून नाव / लोकेशन (उदा. मुख्य गोडावून, आर्वी रोड)
-  rackLocation?: string; // रॅक / कपाट क्रमांक
-}
-
-export interface StockTransferRecord {
-  id: string;
-  date: string;
-  stockItemId: string;
-  itemName: string;
-  itemCode: string;
-  fromLocation: 'Godown' | 'Shop';
-  toLocation: 'Godown' | 'Shop';
-  quantity: number;
-  transferredBy: string;
+  totalPurchase?: number; // Alias for import convenience
+  status?: string;
+  createdAt: string;
   notes?: string;
-  timestamp: string;
 }
 
-export interface PurchaseItemDetail {
-  id: string;
-  description: string;
-  hsn: string;
+export interface InvoiceItem {
+  stockId: string;
+  name: string;
+  brand: string;
+  model?: string;
+  serialNo?: string;
   qty: number;
   rate: number;
-  discount: number;
-  taxableAmount: number;
-  taxRate: number;
-  cgstRate: number;
-  cgstAmount: number;
-  sgstRate: number;
-  sgstAmount: number;
-  igstRate?: number;
-  igstAmount?: number;
-  taxAmount: number;
-  totalAmount: number;
-  serialNumbers?: string[];
+  discountPct: number;
+  taxPct: number;
+  total: number;
 }
 
-export interface PurchaseEntry {
+export interface Transaction {
   id: string;
-  billNo: string;
+  invoiceNo: string;
   date: string;
-  supplierName: string;
-  supplierAddress?: string;
-  supplierPhone?: string;
-  supplierGstin?: string;
-  supplierState?: string;
-  
-  // Buyer Details
-  buyerName?: string;
-  buyerGstin?: string;
-  buyerAddress?: string;
-  
-  // Order & Logistics
-  poNo?: string;
-  poDate?: string;
-  location?: string;
-  salesConsultant?: string;
-  approvedBy?: string;
-  transporter?: string;
-  vehicleNo?: string;
-  ewayBillNo?: string;
-  irn?: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress?: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  grandTotal: number;
+  paidAmount: number;
+  balanceDue: number;
+  paymentMode: 'Cash' | 'UPI' | 'Card' | 'Bajaj Finance' | 'Cheque' | 'Scheme Adjustment' | 'Credit' | 'Bank Transfer' | 'EMI';
+  status: 'Paid' | 'Partial' | 'Unpaid';
+  deliveryStatus: 'Delivered' | 'Pending Delivery' | 'Dispatched';
+  linkedCardId?: string;
+  linkedCardNo?: string;
+  schemeDiscount?: number;
+  financeDetails?: {
+    isFinance: boolean;
+    provider?: string;
+    downPayment?: number;
+    loanAmount?: number;
+    fileNo?: string;
+    emiMonths?: number;
+    monthlyEmi?: number;
+  };
+  remarks?: string;
+  createdBy: string;
+}
 
-  // Items
-  items: string;
-  itemsDetail?: PurchaseItemDetail[];
+export interface PurchaseItem {
+  name: string;
+  brand: string;
+  model?: string;
+  serialNo?: string;
+  barcode?: string;
+  qty: number;
+  purchaseRate: number;
+  salePrice?: number;
+  total: number;
+}
 
-  // Financials & Tax
-  subtotal?: number;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  totalTax?: number;
+export interface Purchase {
+  id: string;
+  purchaseNo: string;
+  dealerId: string;
+  dealerName: string;
+  date: string;
+  items: PurchaseItem[];
   totalAmount: number;
   paidAmount: number;
-  status: 'Paid' | 'Partial' | 'Pending';
-  paymentMode: 'Cash' | 'Online' | 'Cheque';
-  
-  // Supplier Bank Details
-  supplierBank?: {
-    accountName?: string;
-    accountNo?: string;
-    ifscCode?: string;
-    bankName?: string;
-    branch?: string;
-  };
-
+  balanceDue: number;
+  paymentMode: string;
+  updateStock?: boolean;
   notes?: string;
-  autoUpdateStock?: boolean;
 }
 
-export interface StaffMember {
+export interface Dealer {
   id: string;
   name: string;
-  role: string;
+  companyName: string;
   phone: string;
-  salary: number;
-  advancePaid: number;
-  attendanceToday: 'Present' | 'Absent' | 'Half Day';
   email?: string;
-  status?: 'Active' | 'Pending Approval' | 'Inactive';
-  isApprovedByAdmin?: boolean;
-  approvalDate?: string;
-  approvedBy?: string;
+  city: string;
+  openingBalance: number;
+  currentPayable: number;
+  notes?: string;
 }
 
-export interface ExpenseEntry {
+export interface DealerPayment {
+  id: string;
+  dealerId: string;
+  dealerName: string;
+  date: string;
+  amount: number;
+  paymentMode: 'NEFT/RTGS' | 'Cheque' | 'Cash' | 'UPI';
+  referenceNo?: string;
+  note?: string;
+}
+
+export interface CardMember {
+  id: string;
+  cardNo: string; // e.g. 1050 or SSE-CD-1050
+  schemeNo?: number; // 1, 2, 3, 4, 5 (Scheme 1 & 2: 1001-3000, Scheme 3, 4, 5: 1001-6000)
+  schemeName?: string; // e.g. 'योजना १ (1001-3000)'
+  sheetNo?: string;
+  memberName: string;
+  phone: string;
+  address: string;
+  village?: string;
+  nomineeName?: string;
+  durationMonths: number; // 30
+  monthlyAmount: number; // e.g. 100, 200, 1000
+  targetAmount?: number; // e.g. 15000 (weekly 100/200 scheme) or 30000 (monthly 1000 scheme)
+  planType?: '15000_scheme' | '30000_scheme' | 'custom_scheme';
+  schemeMonth?: number;
+  monthlyFee?: number;
+  startDate: string;
+  endDate: string;
+  status: 'Active' | 'Draw Winner' | 'Matured' | 'Redeemed' | 'Surrendered';
+  totalPaidMonths: number;
+  paidMonthsCount?: number;
+  totalAmountPaid: number;
+  totalPaid?: number;
+  isLuckyDrawEligible?: boolean;
+  drawMonthWon?: number;
+  prizeDetails?: string;
+  collectedBy?: string;
+  notes?: string;
+  // Attached Item Delivered / Bill Khata Details
+  deliveredItemName?: string;
+  itemBillNo?: string;
+  itemBillDate?: string;
+  itemTotalAmount?: number;
+  itemAdvancePaid?: number;
+  itemBalanceDue?: number;
+  itemDueDt?: string;
+}
+
+export interface CardTransaction {
+  id: string;
+  receiptNo: string;
+  cardMemberId: string;
+  cardNo: string;
+  memberName: string;
+  monthNumber: number; // 1 to 30
+  amount: number;
+  date: string;
+  paymentMode: 'Cash' | 'UPI' | 'Bank Transfer';
+  collectedBy: string;
+  weekNumber?: number;
+  remarks?: string;
+}
+
+export interface Staff {
+  id: string;
+  name: string;
+  role: 'Sales Executive' | 'Floor Manager' | 'Cashier' | 'Delivery Driver' | 'Accountant' | 'Agent';
+  phone: string;
+  monthlySalary: number;
+  joiningDate: string;
+  isActive: boolean;
+}
+
+export interface Expense {
   id: string;
   date: string;
-  category: 'Tea & Snacks' | 'Rent' | 'Electricity' | 'Maintenance' | 'Transport' | 'Stationery' | 'Other';
-  description: string;
+  category: 'Shop Rent' | 'Electricity & Gen' | 'Tea & Refreshments' | 'Staff Welfare' | 'Freight & Transport' | 'Advertising' | 'Showroom Maintenance' | 'Miscellaneous';
   amount: number;
-  paymentMode: 'Cash' | 'Online';
+  paymentMode: 'Cash' | 'UPI' | 'Bank Transfer';
+  paidTo: string;
+  voucherNo: string;
+  note?: string;
 }
 
 export interface AgentAdvance {
   id: string;
-  agentName: string;
+  staffId: string;
+  staffName: string;
   date: string;
   amount: number;
-  paymentMode: 'Cash' | 'Online';
-  notes?: string;
-  createdAt: string;
+  reason: string;
+  deductionMonth: string; // e.g. "Oct 2026"
+  status: 'Pending' | 'Deducted' | 'Waived';
 }
 
-export interface DeliveryRatesConfig {
-  freeDeliveryMinAmount: number;
-  localDeliveryFee: number;
-  outerDeliveryFee: number;
-  estimatedDeliveryTime: string;
-  deliveryAreas: string;
-  deliveryNote: string;
-}
-
-export interface BusinessBankDetails {
-  bankName: string;
-  accountNumber: string;
-  ifsc: string;
-  branch: string;
-  upiQrText?: string;
-}
-
-export interface BusinessSettings {
-  businessName: string;
-  businessNameHindi?: string;
-  domainName: string;
-  ownerName: string;
-  role: string;
-  phone: string;
-  additionalPhones?: string[];
-  email: string;
-  gstin: string;
-  address: string;
-  addressHindi?: string;
-  invoicePrefix: string;
-  currency: string;
-  tagline: string;
-  deliveryRates?: DeliveryRatesConfig;
-  shopNotice?: string;
-  whatsappOrderNumber?: string;
-  whatsappSecondaryNumber?: string;
-  bankDetails?: BusinessBankDetails;
-  warrantyDisclaimer?: string;
-  adminPassword?: string;
-  staffPassword?: string;
-  whatsappGroupLink?: string;
-}
-
-export type UserRole = 'admin' | 'staff';
-
-export interface AuthUser {
+export interface BillReceipt {
   id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  phone?: string;
-  avatar?: string;
-  loggedInAt: string;
-}
-
-export type ActiveTab = 
-  | 'dashboard'
-  | 'add-entry'
-  | 'online-orders'
-  | 'all-entries'
-  | 'bill-receipts'
-  | 'card-scheme'
-  | 'card-passbook'
-  | 'customers'
-  | 'stock'
-  | 'purchases'
-  | 'dealer-ledger'
-  | 'csv-import'
-  | 'uploaded-data'
-  | 'staff'
-  | 'agent-commission'
-  | 'expenses'
-  | 'finance-calc'
-  | 'furniture-job-cards'
-  | 'furniture-jobs'
-  | 'finance-do-register'
-  | 'finance-do'
-  | 'daily-reconciliation'
-  | 'daily-collection-log'
-  | 'village-khata'
-  | 'settings';
-
-export interface FurnitureJobCard {
-  id: string;
-  jobNo: string;
+  receiptNo: number; // Numbered starting from 1079
+  customerId: string;
   customerName: string;
-  customerPhone: string;
-  itemType: 'Sofa Set' | 'Teak Bed' | 'Dining Table' | 'Wardrobe' | 'Dressing Table' | 'Mandir' | 'Custom Teak Item';
-  woodType: 'Pure Teak (सागवान)' | 'Engineered Teak' | 'Rosewood Polish';
-  dimensionOrSpecs: string;
-  totalAmount: number;
-  advancePaid: number;
-  balanceDue: number;
-  artisanName?: string;
-  orderDate: string;
-  targetDeliveryDate: string;
-  stage: 'Seasoning' | 'Cutting' | 'Carving' | 'Polishing' | 'Cushioning' | 'QC' | 'Ready' | 'Delivered';
-  notes?: string;
-  updatedAt: string;
-}
-
-export interface FinanceDORecord {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  invoiceNo: string;
-  itemName: string;
-  financeCompany: 'Bajaj Finserv' | 'TVS Credit' | 'HDB Financial' | 'IDFC First' | 'Shriram Finance' | 'Other';
-  doNumber: string;
-  sanctionedAmount: number;
-  customerDownPayment: number;
-  processingFee: number;
-  dbdAmount?: number;
-  insuranceAmount?: number;
-  netDisbursalAmount?: number;
-  payoutStatus: 'Pending DO Verification' | 'Disbursed to Bank' | 'UTR Received' | 'Claim Rejected';
-  utrNumber?: string;
-  disbursedDate?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-export interface DailyCashReconciliation {
-  id: string;
+  invoiceNo?: string;
+  amountPaid: number;
   date: string;
+  paymentMode: 'Cash' | 'UPI' | 'Cheque' | 'Card';
+  balanceRemaining: number;
+  remarks?: string;
+  handledBy: string;
+}
+
+export interface AuthSession {
+  id: string;
+  username: string;
+  role: 'Admin' | 'Manager' | 'Cashier';
+  loginTime: string;
+  device: string;
+}
+
+export interface SecurityAuditEntry {
+  id: string;
+  timestamp: string;
+  username: string;
+  role: string;
+  eventType:
+    | 'LOGIN_SUCCESS'
+    | 'LOGIN_FAILED'
+    | 'LOGOUT'
+    | 'PASSWORD_CHANGED'
+    | 'LOCKOUT_TRIGGERED'
+    | 'STAFF_ADDED'
+    | 'ACCOUNT_APPROVED'
+    | 'ACCOUNT_REJECTED'
+    | 'ACCOUNT_DELETED'
+    | 'SECURITY_SETTINGS_UPDATED';
+  ipOrDevice: string;
+  details?: string;
+}
+
+export interface SecuritySettings {
+  masterUsername: string;
+  masterPasswordHash?: string;
+  masterPinHash?: string;
+  securityRecoveryQuestion?: string;
+  securityRecoveryAnswerHash?: string;
+  maxFailedAttempts: number;
+  lockoutDurationMinutes: number;
+  autoLockMinutes: number;
+  requireStrongPassword: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'Admin' | 'Manager' | 'Cashier' | 'Agent' | 'Staff';
+  pin: string; // PIN or Password hash
+  phone?: string;
+  status?: 'active' | 'pending' | 'rejected';
+  createdAt?: string;
+  approvedBy?: string;
+  passwordHash?: string;
+  lastLogin?: string;
+}
+
+export interface CashDenomination {
+  d500: number;
+  d200: number;
+  d100: number;
+  d50: number;
+  d20: number;
+  d10: number;
+  coins: number;
+}
+
+export interface DailyCashClosing {
+  id: string;
+  date: string; // YYYY-MM-DD
+  closedAt: string; // ISO string
+  closedBy: string; // Staff/Admin name
+
+  // Inflows
   openingCash: number;
-  cashSales: number;
-  cashSchemeDeposits: number;
-  cashKhataReceipts: number;
-  cashExpenses: number;
-  expectedCash: number;
-  physicalCash: number;
-  discrepancy: number;
-  denominations: {
-    c500: number;
-    c200: number;
-    c100: number;
-    c50: number;
-    c20: number;
-    c10: number;
-    coins: number;
-  };
-  closedBy: string;
-  notes?: string;
+  salesCash: number; // Cash from Transactions
+  receiptsCash: number; // Cash from Customer Bill Receipts
+  schemeCash: number; // Cash from Card Scheme installments
+  otherCashIn: number;
+  totalCashIn: number;
+
+  // Outflows
+  expensesCash: number; // Cash paid for shop expenses
+  staffAdvanceCash: number; // Cash paid for staff/agent advances
+  dealerCash: number; // Cash paid to wholesale dealers
+  otherCashOut: number;
+  totalCashOut: number;
+
+  // Expected vs Actual
+  expectedCash: number; // openingCash + totalCashIn - totalCashOut
+  actualCash: number; // calculated from denomination breakdown
+  discrepancy: number; // actualCash - expectedCash (0 = matched, negative = shortage/तूट, positive = excess)
+  denominations: CashDenomination;
+  remarks?: string;
+  status: 'Matched' | 'Shortage' | 'Excess';
+}
+
+export interface DealerPdcCheque {
+  id: string;
+  dealerId: string;
+  dealerName: string;
+  chequeNumber: string;
+  bankName: string;
+  amount: number;
+  issueDate: string;
+  dueDate: string; // PDC Maturity Date
+  daysRemaining?: number;
+  status: 'Upcoming' | 'Due in 3 Days' | 'Due Today' | 'Overdue' | 'Cleared' | 'Bounced';
+  note?: string;
+}
+
+export interface WarrantyServiceReminder {
+  id: string;
+  transactionId: string;
+  invoiceNo: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  productName: string;
+  brand: string;
+  serialNo?: string;
+  saleDate: string;
+  warrantyMonths: number;
+  expiryDate: string;
+  serviceDueDate: string; // Usually at 6 or 12 months for preventive checkup
+  status: 'Active' | 'Expiring Soon' | 'Expired';
+  lastReminderSent?: string;
+}
+
+export interface FestivalPromoCreative {
+  id: string;
+  festivalName: string;
+  category: string;
+  headline: string;
+  tagline: string;
+  discount: string;
+  schemeWeekly: string;
+  whatsappMessage: string;
+  themeColor: string;
   createdAt: string;
 }
 
-export interface MergedCustomerRecord {
-  secondaryId: string;
-  secondaryName: string;
-  secondaryPhone?: string;
-  primaryId: string;
-  primaryName: string;
-  primaryPhone?: string;
-  mergedAt: string;
+export interface PurchaseOrderItem {
+  itemName: string;
+  category: string;
+  brand: string;
+  qty: number;
+  expectedRate: number;
+  total: number;
 }
 
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  dealerId: string;
+  dealerName: string;
+  date: string;
+  expectedDate?: string;
+  items: PurchaseOrderItem[];
+  totalAmount: number;
+  notes?: string;
+  status: 'Draft' | 'Sent' | 'Received' | 'Cancelled';
+}
 
+export interface DebitNote {
+  id: string;
+  debitNoteNo: string;
+  dealerId: string;
+  dealerName: string;
+  date: string;
+  reason: 'Transit Damage' | 'Defective Display/Panel' | 'Cracked Body' | 'Rate Difference' | 'Short Supply' | 'Other';
+  productName: string;
+  serialNo?: string;
+  amount: number;
+  status: 'Applied' | 'Settled' | 'Pending';
+  remarks?: string;
+}
+
+export interface StaffAttendanceRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  staffId: string;
+  staffName: string;
+  status: 'Present' | 'Half Day' | 'Absent' | 'Paid Leave';
+  overtimeHours?: number;
+  note?: string;
+}
+
+export interface CustomerLoyaltyRecord {
+  customerId: string;
+  customerName: string;
+  pointsBalance: number; // 1 point = ₹1
+  totalEarned: number;
+  totalRedeemed: number;
+  referredBy?: string;
+  referralCount: number;
+}
+
+export interface DeliveryChallan {
+  id: string;
+  challanNo: string;
+  date: string;
+  invoiceNo?: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+  vehicleNo: string;
+  driverName: string;
+  driverPhone: string;
+  items: { itemName: string; qty: number; serialNo?: string }[];
+  ewayBillNo?: string;
+  dispatchTime: string;
+  status: 'Dispatched' | 'Delivered' | 'Returned';
+  receiverSign?: boolean;
+}
+
+export interface FinanceCase {
+  id: string;
+  fileNo: string;
+  customerName: string;
+  customerPhone: string;
+  provider: 'Bajaj Finserv' | 'TVS Credit' | 'HDB Financial' | 'IDFC First' | 'Other';
+  productName: string;
+  invoiceAmount: number;
+  downPayment: number;
+  loanAmount: number;
+  tenureMonths: number;
+  monthlyEmi: number;
+  dbdPercent?: number; // Dealer Buy Down
+  status: 'Document Pending' | 'Underwriting' | 'Approved' | 'Delivered' | 'Disbursed' | 'Rejected';
+  approvalDate?: string;
+  disbursedAmount?: number;
+  utrNo?: string;
+}
+
+export interface CustomerCreditScore {
+  customerId: string;
+  customerName: string;
+  score: number; // 300 to 900
+  grade: 'A+ Elite' | 'A Good' | 'B Fair' | 'C Watchlist' | 'High Risk';
+  factors: string[];
+  maxCreditAllowed: number;
+  isCreditBlocked: boolean;
+}
+
+export interface StoreData {
+  updatedAt: string;
+  updatedBy: string;
+  settings: StoreSettings;
+  stock: StockItem[];
+  customers: Customer[];
+  transactions: Transaction[];
+  purchases: Purchase[];
+  dealers: Dealer[];
+  dealerPayments: DealerPayment[];
+  cardMembers: CardMember[];
+  cardTransactions: CardTransaction[];
+  staff: Staff[];
+  expenses: Expense[];
+  agentAdvances: AgentAdvance[];
+  billReceipts: BillReceipt[];
+  authSessions: AuthSession[];
+  adminUsers: AdminUser[];
+  dailyClosings?: DailyCashClosing[];
+  dealerCheques?: DealerPdcCheque[];
+  serviceReminders?: WarrantyServiceReminder[];
+  savedPromos?: FestivalPromoCreative[];
+  lastBackupDate?: string;
+  isDemoWiped?: boolean;
+  securitySettings?: SecuritySettings;
+  securityAuditLogs?: SecurityAuditEntry[];
+  landingPageConfig?: LandingPageConfig;
+  purchaseOrders?: PurchaseOrder[];
+  debitNotes?: DebitNote[];
+  staffAttendance?: StaffAttendanceRecord[];
+  loyaltyRecords?: CustomerLoyaltyRecord[];
+  deliveryChallans?: DeliveryChallan[];
+  financeCases?: FinanceCase[];
+}
