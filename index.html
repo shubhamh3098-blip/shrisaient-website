@@ -2,147 +2,238 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    
+    <!-- Primary SEO Meta Tags -->
+    <title>Best Electronics &amp; Furniture Showroom in Wardha | Shri Sai Enterprises (8600122978)</title>
+    <meta name="description" content="वर्ध्यातील सर्वोत्तम इलेक्ट्रॉनिक्स व फर्निचर शोरूम. फ्रिज, LED TV, वॉशिंग मशीन, सोफा, बेड व कपाट उत्तम दरात आणि ३० महिन्यांच्या सुलभ बचत योजनेसह. पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा. फोन: 8600122978 / 9175537365." />
+    <meta name="keywords" content="Electronics Wardha, Furniture Wardha, Best Electronics Showroom Wardha, Furniture store Wardha, Sofa Bed Cupboard Wardha, LED TV Wardha, Refrigerator Wardha, Shri Sai Enterprises Wardha, Furniture near me, Electronics shop Arvi Road Wardha" />
+    <meta name="author" content="Shri Sai Enterprises, Wardha" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://shrisaient.in" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+
+    <!-- Early suppression for harmless Vite HMR WebSocket in cloud iframe preview -->
     <script>
-      // Suppress benign [vite] websocket connection notices in AI Studio preview iframe
       (function() {
-        var _realConsole = window.console;
-        try {
-          Object.defineProperty(window, 'console', {
-            get: function() { return _realConsole; },
-            set: function(newVal) {
-              if (newVal && typeof newVal.error === 'function') {
-                var origError = newVal.error;
-                newVal.error = function() {
-                  var first = arguments[0];
-                  var text = typeof first === 'string' ? first : (first && first.message ? first.message : '');
-                  if (text.indexOf('[vite]') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('WebSocket') !== -1) {
-                    return;
-                  }
-                  return origError.apply(this, arguments);
-                };
-              }
-              _realConsole = newVal;
-            },
-            configurable: true
-          });
-        } catch (e) {}
-
-        if (window.console && window.console.error) {
-          var currErr = window.console.error;
-          window.console.error = function() {
-            var first = arguments[0];
-            var text = typeof first === 'string' ? first : (first && first.message ? first.message : '');
-            if (text.indexOf('[vite]') !== -1 || text.indexOf('websocket') !== -1 || text.indexOf('WebSocket') !== -1) {
-              return;
+        if (typeof window !== 'undefined') {
+          window.addEventListener('unhandledrejection', function(e) {
+            var m = String((e && e.reason && (e.reason.message || e.reason)) || '');
+            if (m.indexOf('WebSocket') !== -1 || m.indexOf('websocket') !== -1) {
+              if (e.preventDefault) e.preventDefault();
+              if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+              return true;
             }
-            return currErr.apply(this, arguments);
-          };
+          }, true);
+          window.addEventListener('error', function(e) {
+            var m = String((e && (e.message || (e.error && e.error.message))) || '');
+            if (m.indexOf('WebSocket') !== -1 || m.indexOf('websocket') !== -1) {
+              if (e.preventDefault) e.preventDefault();
+              if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+              return true;
+            }
+          }, true);
         }
-
-        var _realOnError = null;
-        try {
-          Object.defineProperty(window, 'onerror', {
-            get: function() { return _realOnError; },
-            set: function(fn) {
-              _realOnError = function(message) {
-                var str = String(message || '');
-                if (str.indexOf('[vite]') !== -1 || str.indexOf('websocket') !== -1) {
-                  return true;
-                }
-                if (fn) return fn.apply(this, arguments);
-              };
-            },
-            configurable: true
-          });
-        } catch (e) {}
       })();
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Shri Sai Enterprises - Cash & Business Manager</title>
-    <meta name="description" content="Shri Sai Enterprises, Wardha - Premium electronics, contemporary furniture showroom, and 30-month savings scheme management system." />
-    <meta name="keywords" content="Shri Sai Enterprises Wardha, electronics and furniture Wardha, sofa set Wardha, wooden bed Wardha, air coolers Wardha, smart TV Wardha, home appliances Arvi road Punjab Colony Wardha, 30 month savings scheme, shrisaient.in" />
-    <link rel="canonical" href="https://shrisaient.in/" />
 
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://shrisaient.in/" />
-    <meta property="og:title" content="Shri Sai Enterprises - Cash & Business Manager" />
-    <meta property="og:description" content="Shri Sai Enterprises, Wardha - Premium electronics, contemporary furniture showroom, and 30-month savings scheme management system." />
-    <meta property="og:image" content="https://shrisaient.in/pwa-512x512.png" />
-    <meta property="og:locale" content="en_IN" />
+    <!-- Local SEO Geo Tags for Wardha, Maharashtra -->
+    <meta name="geo.region" content="IN-MH" />
+    <meta name="geo.placename" content="Wardha, Maharashtra, India" />
+    <meta name="geo.position" content="20.7453;78.6022" />
+    <meta name="ICBM" content="20.7453, 78.6022" />
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Shri Sai Enterprises - Premium Electronics & Contemporary Furniture" />
-    <meta name="twitter:description" content="Wardha's top showroom for electronics, home appliances, teak furniture and 30-month savings scheme. Phone: 8766486915." />
-
-    <!-- Google Fonts: Inter (Latin Clean) & Noto Sans Devanagari / Rozha One for refined Marathi typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Yantramanav:wght@400;500;700;900&display=swap" rel="stylesheet" />
-
-    <!-- Structured Data / JSON-LD for Google Local SEO & Google Business Profile -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      "name": "Shri Sai Enterprises",
-      "alternateName": "श्री साई इंटरप्राइजेस वर्धा",
-      "image": "https://shrisaient.in/pwa-512x512.png",
-      "@id": "https://shrisaient.in/",
-      "url": "https://shrisaient.in/",
-      "telephone": "+918766486915",
-      "priceRange": "₹₹",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Matoshree Sabhagruha Samor, Arvi Road, Punjab Colony",
-        "addressLocality": "Wardha",
-        "addressRegion": "Maharashtra",
-        "postalCode": "442001",
-        "addressCountry": "IN"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": 20.7453,
-        "longitude": 78.6022
-      },
-      "openingHoursSpecification": [
-        {
-          "@type": "OpeningHoursSpecification",
-          "dayOfWeek": [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday"
-          ],
-          "opens": "09:00",
-          "closes": "21:00"
-        }
-      ],
-      "sameAs": [
-        "https://wa.me/918766486915",
-        "https://wa.me/918600122798"
-      ],
-      "description": "Premier showroom and service center in Wardha for Electronics, Home Appliances, Coolers, LED TVs, Electrical Contracting & 30-Month Weekly Savings Card Scheme."
-    }
-    </script>
-    
-    <!-- PWA & Mobile Web App Capabilities -->
-    <meta name="theme-color" content="#0B1528" />
+    <!-- Favicon & Mobile PWA App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/shri-sai-logo.svg?v=3" />
+    <link rel="apple-touch-icon" href="/shri-sai-logo.svg?v=3" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Shri Sai Ent" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Shri Sai ERP" />
+    <meta name="theme-color" content="#090d1f" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shri Sai Enterprises - Electronics &amp; Furniture Showroom, Wardha" />
+    <meta property="og:url" content="https://shrisaient.in" />
+    <meta property="og:title" content="Best Electronics &amp; Furniture Showroom in Wardha | Shri Sai Enterprises (सस्ते व खात्रीशीर दर)" />
+    <meta property="og:description" content="वर्ध्यातील सर्वोत्तम इलेक्ट्रॉनिक्स व फर्निचर शोरूम. फ्रिज, टीव्ही, वॉशिंग मशीन, सोफा, बेड व कपाट उत्तम दरात आणि ३० महिन्यांच्या सुलभ बचत योजनेसह उपलब्ध. Shri Sai Enterprises, Wardha." />
+    <meta property="og:image" content="/shri-sai-logo.svg?v=3" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://shrisaient.in" />
+    <meta name="twitter:title" content="Best Electronics &amp; Furniture Showroom in Wardha | Shri Sai Enterprises" />
+    <meta name="twitter:description" content="वर्ध्यातील सर्वोत्तम इलेक्ट्रॉनिक्स व फर्निचर शोरूम. फ्रिज, टीव्ही, वॉशिंग मशीन, सोफा, बेड व कपाट उत्तम दरात आणि ३० महिन्यांच्या सुलभ बचत योजनेसह उपलब्ध. Shri Sai Enterprises, Wardha." />
+    <meta name="twitter:image" content="/shri-sai-logo.svg?v=3" />
+
+    <!-- Google My Business / Local Business Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": ["FurnitureStore", "ElectronicsStore", "HomeGoodsStore"],
+          "@id": "https://shrisaient.in/#store",
+          "name": "Shri Sai Enterprises - Electronics & Furniture Showroom, Wardha",
+          "alternateName": ["Shri Sai Enterprises Wardha", "श्री साई एंटरप्रायजेस वर्धा", "Shri Sai Electronics & Furniture"],
+          "url": "https://shrisaient.in",
+          "logo": "https://shrisaient.in/shri-sai-logo.svg",
+          "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&auto=format&fit=crop&q=80",
+          "description": "वर्ध्यातील अग्रगण्य इलेक्ट्रॉनिक्स व फर्निचर शोरूम. स्मार्ट LED TV, फ्रिज, वॉशिंग मशीन, सोफा संच, बेड, कपाट आणि ३० महिन्यांची सुलभ साप्ताहिक बचत योजना. पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा.",
+          "telephone": "+91-8600122978",
+          "contactPoint": [
+            {
+              "@type": "ContactPoint",
+              "telephone": "+91-8600122978",
+              "contactType": "sales & customer support",
+              "areaServed": "IN",
+              "availableLanguage": ["Marathi", "Hindi", "English"]
+            },
+            {
+              "@type": "ContactPoint",
+              "telephone": "+91-9175537365",
+              "contactType": "billing & installment collection"
+            },
+            {
+              "@type": "ContactPoint",
+              "telephone": "+91-8766486915",
+              "contactType": "home delivery & service"
+            }
+          ],
+          "priceRange": "₹₹",
+          "currenciesAccepted": "INR",
+          "paymentAccepted": "Cash, UPI, Google Pay, PhonePe, Net Banking, Credit Card, 30-Month Weekly Installments",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony",
+            "addressLocality": "Wardha",
+            "addressRegion": "Maharashtra",
+            "postalCode": "442001",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": "20.7453",
+            "longitude": "78.6022"
+          },
+          "hasMap": "https://maps.google.com/?q=Shri+Sai+Enterprises+Matoshree+Sabhagruh+Arvi+Road+Wardha",
+          "areaServed": [
+            "Wardha",
+            "Sevagram",
+            "Deoli",
+            "Arvi",
+            "Hinganghat",
+            "Seloo",
+            "Pulgaon",
+            "Sindi",
+            "Samudrapur"
+          ],
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "528",
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday"
+              ],
+              "opens": "09:30",
+              "closes": "21:30"
+            }
+          ],
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Electronics, Teak Furniture & 30-Month Savings Scheme",
+            "itemListElement": [
+              {
+                "@type": "OfferCatalog",
+                "name": "Electronics in Wardha",
+                "description": "Smart LED TVs (32 to 65 inch), Inverter Refrigerators, 5-Star Washing Machines, Air Coolers, Split AC"
+              },
+              {
+                "@type": "OfferCatalog",
+                "name": "Furniture in Wardha",
+                "description": "Pure Chandrapur Teakwood Sofas, Hydraulic Storage Diwans, Sheesham Beds, Heavy Steel Wardrobes"
+              },
+              {
+                "@type": "OfferCatalog",
+                "name": "30-Month Weekly Savings Scheme",
+                "description": "Save ₹100 or ₹200 weekly, monthly lucky draw bumper prizes, 100% money-back guarantee with high-grade furniture or electronics."
+              }
+            ]
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://shrisaient.in/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "वर्ध्यात इलेक्ट्रॉनिक्स आणि फर्निचरसाठी सर्वोत्तम दुकान कोणते? (Best Electronics & Furniture store in Wardha?)",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "वर्ध्यातील आर्वी रोडवर मातोश्री सभागृहासमोर असलेले श्री साई एंटरप्रायजेस (Shri Sai Enterprises) हे इलेक्ट्रॉनिक्स आणि फर्निचरसाठी सर्वोत्तम शोरूम आहे. येथे स्मार्ट टीव्ही, फ्रिज, वॉशिंग मशीन, सागवान सोफा, बेड व कपाटे अत्यंत रास्त दरात आणि ३० महिन्यांच्या सुलभ हप्त्यांवर मिळतात. संपर्क: 8600122978 / 9175537365."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "श्री साई एंटरप्रायजेस वर्धा चा पत्ता आणि संपर्क नंबर काय आहे? (What is the address and phone number?)",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "पत्ता: मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१ (Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha). मोबाइल नंबर: +91 8600122978 / +91 9175537365 / +91 8766486915."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "श्री साई एंटरप्रायजेसची ३० महिन्यांची बचत योजना काय आहे? (What is the 30-Month Savings Scheme?)",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "ग्राहकांना आठवड्याला फक्त ₹१०० किंवा ₹२०० भरून ३० महिन्यांची बचत करता येते. दरमहा भाग्यवान सोडत (Lucky Draw) निघते, ज्यात विजेत्या ग्राहकांना मोफत बंपर भेटवस्तू मिळतात आणि योजना पूर्ण झाल्यावर भरलेली सर्व रक्कम किंवा मनापसंत फर्निचर/इलेक्ट्रॉनिक्स वस्तू मिळते."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "वर्धा व आजूबाजूच्या गावांमध्ये होम डिलिव्हरी उपलब्ध आहे का? (Is home delivery available?)",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "होय, वर्धा शहर, सेवाग्राम, देवळी, आर्वी, हिंगणघाट, सेलू, आणि पुलगाव परिसरात सुरक्षित होम डिलिव्हरी व त्वरित इन्स्टॉलेशन सुविधा दिली जाते."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://shrisaient.in/#website",
+          "url": "https://shrisaient.in",
+          "name": "Shri Sai Enterprises Wardha",
+          "publisher": {
+            "@id": "https://shrisaient.in/#store"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

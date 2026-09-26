@@ -1,369 +1,429 @@
-import express from 'express';
-import http from 'http';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
-import dotenv from 'dotenv';
-
-// Safe directory resolution compatible with both ESM (tsx dev) and CommonJS (esbuild dist/server.cjs)
-const getAppDirname = (): string => {
-  try {
-    if (typeof __dirname !== 'undefined' && __dirname) {
-      return __dirname;
-    }
-    if (typeof import.meta !== 'undefined' && import.meta.url) {
-      return path.dirname(fileURLToPath(import.meta.url));
-    }
-  } catch (e) {
-    // Fallback if environment doesn't provide URL
-  }
-  return process.cwd();
-};
-
-const appDirname = getAppDirname();
+import express, { Response } from "express";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-async function startServer() {
-  const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Increase payload limit for base64 bill photos (supports high-res images)
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+const app = express();
+const PORT = 3000;
 
-  // API & Container Health checks (for Cloud Run startup/liveness probes & internal monitoring)
-  const healthCheckHandler = (req: express.Request, res: express.Response) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.use(express.json({ limit: "25mb" }));
+
+// ----------------------------------------------------------------------------
+// PERSISTENT DATA & REAL-TIME MULTI-DEVICE SYNC ENGINE
+// ----------------------------------------------------------------------------
+const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_FILE = path.join(DATA_DIR, "store_data.json");
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+let serverStoreData: any = null;
+
+// Load persisted data on server boot
+try {
+  if (fs.existsSync(DATA_FILE)) {
+    const raw = fs.readFileSync(DATA_FILE, "utf-8");
+    serverStoreData = JSON.parse(raw);
+    console.log(`[Realtime Sync] Loaded existing store data from ${DATA_FILE}`);
+  }
+} catch (err) {
+  console.error("[Realtime Sync] Failed reading data file:", err);
+}
+
+// Active Server-Sent Events (SSE) clients for real-time live sync
+const sseClients = new Set<Response>();
+
+function broadcastSyncUpdate(updatedData: any, sourceDeviceId?: string) {
+  const payload = JSON.stringify({
+    type: "REALTIME_STORE_UPDATE",
+    version: updatedData.updatedAt || new Date().toISOString(),
+    updatedBy: updatedData.updatedBy || "Realtime Sync",
+    sourceDeviceId: sourceDeviceId || "unknown",
+    data: updatedData,
+  });
+
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// 1. Get current server state
+app.get("/api/sync", (_req, res) => {
+  res.json({
+    success: true,
+    data: serverStoreData,
+    version: serverStoreData?.updatedAt || null,
+    connectedDevices: sseClients.size,
+  });
+});
+
+// 2. Push client updates to server (from mobile agent phone or counter computer)
+app.post("/api/sync", (req, res) => {
+  const { data, sourceDeviceId } = req.body;
+  if (!data) {
+    return res.status(400).json({ success: false, message: "Missing store data payload" });
+  }
+
+  // Stamp updated timestamp
+  data.updatedAt = new Date().toISOString();
+  serverStoreData = data;
+
+  // Persist to disk asynchronously
+  fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8", (err) => {
+    if (err) console.error("[Realtime Sync] Error saving store data to file:", err);
+  });
+
+  // Broadcast in real-time to all connected mobile agents and desktops
+  broadcastSyncUpdate(data, sourceDeviceId);
+
+  res.json({
+    success: true,
+    version: data.updatedAt,
+    connectedDevices: sseClients.size,
+  });
+});
+
+// 3. Server-Sent Events stream for instant real-time synchronization
+app.get("/api/sync/events", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  sseClients.add(res);
+
+  // Send initial handshake
+  res.write(
+    `data: ${JSON.stringify({
+      type: "INIT_CONNECTED",
+      version: serverStoreData?.updatedAt || null,
+      message: "Real-time sync connected to Shri Sai Central Server",
+      timestamp: new Date().toISOString(),
+    })}\n\n`
+  );
+
+  // Keep-alive heartbeat every 20 seconds
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(": keepalive\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    }
+  }, 20000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+});
+
+// 4. Quick Agent Weekly Collection Endpoint (Ultra-lightweight for field agents on 2G/3G)
+app.post("/api/agent/quick-collect", (req, res) => {
+  const { cardNo, memberName, amount, paymentMode = "Cash", collectedBy = "Field Agent", monthNumber, remarks = "" } = req.body;
+
+  if (!cardNo || !amount) {
+    return res.status(400).json({ success: false, message: "Card number and amount are required" });
+  }
+
+  if (!serverStoreData) {
+    return res.status(400).json({ success: false, message: "Store not initialized yet" });
+  }
+
+  const collectAmt = Number(amount) || 0;
+  const now = new Date();
+  const receiptNo = `SCH-REC-${Date.now().toString().slice(-6)}`;
+
+  // Find card member
+  const memberIndex = (serverStoreData.cardMembers || []).findIndex(
+    (m: any) => m.cardNo.trim().toLowerCase() === cardNo.trim().toLowerCase()
+  );
+
+  let updatedMember = null;
+  if (memberIndex !== -1) {
+    const mem = serverStoreData.cardMembers[memberIndex];
+    mem.paidAmount = (mem.paidAmount || 0) + collectAmt;
+    mem.completedMonths = Math.min(30, (mem.completedMonths || 0) + (monthNumber ? 1 : Math.round(collectAmt / (mem.weeklyInstallment * 4 || 1000))));
+    mem.lastPaymentDate = now.toISOString();
+    updatedMember = mem;
+  }
+
+  const newTx = {
+    id: `ct-${Date.now()}`,
+    receiptNo,
+    cardMemberId: updatedMember?.id || `cm-${cardNo}`,
+    cardNo,
+    memberName: memberName || updatedMember?.memberName || "Customer",
+    monthNumber: monthNumber || updatedMember?.completedMonths || 1,
+    amount: collectAmt,
+    date: now.toISOString(),
+    paymentMode,
+    collectedBy,
+    remarks,
   };
-  app.get('/api/health', healthCheckHandler);
-  app.get('/health', healthCheckHandler);
-  app.get('/healthz', healthCheckHandler);
 
-  // API: Scan Purchase Invoice / Bill via Gemini AI Multimodal Vision
-  app.post('/api/scan-purchase-invoice', async (req, res) => {
-    try {
-      const { imageBase64, mimeType } = req.body;
-      if (!imageBase64) {
-        return res.status(400).json({ success: false, error: 'Image data is required' });
-      }
+  if (!serverStoreData.cardTransactions) {
+    serverStoreData.cardTransactions = [];
+  }
+  serverStoreData.cardTransactions.unshift(newTx);
+  serverStoreData.updatedAt = now.toISOString();
+  serverStoreData.updatedBy = `${collectedBy} (Mobile Field App)`;
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({
-          success: false,
-          error: 'GEMINI_API_KEY is not configured in server environment.',
-          needKey: true,
-        });
-      }
-
-      let cleanBase64 = imageBase64;
-      let detectedMime = mimeType || 'image/jpeg';
-      if (imageBase64.includes(';base64,')) {
-        const parts = imageBase64.split(';base64,');
-        detectedMime = parts[0].replace('data:', '') || detectedMime;
-        cleanBase64 = parts[1];
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      });
-
-      const prompt = `You are an expert OCR and retail invoice data extraction specialist for electronics, home appliances, and furniture store purchase bills (खरेदी बीजक / Tax Invoice).
-Your task is to analyze the attached purchase bill/invoice image, accurately read English, Hindi, and Marathi text, and extract all supplier, bill, product items, serial numbers, taxes, and billing totals.
-
-Return strictly valid JSON with this exact schema:
-{
-  "supplierName": "Name of supplier/distributor/company (e.g. MANISHA ENTERPRISES, LG ELECTRONICS, SAMSUNG, GODREJ, etc.)",
-  "supplierAddress": "Address of supplier or empty string",
-  "supplierPhone": "Phone or mobile number if present, else empty string",
-  "supplierGstin": "15-character GSTIN number if present, else empty string",
-  "supplierState": "MAHARASHTRA",
-  "buyerName": "Buyer name (e.g. SHRI SAI ENTERPRISES) if printed, else empty string",
-  "buyerGstin": "Buyer GSTIN if printed, else empty string",
-  "buyerAddress": "Buyer address if printed, else empty string",
-  "billNo": "Invoice/Bill number as printed on bill",
-  "date": "Invoice date in YYYY-MM-DD format (convert DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD)",
-  "poNo": "Purchase order / PO number if mentioned, else empty string",
-  "poDate": "PO date in YYYY-MM-DD or empty string",
-  "location": "Location / Warehouse / Distribution branch if shown, else 'DISTRIBUTION WAREHOUSE'",
-  "salesConsultant": "Sales person or consultant name if shown, else empty string",
-  "approvedBy": "Approved by name if shown, else empty string",
-  "transporter": "Transporter name if mentioned, else 'GENERAL TRANSPORT'",
-  "vehicleNo": "Vehicle number if mentioned, else empty string",
-  "items": [
-    {
-      "description": "Clear product description with brand and model (e.g. 'LG GLT2216WYRI Refrigerator 240L', 'Samsung 43 Inch Smart LED TV', etc.)",
-      "hsn": "HSN code (e.g. '84182100', '84501100', '85287200', etc.) or empty string",
-      "qty": 1,
-      "rate": 20000,
-      "discount": 0,
-      "taxRate": 18,
-      "taxableAmount": 20000,
-      "taxAmount": 3600,
-      "totalAmount": 23600,
-      "serialNumbers": ["602NRZX294301", "602NRQV293652"]
-    }
-  ],
-  "subtotal": 20000,
-  "cgstAmount": 1800,
-  "sgstAmount": 1800,
-  "igstAmount": 0,
-  "totalTax": 3600,
-  "totalAmount": 23600,
-  "paidAmount": 0,
-  "paymentMode": "Online",
-  "supplierBank": {
-    "accountName": "Supplier bank account name if mentioned",
-    "accountNo": "Bank account number if mentioned",
-    "ifscCode": "IFSC code if mentioned",
-    "bankName": "Bank name",
-    "branch": "Branch name"
-  },
-  "notes": "Any special notes, scheme discounts, or delivery details mentioned on bill"
-}
-
-Important Instructions:
-1. Extract every individual item line row in the bill.
-2. Carefully look for Serial Numbers, IMEI numbers, Barcodes, or Unit Numbers printed on the bill (often in a dedicated column, below the item name, or in a serial list at the bottom). Put each individual serial into the 'serialNumbers' array.
-3. Ensure all numbers (qty, rate, discount, taxRate, taxableAmount, taxAmount, totalAmount, subtotal, cgstAmount, sgstAmount, igstAmount, totalTax) are numbers, NOT strings.
-4. If rate is per unit, ensure line totalAmount = taxableAmount + taxAmount.
-5. If payment status or paid amount is marked on the bill, extract it; otherwise default paidAmount to 0.
-6. Return ONLY the JSON object. Do not include extra conversational text or formatting outside the JSON.`;
-
-      const imagePart = {
-        inlineData: {
-          mimeType: detectedMime,
-          data: cleanBase64,
-        },
-      };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            parts: [
-              imagePart,
-              { text: prompt },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
-
-      let responseText = response.text || '{}';
-      responseText = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsedData = JSON.parse(responseText);
-
-      return res.json({
-        success: true,
-        data: parsedData,
-      });
-    } catch (err: any) {
-      console.error('Error processing invoice with Gemini Vision:', err);
-      return res.status(500).json({
-        success: false,
-        error: err.message || 'Failed to parse invoice with AI Vision',
-      });
-    }
+  fs.writeFile(DATA_FILE, JSON.stringify(serverStoreData, null, 2), "utf-8", (err) => {
+    if (err) console.error("Error saving quick collection:", err);
   });
 
-  // API: Scan Dealer / Supplier Ledger Statement & Invoices (PDF or Image)
-  app.post('/api/scan-dealer-statement', async (req, res) => {
-    try {
-      const { fileBase64, imageBase64, mimeType } = req.body;
-      const rawBase64 = fileBase64 || imageBase64;
-      if (!rawBase64) {
-        return res.status(400).json({ success: false, error: 'Document or image data is required' });
-      }
+  broadcastSyncUpdate(serverStoreData, "agent-mobile-quick");
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({
-          success: false,
-          error: 'GEMINI_API_KEY is not configured in server environment.',
-          needKey: true,
-        });
-      }
+  res.json({
+    success: true,
+    receiptNo,
+    transaction: newTx,
+    updatedMember,
+  });
+});
 
-      let cleanBase64 = rawBase64;
-      let detectedMime = mimeType || 'application/pdf';
-      if (rawBase64.includes(';base64,')) {
-        const parts = rawBase64.split(';base64,');
-        detectedMime = parts[0].replace('data:', '') || detectedMime;
-        cleanBase64 = parts[1];
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
+// Lazy initialization for Gemini client
+let geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  if (!geminiClient && process.env.GEMINI_API_KEY) {
+    geminiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
         },
-      });
-
-      const statementPrompt = `You are an expert financial auditor and retail ledger reconciliation specialist for electronics, home appliances, and furniture dealerships.
-Your task is to analyze the attached supplier/dealer account statement or purchase invoice (PDF or image).
-Suppliers include companies like MANISHA ENTERPRISES, LG ELECTRONICS, SAMSUNG, GODREJ, VOLTAS, BAJAJ, or local distributors.
-The buyer is SHRI SAI ENTERPRISES (श्री साई एंटरप्रायझेस, वर्धा).
-
-Carefully extract:
-1. Supplier / Dealer identity: Name, phone, address, GSTIN.
-2. Document type: Determine whether this is a "STATEMENT" (account statement/ledger covering multiple dates/invoices/payments) or a single "INVOICE" (purchase bill).
-3. If statement: Extract statement date range, opening balance, closing balance, total debits, total credits.
-4. Extract every transaction row in chronological order:
-   - date: formatted as YYYY-MM-DD
-   - type: "INVOICE" (when goods were billed/debit to buyer) or "PAYMENT" (when buyer paid via NEFT/RTGS/UPI/Cheque/Cash credit)
-   - refNo: Invoice number (e.g. CS/2526/0842, INV-9812) or Payment reference (e.g. UTR, Cheque No, Bank Ref)
-   - particulars: Brief item summary (e.g. "LG 240L Fridge 2 Nos", "Payment via NEFT", etc.)
-   - debit: Amount billed for goods (number, 0 if payment)
-   - credit: Amount paid to supplier (number, 0 if invoice)
-   - balance: Running balance if shown (number)
-
-Return strictly valid JSON with this exact schema:
-{
-  "documentType": "STATEMENT" or "INVOICE",
-  "dealerName": "Supplier / Dealer Name",
-  "dealerPhone": "Supplier Phone or mobile",
-  "dealerAddress": "Supplier Address",
-  "dealerGstin": "Supplier GSTIN",
-  "statementPeriod": "e.g. 01/04/2025 to 31/03/2026",
-  "openingBalance": 0,
-  "closingBalance": 45000,
-  "totalDebits": 125000,
-  "totalCredits": 80000,
-  "summaryNotes": "Brief 1-line note summarizing statement status",
-  "transactions": [
-    {
-      "date": "YYYY-MM-DD",
-      "type": "INVOICE",
-      "refNo": "INV-1029",
-      "particulars": "LG Refrigerators & LED TV",
-      "debit": 45000,
-      "credit": 0,
-      "balance": 45000
-    },
-    {
-      "date": "YYYY-MM-DD",
-      "type": "PAYMENT",
-      "refNo": "UTR-ICICI90214",
-      "particulars": "NEFT Payment from SBI A/c",
-      "debit": 0,
-      "credit": 30000,
-      "balance": 15000
-    }
-  ]
+      },
+    });
+  }
+  return geminiClient;
 }
 
-Important Instructions:
-- Ensure all numbers (debit, credit, balance, openingBalance, closingBalance, totalDebits, totalCredits) are numeric numbers, NOT strings.
-- Dates must be in YYYY-MM-DD format.
-- Return ONLY the JSON object. Do not wrap in conversational text.`;
-
-      const filePart = {
-        inlineData: {
-          mimeType: detectedMime,
-          data: cleanBase64,
-        },
-      };
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            parts: [
-              filePart,
-              { text: statementPrompt },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
-
-      let responseText = response.text || '{}';
-      responseText = responseText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsedData = JSON.parse(responseText);
-
-      return res.json({
-        success: true,
-        data: parsedData,
-      });
-    } catch (err: any) {
-      console.error('Error processing dealer statement with Gemini Vision:', err);
-      return res.status(500).json({
-        success: false,
-        error: err.message || 'Failed to parse dealer statement with AI Vision',
-      });
-    }
+// Health Check API
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    time: new Date().toISOString(),
   });
+});
 
-  // Serve production build if NODE_ENV is production
-  const distCandidates = [
-    path.resolve(process.cwd(), 'dist'),
-    path.resolve(appDirname),
-    path.resolve(appDirname, 'dist'),
+// Helper: Generate dynamic smart Marathi promotional fallback
+function generateSmartPromoFallback(params: {
+  festivalName: string;
+  category: string;
+  discount: string;
+  schemeWeekly: string;
+  customMessage?: string;
+  shopPhone?: string;
+  shopAddress?: string;
+}) {
+  const {
+    festivalName,
+    category,
+    discount,
+    schemeWeekly,
+    customMessage,
+    shopPhone = "7822859073",
+    shopAddress = "मातोश्री सभागृह समोर, आर्वी रोड, वर्धा",
+  } = params;
+
+  let themeColor = "#b45309";
+  const lowerFest = (festivalName || "").toLowerCase();
+  if (lowerFest.includes("दिवाळी") || lowerFest.includes("diwali") || lowerFest.includes("लक्ष्मी")) {
+    themeColor = "#dc2626";
+  } else if (lowerFest.includes("दसरा") || lowerFest.includes("dussehra")) {
+    themeColor = "#7c3aed";
+  } else if (lowerFest.includes("गुढी") || lowerFest.includes("पाडवा") || lowerFest.includes("padwa")) {
+    themeColor = "#d97706";
+  } else if (lowerFest.includes("उन्हाळा") || lowerFest.includes("कूलर") || lowerFest.includes("कुलर") || lowerFest.includes("summer")) {
+    themeColor = "#0284c7";
+  } else if (lowerFest.includes("साप्ताहिक") || lowerFest.includes("योजना") || lowerFest.includes("scheme")) {
+    themeColor = "#059669";
+  }
+
+  const headline = `🚩 श्री साई इंटरप्रायजेस, वर्धा - भव्य ${festivalName} विशेष महाधमाका सेल! 🎁`;
+
+  const bullets = [
+    `✨ ${category} वर तब्बल ${discount} पर्यंत थेट फेस्टिव्हल डिस्काउंट!`,
+    `💳 ३०-महिने साप्ताहिक बचत कार्ड: दर आठवड्याला फक्त ₹${schemeWeekly} चा सुलभ हप्ता!`,
+    `🏆 प्रत्येक खरेदीवर हमखास भेटवस्तू व लकी ड्रॉ मध्ये आकर्षक बक्षिसे!`,
+    `🚚 ०% व्याज फायनान्स (Bajaj/TVS) सह वर्धा शहर व ग्रामीण भागात मोफत होम डिलिव्हरी!`
   ];
-  const distPath = distCandidates.find((dir) => {
-    return fs.existsSync(path.join(dir, 'index.html')) && fs.existsSync(path.join(dir, 'assets'));
-  }) || path.resolve(process.cwd(), 'dist');
-  const indexHtmlPath = path.join(distPath, 'index.html');
-  const isProduction = process.env.NODE_ENV === 'production' || 
-                       (typeof __filename !== 'undefined' && __filename.endsWith('server.cjs')) ||
-                       (Boolean(process.env.K_SERVICE) && !process.env.K_SERVICE.startsWith('ais-dev-'));
 
-  if (!isProduction) {
-    try {
-      const { createServer: createViteServer } = await import('vite');
-      const vite = await createViteServer({
-        server: {
-          middlewareMode: true,
-          hmr: false,
-        },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-      console.log('Vite middleware successfully initialized and mounted');
-    } catch (viteError: any) {
-      console.warn('Vite dev server failed to initialize, falling back to static build:', viteError.message);
-      if (fs.existsSync(distPath)) {
-        app.use(express.static(distPath));
-        app.get('*', (req, res) => {
-          if (fs.existsSync(indexHtmlPath)) {
-            res.sendFile(indexHtmlPath);
-          } else {
-            res.status(200).send('API Server is ready');
-          }
-        });
-      }
-    }
-  } else {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      if (fs.existsSync(indexHtmlPath)) {
-        res.sendFile(indexHtmlPath);
-      } else {
-        res.status(200).send('API Server is ready');
-      }
+  const whatsappMessage = `🚩 *श्री साई इंटरप्रायजेस, वर्धा* 🚩
+✨ *${festivalName} विशेष सणवार महा ऑफर!* ✨
+
+घर सजवा दर्जेदार इलेक्ट्रॉनिक्स आणि १००% अस्सल चंद्रपूर सागवान लाकडी फर्निचरने थेट फॅक्टरी दरात!
+
+🎁 *मुख्य सणवार ऑफर्स:*
+🔹 *${category}* वर तब्बल *${discount} पर्यंत भव्य सूट!*
+🔹 *३०-महिने साप्ताहिक योजना:* दर आठवड्याला फक्त *₹${schemeWeekly} चा हप्ता!*
+🔹 प्रत्येक खरेदीवर हमखास भेटवस्तू व दरमहा लकी ड्रॉ मध्ये आकर्षक बक्षिसे!
+🔹 ०% व्याज फायनान्स (Bajaj Finance / TVS Credit) सह त्वरित मंजुरी.
+🔹 वर्धा शहर व ग्रामीण भागात मोफत सुरक्षित होम डिलिव्हरी.
+${customMessage ? `🔹 *विशेष सूचना:* ${customMessage}\n` : ''}
+📍 *पत्ता:* श्री साई इंटरप्रायजेस, ${shopAddress}
+📞 *संपर्क:* ${shopPhone} / 8766486915
+💬 *थेट व्हॉट्सॲप ऑर्डर / चौकशी:*
+https://wa.me/91${shopPhone}?text=${encodeURIComponent(`नमस्कार, मला ${festivalName} विशेष ऑफरबद्दल माहिती हवी आहे.`)}`;
+
+  return {
+    headline,
+    whatsappMessage,
+    bannerTagline: `${festivalName} निमित्त दर्जेदार वस्तू आणि सर्वात मोठा डिस्काउंट धमाका!`,
+    offerBullets: bullets,
+    themeColor,
+  };
+}
+
+// 6. सणवार व साप्ताहिक ऑफर्स व्हॉट्सॲप ब्रॉडकास्ट (AI Promo Creative Generator with Gemini Free Tier & Resilient Fallback)
+app.post("/api/generate-promo", async (req, res) => {
+  const {
+    festivalName = "गुढीपाडवा",
+    category = "इलेक्ट्रॉनिक्स व फर्निचर",
+    discount = "30%",
+    schemeWeekly = "100",
+    customMessage = "",
+    shopPhone = "7822859073",
+    shopAddress = "मातोश्री सभागृह समोर, आर्वी रोड, वर्धा",
+  } = req.body;
+
+  const fallbackData = generateSmartPromoFallback({
+    festivalName,
+    category,
+    discount,
+    schemeWeekly,
+    customMessage,
+    shopPhone,
+    shopAddress,
+  });
+
+  const ai = getGeminiClient();
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      source: "template-engine",
+      ...fallbackData,
     });
   }
 
-  // AI Studio Dev Container and Cloud Run require binding to port 3000 on 0.0.0.0
-  // Nginx proxies incoming traffic from port 8080 ($PORT) to internal port 3000.
-  const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server actively running on http://0.0.0.0:${PORT}`);
+  const prompt = `You are an expert Marathi advertising copywriter for "श्री साई इंटरप्रायजेस" (Shri Sai Enterprises), a leading electronics and teakwood furniture showroom in Wardha, Maharashtra.
+The shop sells Smart 4K TVs, Inverter Refrigerators, Coolers, Teakwood Sofas (3+1+1), Sagwan Diwan beds (4x6, 5x6), Steel Cupboards, and runs a famous "३०-महिने साप्ताहिक बचत कार्ड योजना" with weekly installments of ₹100 or ₹200.
+
+Generate an appealing Marathi festive WhatsApp broadcast message and promotional flyer details for:
+- Festival/Event: ${festivalName}
+- Category: ${category}
+- Discount: ${discount}
+- Weekly Scheme installment: ₹${schemeWeekly}/week
+- Shop address: ${shopAddress}
+- Phone: ${shopPhone}
+- Extra note: ${customMessage}
+
+Format your response as a valid JSON object ONLY with the following structure (no markdown fences, just pure JSON):
+{
+  "headline": "Short punchy Marathi headline with festival vibe and emojis",
+  "whatsappMessage": "Full ready-to-send Marathi WhatsApp message formatted with bold asterisks, emojis, bullet points, shop address, and contact number",
+  "bannerTagline": "Catchy Marathi banner tagline (max 10 words)",
+  "offerBullets": ["Marathi offer highlight 1", "Marathi offer highlight 2", "Marathi offer highlight 3", "Marathi offer highlight 4"],
+  "themeColor": "hex color code representing the festival (e.g., #b45309 for orange/gold, #dc2626 for festive red, #047857 for emerald)"
+}`;
+
+  let responseText = "";
+  let activeSource = "gemini-3.8-flash";
+
+  // Tier 1: Try Primary Model (gemini-3.8-flash)
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+    responseText = response.text || "";
+  } catch (primaryErr: any) {
+    console.warn("Primary model gemini-3.8-flash unavailable/busy:", primaryErr?.message || primaryErr);
+    
+    // Tier 2: Try Secondary High-Throughput Model (gemini-3.1-flash-lite)
+    try {
+      activeSource = "gemini-3.1-flash-lite";
+      const liteResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+      responseText = liteResponse.text || "";
+    } catch (liteErr: any) {
+      console.warn("Secondary model gemini-3.1-flash-lite also unavailable:", liteErr?.message || liteErr);
+      // Both AI models busy/unavailable (e.g. 503 high demand spike).
+      // Seamlessly deliver smart fallback without failing with HTTP 500!
+      return res.json({
+        success: true,
+        source: "smart-template-engine",
+        ...fallbackData,
+      });
+    }
+  }
+
+  // Parse JSON response safely
+  let parsedData = {};
+  try {
+    // Strip markdown fences if present
+    const cleanText = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
+    parsedData = JSON.parse(cleanText);
+  } catch {
+    parsedData = {
+      headline: `🚩 श्री साई इंटरप्रायजेस - ${festivalName} विशेष ऑफर!`,
+      whatsappMessage: responseText || fallbackData.whatsappMessage,
+      bannerTagline: fallbackData.bannerTagline,
+      offerBullets: fallbackData.offerBullets,
+      themeColor: fallbackData.themeColor,
+    };
+  }
+
+  return res.json({
+    success: true,
+    source: activeSource,
+    ...fallbackData,
+    ...parsedData,
+  });
+});
+
+// Setup Vite middleware in dev or static files in production
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
