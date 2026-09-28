@@ -264,7 +264,7 @@ function AppContent() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 apple-wallpaper-bg ${
+    <div className={`h-screen max-h-screen overflow-hidden flex flex-col font-sans transition-colors duration-300 apple-wallpaper-bg ${
       isDayMode
         ? 'text-slate-800'
         : 'text-slate-100'
@@ -312,7 +312,7 @@ function AppContent() {
 
       {/* Mobile PWA Web App Shortcut Prompt (Dedicated for Field Agents) */}
       {showPwaInstallBanner && (
-        <div className="md:hidden bg-linear-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white px-3.5 py-2 border-b border-indigo-500/30 text-xs flex items-center justify-between gap-2 z-20 shadow-md">
+        <div className="md:hidden shrink-0 bg-linear-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white px-3.5 py-2 border-b border-indigo-500/30 text-xs flex items-center justify-between gap-2 z-20 shadow-md">
           <div className="flex items-center gap-2 overflow-hidden">
             <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30">
               <Smartphone className="w-3.5 h-3.5" />
@@ -335,8 +335,8 @@ function AppContent() {
         </div>
       )}
 
-      {/* Main App Body */}
-      <div className="flex flex-1 overflow-hidden relative">
+      {/* Main App Body with definite height */}
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {/* Navigation Sidebar */}
         <Sidebar
           currentTab={currentTab}
@@ -355,9 +355,12 @@ function AppContent() {
         />
 
         {/* Dynamic Main Workspace View */}
-        <main className={`flex-1 overflow-y-auto px-2.5 sm:px-5 md:px-6 py-2.5 sm:py-5 md:py-6 pb-32 md:pb-8 transition-colors duration-300 ${
-          isDayMode ? 'bg-slate-100/40' : 'bg-transparent'
-        }`}>
+        <main
+          id="main-workspace-scroll"
+          className={`flex-1 min-h-0 h-full overflow-y-auto overflow-x-hidden px-2.5 sm:px-5 md:px-6 py-2.5 sm:py-5 md:py-6 pb-32 md:pb-12 transition-colors duration-300 overscroll-contain ${
+            isDayMode ? 'bg-slate-100/40' : 'bg-transparent'
+          }`}
+        >
           <div className="max-w-7xl mx-auto">
             {/* Sub-Feature Segment Navigation (Only in detailed view to keep main workspace uncluttered) */}
             {!isSimpleView && (

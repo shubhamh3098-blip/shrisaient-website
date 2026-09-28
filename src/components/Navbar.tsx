@@ -72,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`sticky top-0 z-40 px-2.5 sm:px-6 py-1.5 sm:py-2.5 transition-colors duration-300 backdrop-blur-md ${
+      className={`sticky top-0 z-40 shrink-0 px-2.5 sm:px-6 py-1.5 sm:py-2.5 transition-colors duration-300 backdrop-blur-md ${
         isDayMode
           ? 'bg-white/90 border-b border-slate-200/90 text-slate-800 shadow-sm'
           : 'bg-[#050814]/95 border-b border-sky-500/20 text-slate-100 shadow-[0_4px_25px_rgba(0,0,0,0.6)]'

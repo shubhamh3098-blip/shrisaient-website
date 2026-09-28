@@ -96,7 +96,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
 
   return (
     <div
-      className={`relative z-30 px-3 sm:px-5 py-2 border-b backdrop-blur-xl transition-all duration-200 ${
+      className={`relative z-30 shrink-0 px-3 sm:px-5 py-2 border-b backdrop-blur-xl transition-all duration-200 ${
         isDayMode
           ? 'bg-white/95 border-slate-200/90 shadow-xs'
           : 'bg-[#090d1f]/95 border-slate-800 shadow-md'

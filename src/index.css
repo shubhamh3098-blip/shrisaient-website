@@ -3,7 +3,11 @@
 /* Global Box-Sizing & Viewport Reset */
 *, *::before, *::after {
   box-sizing: border-box;
-  touch-action: manipulation; /* Eliminates 300ms mobile tap delay for snappy 120Hz feel */
+}
+
+/* Fast tap response for touch devices without blocking mouse wheel on containers */
+button, a, input, select, textarea, [role="button"], label {
+  touch-action: manipulation;
 }
 
 /* 120Hz High Refresh Rate & GPU Hardware Accelerated Rendering */
@@ -21,7 +25,6 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
 }
 
 /* Butter-Smooth 120fps GPU Promotion for Cards, Modals, Buttons & Surfaces */

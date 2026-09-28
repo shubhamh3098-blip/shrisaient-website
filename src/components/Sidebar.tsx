@@ -899,7 +899,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Persistent Sidebar */}
-      <aside className="hidden md:block w-64 h-[calc(100vh-57px)] shrink-0">
+      <aside className="hidden md:block w-64 h-full min-h-0 shrink-0 overflow-hidden">
         {sidebarContent}
       </aside>
 
