@@ -25,6 +25,11 @@ import {
   StoreSettings,
   Transaction,
 } from '../types';
+import {
+  pushStoreDataToFirestore,
+  pullStoreDataFromFirestore,
+  subscribeToFirestoreStore,
+} from './firebaseClient';
 
 const STORAGE_KEY = 'shri_sai_enterprises_store_data_v3';
 const SYNC_CHANNEL_NAME = 'shri_sai_realtime_sync_channel';
@@ -191,9 +196,20 @@ export class StorageService {
   }
 
   /**
-   * Pushes store data to central server endpoint
+   * Pushes store data to central server endpoint and Firebase Firestore
    */
   public static async pushToServer(data: StoreData, isExplicitReset: boolean = false): Promise<boolean> {
+    // 1. Push to Firebase Firestore (ensures multi-device live sync even on GitHub Pages / static hosting)
+    pushStoreDataToFirestore(data).then((ok) => {
+      if (ok) {
+        this.isConnected = true;
+        this.lastSyncTimestamp = new Date().toISOString();
+      }
+    }).catch((err) => {
+      console.warn('[Firebase Firestore] Cloud push warning:', err);
+    });
+
+    // 2. Push to Node server endpoint (if running locally or in Docker)
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -223,70 +239,89 @@ export class StorageService {
         return true;
       }
     } catch {
-      this.isConnected = false;
+      // Node server not running or static hosting (e.g. GitHub Pages) - firestore is primary
     }
-    return false;
+    return this.isConnected;
   }
 
   /**
-   * Pulls latest state from central server
+   * Pulls latest state from central server or Firebase Firestore
    */
   public static async pullFromServer(): Promise<StoreData | null> {
+    let cloudData: StoreData | null = null;
+
+    // 1. Try Node server if available
     try {
       const res = await fetch('/api/sync');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
-          this.isConnected = true;
-          this.lastSyncTimestamp = new Date().toISOString();
-          const serverData: StoreData = json.data;
-
-          const current = this.loadData();
-          
-          const serverCount = (serverData.customers?.length || 0) +
-                              (serverData.cardMembers?.length || 0) +
-                              (serverData.transactions?.length || 0) +
-                              (serverData.cardTransactions?.length || 0) +
-                              (serverData.billReceipts?.length || 0);
-
-          const localCount = (current.customers?.length || 0) +
-                             (current.cardMembers?.length || 0) +
-                             (current.transactions?.length || 0) +
-                             (current.cardTransactions?.length || 0) +
-                             (current.billReceipts?.length || 0);
-
-          const serverTime = new Date(serverData.updatedAt || 0).getTime();
-          const localTime = new Date(current.updatedAt || 0).getTime();
-
-          // Preserve stock catalog if server had empty stock
-          if ((!serverData.stock || serverData.stock.length === 0) && current.stock && current.stock.length > 0) {
-            serverData.stock = current.stock;
-          } else if (!serverData.stock || serverData.stock.length === 0) {
-            serverData.stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
-              ...p,
-              id: `stk-show-${idx + 1}`,
-              updatedAt: new Date().toISOString(),
-            }));
-          }
-
-          // Case 1: Fresh mobile device (localCount === 0 while server has records) -> ALWAYS adopt server data
-          // Case 2: Server has more records than local -> adopt server data
-          // Case 3: Server timestamp is newer and server is not empty -> adopt server data
-          if ((serverCount > 0 && localCount === 0) || serverCount > localCount || (serverTime >= localTime && serverCount > 0)) {
-            this.cachedData = serverData;
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
-            } catch {}
-            return serverData;
-          } else if (localCount > serverCount && localCount > 0) {
-            // Local device (PC) has imported data that is newer or larger than server! Push to server immediately
-            await this.pushToServer(current);
-            return current;
-          }
+          cloudData = json.data;
         }
       }
     } catch {
-      this.isConnected = false;
+      // Node server not present
+    }
+
+    // 2. If Node server didn't respond (e.g. on GitHub Pages), pull from Firebase Firestore
+    if (!cloudData) {
+      try {
+        const firestoreData = await pullStoreDataFromFirestore();
+        if (firestoreData) {
+          cloudData = firestoreData;
+        }
+      } catch (err) {
+        console.warn('[Firebase Firestore] Cloud pull warning:', err);
+      }
+    }
+
+    if (cloudData) {
+      this.isConnected = true;
+      this.lastSyncTimestamp = new Date().toISOString();
+      const serverData: StoreData = cloudData;
+
+      const current = this.loadData();
+      
+      const serverCount = (serverData.customers?.length || 0) +
+                          (serverData.cardMembers?.length || 0) +
+                          (serverData.transactions?.length || 0) +
+                          (serverData.cardTransactions?.length || 0) +
+                          (serverData.billReceipts?.length || 0);
+
+      const localCount = (current.customers?.length || 0) +
+                         (current.cardMembers?.length || 0) +
+                         (current.transactions?.length || 0) +
+                         (current.cardTransactions?.length || 0) +
+                         (current.billReceipts?.length || 0);
+
+      const serverTime = new Date(serverData.updatedAt || 0).getTime();
+      const localTime = new Date(current.updatedAt || 0).getTime();
+
+      // Preserve stock catalog if server had empty stock
+      if ((!serverData.stock || serverData.stock.length === 0) && current.stock && current.stock.length > 0) {
+        serverData.stock = current.stock;
+      } else if (!serverData.stock || serverData.stock.length === 0) {
+        serverData.stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
+          ...p,
+          id: `stk-show-${idx + 1}`,
+          updatedAt: new Date().toISOString(),
+        }));
+      }
+
+      // Case 1: Fresh mobile device (localCount === 0 while server has records) -> ALWAYS adopt server data
+      // Case 2: Server has more records than local -> adopt server data
+      // Case 3: Server timestamp is newer and server is not empty -> adopt server data
+      if ((serverCount > 0 && localCount === 0) || serverCount > localCount || (serverTime >= localTime && serverCount > 0)) {
+        this.cachedData = serverData;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+        } catch {}
+        return serverData;
+      } else if (localCount > serverCount && localCount > 0) {
+        // Local device (PC) has imported data that is newer or larger than server! Push to cloud immediately
+        await this.pushToServer(current);
+        return current;
+      }
     }
     return null;
   }
@@ -380,6 +415,48 @@ export class StorageService {
 
     connectSSE();
 
+    // 2b. Setup Real-time Firebase Firestore Cloud Listener (Cross-device sync for mobile/desktop on GitHub Pages)
+    let unsubscribeFirestore: (() => void) | null = null;
+    try {
+      unsubscribeFirestore = subscribeToFirestoreStore(
+        (firestoreData) => {
+          this.isConnected = true;
+          this.lastSyncTimestamp = new Date().toISOString();
+
+          const current = this.loadData();
+          const firestoreCount = (firestoreData.customers?.length || 0) +
+                                 (firestoreData.cardMembers?.length || 0) +
+                                 (firestoreData.transactions?.length || 0) +
+                                 (firestoreData.cardTransactions?.length || 0) +
+                                 (firestoreData.billReceipts?.length || 0);
+
+          const localCount = (current.customers?.length || 0) +
+                             (current.cardMembers?.length || 0) +
+                             (current.transactions?.length || 0) +
+                             (current.cardTransactions?.length || 0) +
+                             (current.billReceipts?.length || 0);
+
+          const firestoreTime = new Date(firestoreData.updatedAt || 0).getTime();
+          const localTime = new Date(current.updatedAt || 0).getTime();
+
+          // Adopt Firestore data if it has records and is newer or local is empty/fresh
+          if (firestoreCount > 0 && (localCount === 0 || firestoreCount > localCount || firestoreTime > localTime)) {
+            notifyListeners(firestoreData);
+          }
+        },
+        (status) => {
+          if (status.isConnected) {
+            this.isConnected = true;
+            if (status.lastSyncAt) {
+              this.lastSyncTimestamp = status.lastSyncAt;
+            }
+          }
+        }
+      );
+    } catch (err) {
+      console.warn('[Firebase Firestore] Cloud listener subscription error:', err);
+    }
+
     // 3. Listen to local BroadcastChannel (other tabs on same browser)
     try {
       if ('BroadcastChannel' in window) {
@@ -435,6 +512,9 @@ export class StorageService {
         this.syncListeners.splice(idx, 1);
       }
       clearTimeout(reconnectTimeout);
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+      }
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
