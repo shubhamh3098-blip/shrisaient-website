@@ -160,7 +160,7 @@ export function importCustomersTolerant(
   }
 
   storeData.customers = existingCustomers;
-  storeData.isDemoWiped = false; // Mark data as active
+  storeData.isDemoWiped = true;
   StorageService.saveData(storeData);
 
   return {
@@ -179,19 +179,38 @@ export function importSchemeCardsTolerant(
   headers: string[],
   rows: string[][],
   storeData: StoreData,
-  explicitSchemeNo?: number
+  explicitSchemeNo?: number,
+  fileName?: string
 ): TolerantImportResult {
   if (rows.length === 0) {
     return { totalRowsProcessed: 0, added: 0, updated: 0, skipped: 0, category: 'scheme_cards' };
   }
 
-  let cardIdx = findColIndex(headers, ['कार्ड', 'card.no', 'card no', 'card', 'कार्ड क्र', 'कार्ड नं'], 1);
+  let cardIdx = findColIndex(headers, ['कार्ड', 'card.no', 'card no', 'card', 'कार्ड क्र', 'कार्ड नं', 'card_no'], 1);
   let nameIdx = findColIndex(headers, ['नाव', 'name', 'member name', 'सभासद', 'सदस्य', 'party'], 0);
   let villageIdx = findColIndex(headers, ['गाव', 'village', 'villege', 'town', 'city'], 2);
   let phoneIdx = findColIndex(headers, ['मोबाईल', 'phone', 'mobile', 'contact', 'cell'], 3);
   let amountIdx = findColIndex(headers, ['opening amt', 'रक्कम', 'paid', 'amount', 'हप्ता', 'एकूण'], 4);
   let dateIdx = findColIndex(headers, ['date', 'तारीख', 'दिनांक'], 5);
   let sheetIdx = findColIndex(headers, ['sheet no', 'sheet', 'शिट'], 6);
+  let schemeIdx = findColIndex(headers, ['योजना', 'scheme', 'batch', 'योजना क्र', 'योजना नं', 'scheme no', 'sch'], -1);
+
+  // Detect file-level scheme hint from fileName (e.g. "Scheme 2.csv", "योजना २.xlsx", "SCH2.xlsx")
+  let fileSchemeHint: number | undefined = explicitSchemeNo;
+  if (!fileSchemeHint && fileName) {
+    const fn = fileName.toLowerCase();
+    if (fn.includes('scheme 2') || fn.includes('scheme2') || fn.includes('योजना २') || fn.includes('योजना 2') || fn.includes('sch2') || fn.includes('sch-2') || fn.includes('batch 2')) {
+      fileSchemeHint = 2;
+    } else if (fn.includes('scheme 3') || fn.includes('scheme3') || fn.includes('योजना ३') || fn.includes('योजना 3') || fn.includes('sch3') || fn.includes('sch-3') || fn.includes('batch 3')) {
+      fileSchemeHint = 3;
+    } else if (fn.includes('scheme 4') || fn.includes('scheme4') || fn.includes('योजना ४') || fn.includes('योजना 4') || fn.includes('sch4') || fn.includes('sch-4')) {
+      fileSchemeHint = 4;
+    } else if (fn.includes('scheme 5') || fn.includes('scheme5') || fn.includes('योजना ५') || fn.includes('योजना 5') || fn.includes('sch5') || fn.includes('sch-5')) {
+      fileSchemeHint = 5;
+    } else if (fn.includes('scheme 1') || fn.includes('scheme1') || fn.includes('योजना १') || fn.includes('योजना 1') || fn.includes('sch1') || fn.includes('sch-1')) {
+      fileSchemeHint = 1;
+    }
+  }
 
   const existingCards = [...storeData.cardMembers];
   let added = 0;
@@ -206,9 +225,10 @@ export function importSchemeCardsTolerant(
     let rawName = cols[nameIdx]?.trim() || '';
     let rawVillage = cols[villageIdx]?.trim() || '';
     let rawPhone = cols[phoneIdx]?.trim() || '';
-    let rawAmount = cols[amountIdx]?.trim() || '1000';
+    let rawAmount = cols[amountIdx]?.trim() || '100';
     let rawDate = cols[dateIdx]?.trim() || '';
     let rawSheet = cols[sheetIdx]?.trim() || '';
+    let rawScheme = schemeIdx !== -1 ? (cols[schemeIdx]?.trim() || '') : '';
 
     // If card column had name and name had card, auto-swap
     if (/^\d+$/.test(rawName) && !/^\d+$/.test(rawCard)) {
@@ -226,18 +246,69 @@ export function importSchemeCardsTolerant(
     const cardDigits = rawCard.match(/\d+/g);
     const cardNum = cardDigits ? parseInt(cardDigits[cardDigits.length - 1], 10) : (1001 + i);
 
-    let schemeNo = explicitSchemeNo || 1;
-    if (!explicitSchemeNo) {
-      if (cardNum > 3000 && cardNum <= 6000) {
-        schemeNo = 3;
-      } else if (rawSheet.toLowerCase().includes('sch2') || rawSheet.toLowerCase().includes('scheme 2')) {
+    // Accurate Scheme Resolution:
+    // 1. Explicit parameter from UI or filename takes precedence
+    // 2. CSV Scheme Column (e.g. 'योजना २', 'Scheme 2', '2')
+    // 3. Card Number Prefix or String (e.g. 'SCH2-1050', 'S2-1050')
+    // 4. Sheet column (e.g. 'Scheme 2', 'योजना २')
+    let schemeNo = explicitSchemeNo || fileSchemeHint || 1;
+    if (!explicitSchemeNo && !fileSchemeHint) {
+      const combinedSchemeText = `${rawScheme} ${rawSheet} ${rawCard}`.toLowerCase();
+      const rawSchemeTrimmed = rawScheme.trim();
+      
+      if (
+        rawSchemeTrimmed === '2' || rawSchemeTrimmed === '२' ||
+        combinedSchemeText.includes('scheme 2') || 
+        combinedSchemeText.includes('योजना २') || 
+        combinedSchemeText.includes('योजना 2') || 
+        combinedSchemeText.includes('sch2') || 
+        combinedSchemeText.includes('sch-2') ||
+        rawCard.toUpperCase().startsWith('SCH2') ||
+        rawCard.toUpperCase().startsWith('S2-')
+      ) {
         schemeNo = 2;
+      } else if (
+        rawSchemeTrimmed === '3' || rawSchemeTrimmed === '३' ||
+        combinedSchemeText.includes('scheme 3') || 
+        combinedSchemeText.includes('योजना ३') || 
+        combinedSchemeText.includes('योजना 3') || 
+        combinedSchemeText.includes('sch3') || 
+        combinedSchemeText.includes('sch-3') ||
+        rawCard.toUpperCase().startsWith('SCH3') ||
+        rawCard.toUpperCase().startsWith('S3-')
+      ) {
+        schemeNo = 3;
+      } else if (
+        rawSchemeTrimmed === '4' || rawSchemeTrimmed === '४' ||
+        combinedSchemeText.includes('scheme 4') || 
+        combinedSchemeText.includes('योजना ४') || 
+        combinedSchemeText.includes('sch4')
+      ) {
+        schemeNo = 4;
+      } else if (
+        rawSchemeTrimmed === '5' || rawSchemeTrimmed === '५' ||
+        combinedSchemeText.includes('scheme 5') || 
+        combinedSchemeText.includes('योजना ५') || 
+        combinedSchemeText.includes('sch5')
+      ) {
+        schemeNo = 5;
+      } else if (
+        rawSchemeTrimmed === '1' || rawSchemeTrimmed === '१' ||
+        combinedSchemeText.includes('scheme 1') || 
+        combinedSchemeText.includes('योजना १') || 
+        combinedSchemeText.includes('योजना 1') || 
+        combinedSchemeText.includes('sch1') || 
+        combinedSchemeText.includes('sch-1') ||
+        rawCard.toUpperCase().startsWith('SCH1')
+      ) {
+        schemeNo = 1;
       } else {
         schemeNo = 1;
       }
     }
 
     const schemeName = `योजना ${schemeNo} (Scheme ${schemeNo})`;
+    // Standardize formattedCardNo to ensure Scheme 1, 2, 3 don't collide when they share card numbers (e.g. 1001-3000)
     const formattedCardNo = `SCH${schemeNo}-${cardNum}`;
     const openingAmt = cleanNumber(rawAmount, 100);
     const startDate = parseDateSmart(rawDate);
@@ -278,7 +349,12 @@ export function importSchemeCardsTolerant(
       notes: `३०-महिने बचत योजना (${schemeName}) | कार्ड क्र. ${cardNum}${rawSheet ? ` | Sheet: ${rawSheet}` : ''}`,
     };
 
-    const existingIdx = existingCards.findIndex(c => c.cardNo === cardObj.cardNo);
+    // Scheme-isolated unique search:
+    // Only match existing card in THE SAME SCHEME and with the same card number
+    const existingIdx = existingCards.findIndex(
+      c => (c.schemeNo === schemeNo && c.cardNo === cardObj.cardNo) ||
+           (c.schemeNo === schemeNo && (c.cardNo === formattedCardNo || c.cardNo === rawCard.toUpperCase()))
+    );
     if (existingIdx >= 0) {
       existingCards[existingIdx] = { ...existingCards[existingIdx], ...cardObj, id: existingCards[existingIdx].id };
       updated++;
@@ -312,7 +388,7 @@ export function importSchemeCardsTolerant(
   }
 
   storeData.cardMembers = existingCards;
-  storeData.isDemoWiped = false;
+  storeData.isDemoWiped = true;
   StorageService.saveData(storeData);
 
   return {
@@ -469,7 +545,7 @@ export function importBillsTolerant(
 
   storeData.customers = existingCust;
   storeData.transactions = existingTx;
-  storeData.isDemoWiped = false;
+  storeData.isDemoWiped = true;
   StorageService.saveData(storeData);
 
   return {
@@ -544,7 +620,7 @@ export function importReceiptsTolerant(
 
   storeData.billReceipts = existingReceipts;
   storeData.customers = existingCust;
-  storeData.isDemoWiped = false;
+  storeData.isDemoWiped = true;
   StorageService.saveData(storeData);
 
   return {

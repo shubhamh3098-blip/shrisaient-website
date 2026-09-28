@@ -128,6 +128,31 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
     }
   }, [currentMember?.id, storeData.cardTransactions]);
 
+  // Advance to next member card automatically for zero-friction field collection
+  const handleAdvanceToNextCard = () => {
+    setCollectionSuccess(null);
+    const currentIndex = storeData.cardMembers.findIndex((m) => m.id === currentMember?.id);
+    if (currentIndex !== -1 && currentIndex < storeData.cardMembers.length - 1) {
+      const nextMember = storeData.cardMembers[currentIndex + 1];
+      setSelectedMemberId(nextMember.id);
+      setIsChangingCard(false);
+    } else {
+      // If at end of list or not found, open search picker so agent can choose any card
+      setIsChangingCard(true);
+    }
+  };
+
+  // Switch to previous card
+  const handleSelectPreviousCard = () => {
+    setCollectionSuccess(null);
+    const currentIndex = storeData.cardMembers.findIndex((m) => m.id === currentMember?.id);
+    if (currentIndex > 0) {
+      const prevMember = storeData.cardMembers[currentIndex - 1];
+      setSelectedMemberId(prevMember.id);
+      setIsChangingCard(false);
+    }
+  };
+
   // Check if an entry for this card & weekNumber already exists
   const existingEntryForWeek = useMemo(() => {
     if (!currentMember) return null;
@@ -483,44 +508,16 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
         {/* Modal Body */}
         <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto overscroll-contain">
 
-          {/* Success Banner if deposited */}
+          {/* Success Status Indicator */}
           {collectionSuccess && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2 animate-in fade-in">
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                <CheckCircle2 className="w-5 h-5" />
-                <span>₹{collectionSuccess.amount} हप्ता यशस्वीरित्या जमा झाला!</span>
+            <div className="p-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>₹{collectionSuccess.amount} हप्ता जमा! (खालील प्रिंट व पुढील कार्ड वापरा)</span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                पावती क्र: <span className="font-mono font-bold text-slate-900 dark:text-white">{collectionSuccess.receiptNo}</span> (हप्ता #{collectionSuccess.monthNumber})
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '80mm')}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer active:scale-95"
-                  title="80mm Thermal Receipt (80 थर्मल प्रिंट पावती)"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>80mm थर्मल प्रिंट</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '58mm')}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer border border-slate-700"
-                  title="58mm Mini POS Thermal Slip"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>58mm थर्मल</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleWhatsAppShare(collectionSuccess)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>WhatsApp पावती</span>
-                </button>
-              </div>
+              <span className="font-mono text-[11px] font-black text-slate-800 dark:text-slate-200">
+                #{collectionSuccess.receiptNo}
+              </span>
             </div>
           )}
 
@@ -532,13 +529,31 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
               <span className="font-mono">
                 Card #{cardNum} (Scheme {schemeNo} (योजना {schemeNo}))
               </span>
-              <button
-                type="button"
-                onClick={() => setIsChangingCard(!isChangingCard)}
-                className="hover:underline cursor-pointer font-semibold text-emerald-600 dark:text-emerald-400"
-              >
-                {isChangingCard ? 'Close Picker' : 'Change Card'}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleSelectPreviousCard}
+                  className="px-2 py-0.5 rounded-lg bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 cursor-pointer font-bold transition text-[11px]"
+                  title="मागील कार्ड (Previous Card)"
+                >
+                  ◀ मागील
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChangingCard(!isChangingCard)}
+                  className="px-2 py-0.5 rounded-lg hover:underline cursor-pointer font-semibold text-emerald-600 dark:text-emerald-400"
+                >
+                  {isChangingCard ? 'Close' : 'Change Card'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdvanceToNextCard}
+                  className="px-2 py-0.5 rounded-lg bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 cursor-pointer font-bold transition text-[11px]"
+                  title="पुढील कार्ड (Next Card)"
+                >
+                  पुढील ▶
+                </button>
+              </div>
             </div>
 
             <h3 className="text-base font-black tracking-tight uppercase mt-1 text-slate-900 dark:text-white">
@@ -902,46 +917,115 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
         </div>
 
         {/* Modal Action Footer - Sticky at bottom for mobile view */}
-        <div className={`px-4 sm:px-5 py-3 border-t shrink-0 flex items-center justify-between gap-3 sticky bottom-0 z-20 ${
+        <div className={`px-4 sm:px-5 py-3 border-t shrink-0 sticky bottom-0 z-20 transition-all ${
           isDayMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
         }`}>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer min-h-[44px]"
-          >
-            रद्द करा (Cancel)
-          </button>
+          {collectionSuccess ? (
+            <div className="w-full space-y-2.5 py-0.5 animate-in slide-in-from-bottom duration-200">
+              {/* 1. Fast Success Feedback Header right above print buttons */}
+              <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
+                <div className="flex items-center gap-1.5 text-xs font-black truncate">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <span className="truncate">₹{collectionSuccess.amount} हप्ता जमा! पावती #{collectionSuccess.receiptNo}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 shrink-0">
+                  हप्ता #{collectionSuccess.monthNumber || collectionSuccess.weekNumber}
+                </span>
+              </div>
 
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubmitCollection}
-            className={`px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow-md flex items-center gap-2 cursor-pointer transition active:scale-95 touch-manipulation min-h-[44px] ${
-              isSubmitting
-                ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-75'
-                : existingEntryForWeek && !allowDuplicateOverride
-                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/25'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>नोंद होत आहे... (Saving...)</span>
-              </>
-            ) : existingEntryForWeek && !allowDuplicateOverride ? (
-              <>
-                <AlertCircle className="w-4 h-4 text-white" />
-                <span>तरीही हप्ता जमा करा (Collect ₹{amount})</span>
-              </>
-            ) : (
-              <>
-                <Receipt className="w-4 h-4" />
-                <span>हप्ता जमा करा (Collect ₹{amount} Now)</span>
-              </>
-            )}
-          </button>
+              {/* 2. Instant Thermal Print & WhatsApp Share Buttons (Right at bottom where thumb is!) */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '80mm')}
+                  className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+                  title="80mm Thermal Slip Print (80mm पावती प्रिंट)"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span>80mm प्रिंट</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '58mm')}
+                  className="py-2.5 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+                  title="58mm Mini POS Thermal Slip"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span>58mm थर्मल</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleWhatsAppShare(collectionSuccess)}
+                  className="py-2.5 px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+                  title="Send Marathi WhatsApp Receipt"
+                >
+                  <Share2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+
+              {/* 3. The One-Tap Next Card Button for field collection agent */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={handleAdvanceToNextCard}
+                  className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-600/30 cursor-pointer active:scale-95 touch-manipulation min-h-[46px]"
+                >
+                  <span>➡️ पुढील कार्ड / पुढचा ग्राहक जमा करा (Next Card)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="py-3 px-3.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition shrink-0 min-h-[46px]"
+                >
+                  पूर्ण (Done)
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 w-full">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer min-h-[44px]"
+              >
+                रद्द करा (Cancel)
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSubmitCollection}
+                className={`px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow-md flex items-center gap-2 cursor-pointer transition active:scale-95 touch-manipulation min-h-[44px] ${
+                  isSubmitting
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-75'
+                    : existingEntryForWeek && !allowDuplicateOverride
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/25'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>नोंद होत आहे... (Saving...)</span>
+                  </>
+                ) : existingEntryForWeek && !allowDuplicateOverride ? (
+                  <>
+                    <AlertCircle className="w-4 h-4 text-white" />
+                    <span>तरीही हप्ता जमा करा (Collect ₹{amount})</span>
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-4 h-4" />
+                    <span>हप्ता जमा करा (Collect ₹{amount} Now)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

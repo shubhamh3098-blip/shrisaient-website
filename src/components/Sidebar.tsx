@@ -39,9 +39,10 @@ import {
   ShieldCheck,
   QrCode,
   ShieldAlert,
-  Barcode
+  Barcode,
+  LogOut
 } from 'lucide-react';
-import { StoreData } from '../types';
+import { StoreData, AdminUser } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { SaiLogo } from './common/SaiLogo';
 import { GalaxyButton } from './common/GalaxyButton';
@@ -100,6 +101,8 @@ interface SidebarProps {
   onOpenQuickHisab?: () => void;
   onOpenCustomerShowroom?: () => void;
   onOpenDailyBackupModal?: () => void;
+  activeUser?: AdminUser;
+  onLogout?: () => void;
 }
 
 interface NavItemConfig {
@@ -132,6 +135,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenQuickHisab,
   onOpenCustomerShowroom,
   onOpenDailyBackupModal,
+  activeUser,
+  onLogout,
 }) => {
   const { isDayMode } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
@@ -854,8 +859,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
-      {/* Showroom Status Footer */}
-      <div className={`p-3 border-t text-xs ${
+      {/* Showroom Status & Mobile Logout Footer */}
+      <div className={`p-3 border-t text-xs space-y-2.5 ${
         isDayMode
           ? 'border-slate-200/80 bg-slate-50/80 text-slate-600'
           : 'border-white/10 bg-slate-950/40 text-slate-400'
@@ -867,6 +872,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <span className="font-mono text-[10px] opacity-75">#{storeData.settings.nextReceiptNo || 1079}</span>
         </div>
+
+        {/* Mobile User Role & Logout (Quick Access from Mobile Drawer) */}
+        {activeUser && onLogout && (
+          <div className="md:hidden flex items-center justify-between gap-2 pt-2 border-t border-slate-200/50 dark:border-white/10">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+              <span className="font-bold text-slate-800 dark:text-slate-200 truncate text-xs">{activeUser.displayName}</span>
+            </div>
+            <button
+              onClick={() => {
+                onCloseMobile();
+                onLogout();
+              }}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 cursor-pointer transition flex items-center gap-1 shrink-0 active:scale-95"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>लॉगआउट</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ interface CardPassbookPrintModalProps {
   onClose: () => void;
 }
 
-type PrintFormat = 'card30' | 'thermal58' | 'thermal80' | 'a4' | 'rules';
+type PrintFormat = 'card30' | 'rules' | 'thermal58' | 'thermal80' | 'a4';
 
 export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
   member,
@@ -126,18 +126,29 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Build the 30-month table data
-  // Each month: 5 installment lines (100, 100, 100, 100, 200/100 = 500 total)
+  // Build the 30-month table data with 100 100 100 200 weekly installments
   const monthsData = Array.from({ length: 30 }, (_, idx) => {
     const monthNum = idx + 1;
+    const monthStart = (monthNum - 1) * 500;
     const cumulativeTotal = monthNum * 500;
     const isPaid = fin.totalPaid >= cumulativeTotal;
-    const isPartiallyPaid = !isPaid && fin.totalPaid > (monthNum - 1) * 500;
+    const isPartiallyPaid = !isPaid && fin.totalPaid > monthStart;
+
+    const paidInMonth = Math.max(0, Math.min(500, fin.totalPaid - monthStart));
+    const step1Paid = paidInMonth >= 100;
+    const step2Paid = paidInMonth >= 200;
+    const step3Paid = paidInMonth >= 300;
+    const step4Paid = paidInMonth >= 500;
+
     return {
       monthNum,
       cumulativeTotal,
       isPaid,
       isPartiallyPaid,
+      step1Paid,
+      step2Paid,
+      step3Paid,
+      step4Paid,
     };
   });
 
@@ -244,10 +255,11 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="१-पान अचूक A4 प्रिंट (Single Page Print - ४ पाने होणार नाहीत)"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print</span>
+              <span>१-पान प्रिंट</span>
             </button>
 
             <button
@@ -299,7 +311,7 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs pt-1 passbook-header-grid">
                   <div className="md:col-span-2">
                     <span className="font-bold text-slate-700">पूर्ण नाव श्री / सौ : </span>
                     <span className="font-black uppercase text-sm text-slate-950 underline decoration-amber-600 underline-offset-4">
@@ -321,27 +333,27 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                 </div>
               </div>
 
-              {/* 30 Months Grid - Exactly structured like the physical card in two halves */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Left Half: Months 1 to 14 */}
+              {/* 30 Months Grid - Exactly structured like the physical card in two equal halves (15 + 15) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 passbook-months-grid">
+                {/* Left Half: Months 1 to 15 */}
                 <div className="border border-slate-400 rounded-lg overflow-hidden bg-white">
-                  <div className="bg-amber-100/70 border-b border-slate-400 px-2 py-1 font-bold text-[11px] text-amber-950 flex justify-between">
-                    <span>भाग १ (महिना क्र. १ ते १४) • दरमहा ₹५००</span>
-                    <span>एकूण: ₹७,०००</span>
+                  <div className="bg-amber-100/80 border-b border-slate-400 px-2 py-0.5 font-bold text-[11px] text-amber-950 flex justify-between">
+                    <span>भाग १ (महिना क्र. १ ते १५) • दरमहा ₹५००</span>
+                    <span>एकूण: ₹७,५००</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-center border-collapse text-[10px]">
                       <thead>
                         <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold">
-                          <th className="py-1 px-1 border-r border-slate-300">सो.क्र.</th>
-                          <th className="py-1 px-1 border-r border-slate-300">हप्ते (रुपये)</th>
-                          <th className="py-1 px-1 border-r border-slate-300">र.नं.</th>
-                          <th className="py-1 px-1 border-r border-slate-300">दिनांक</th>
-                          <th className="py-1 px-1">स्थिती / सही</th>
+                          <th className="py-0.5 px-1 border-r border-slate-300 w-10">सो.क्र.</th>
+                          <th className="py-0.5 px-1 border-r border-slate-300">हप्ते (रुपये)</th>
+                          <th className="py-0.5 px-1 border-r border-slate-300 w-16">र.नं.</th>
+                          <th className="py-0.5 px-1 border-r border-slate-300 w-16">दिनांक</th>
+                          <th className="py-0.5 px-1 w-16">स्थिती</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {monthsData.slice(0, 14).map((m) => (
+                        {monthsData.slice(0, 15).map((m) => (
                           <tr
                             key={m.monthNum}
                             className={`border-b border-slate-200 transition ${
@@ -352,29 +364,41 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                                 : 'text-slate-600'
                             }`}
                           >
-                            <td className="py-1 px-1 font-bold font-mono border-r border-slate-300 bg-slate-50">
+                            <td className="py-0.5 px-1 font-bold font-mono border-r border-slate-300 bg-slate-50">
                               {m.monthNum}
                             </td>
-                            <td className="py-1 px-1 border-r border-slate-300 font-mono text-[9px] leading-tight">
-                              <div>100 100</div>
-                              <div>100 200</div>
+                            <td className="py-0.5 px-1 border-r border-slate-300 font-mono">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step1Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  100{m.step1Paid ? '✓' : ''}
+                                </span>
+                                <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step2Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  100{m.step2Paid ? '✓' : ''}
+                                </span>
+                                <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step3Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  100{m.step3Paid ? '✓' : ''}
+                                </span>
+                                <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold border ${m.step4Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  200{m.step4Paid ? '✓' : ''}
+                                </span>
+                              </div>
                             </td>
-                            <td className="py-1 px-1 font-bold font-mono border-r border-slate-300 text-slate-900">
+                            <td className="py-0.5 px-1 font-bold font-mono border-r border-slate-300 text-slate-900 text-[9px]">
                               ₹{m.cumulativeTotal}
                             </td>
-                            <td className="py-1 px-1 border-r border-slate-300 font-mono text-[9px]">
+                            <td className="py-0.5 px-1 border-r border-slate-300 font-mono text-[8.5px]">
                               {m.isPaid ? 'जमा' : m.isPartiallyPaid ? 'अंशतः' : '-'}
                             </td>
-                            <td className="py-1 px-1">
+                            <td className="py-0.5 px-1 text-[8.5px]">
                               {m.isPaid ? (
-                                <span className="inline-flex items-center gap-0.5 text-emerald-700 font-bold text-[9px]">
-                                  <Check className="w-3 h-3 text-emerald-600" />
+                                <span className="inline-flex items-center gap-0.5 text-emerald-700 font-black">
+                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
                                   <span>जमा ✓</span>
                                 </span>
                               ) : m.isPartiallyPaid ? (
-                                <span className="text-amber-700 font-bold text-[9px]">अंशतः</span>
+                                <span className="text-amber-700 font-bold">अंशतः</span>
                               ) : (
-                                <span className="text-slate-300 text-[9px]">बाकी</span>
+                                <span className="text-slate-300">बाकी</span>
                               )}
                             </td>
                           </tr>
@@ -384,26 +408,26 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                   </div>
                 </div>
 
-                {/* Right Half: Months 15 to 30 */}
+                {/* Right Half: Months 16 to 30 */}
                 <div className="border border-slate-400 rounded-lg overflow-hidden bg-white flex flex-col justify-between">
                   <div>
-                    <div className="bg-amber-100/70 border-b border-slate-400 px-2 py-1 font-bold text-[11px] text-amber-950 flex justify-between">
-                      <span>भाग २ (महिना क्र. १५ ते ३०) • दरमहा ₹५००</span>
-                      <span>एकूण: ₹८,०००</span>
+                    <div className="bg-amber-100/80 border-b border-slate-400 px-2 py-0.5 font-bold text-[11px] text-amber-950 flex justify-between">
+                      <span>भाग २ (महिना क्र. १६ ते ३०) • दरमहा ₹५००</span>
+                      <span>एकूण: ₹७,५०० (एकूण ₹१५,०००)</span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-center border-collapse text-[10px]">
                         <thead>
                           <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold">
-                            <th className="py-1 px-1 border-r border-slate-300">सो.क्र.</th>
-                            <th className="py-1 px-1 border-r border-slate-300">हप्ते (रुपये)</th>
-                            <th className="py-1 px-1 border-r border-slate-300">र.नं.</th>
-                            <th className="py-1 px-1 border-r border-slate-300">दिनांक</th>
-                            <th className="py-1 px-1">स्थिती / सही</th>
+                            <th className="py-0.5 px-1 border-r border-slate-300 w-10">सो.क्र.</th>
+                            <th className="py-0.5 px-1 border-r border-slate-300">हप्ते (रुपये)</th>
+                            <th className="py-0.5 px-1 border-r border-slate-300 w-16">र.नं.</th>
+                            <th className="py-0.5 px-1 border-r border-slate-300 w-16">दिनांक</th>
+                            <th className="py-0.5 px-1 w-16">स्थिती</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {monthsData.slice(14, 30).map((m) => (
+                          {monthsData.slice(15, 30).map((m) => (
                             <tr
                               key={m.monthNum}
                               className={`border-b border-slate-200 transition ${
@@ -414,29 +438,41 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                                   : 'text-slate-600'
                               }`}
                             >
-                              <td className="py-1 px-1 font-bold font-mono border-r border-slate-300 bg-slate-50">
+                              <td className="py-0.5 px-1 font-bold font-mono border-r border-slate-300 bg-slate-50">
                                 {m.monthNum}
                               </td>
-                              <td className="py-1 px-1 border-r border-slate-300 font-mono text-[9px] leading-tight">
-                                <div>100 100</div>
-                                <div>100 200</div>
+                              <td className="py-0.5 px-1 border-r border-slate-300 font-mono">
+                                <div className="flex items-center justify-center gap-0.5">
+                                  <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step1Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    100{m.step1Paid ? '✓' : ''}
+                                  </span>
+                                  <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step2Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    100{m.step2Paid ? '✓' : ''}
+                                  </span>
+                                  <span className={`px-1 py-0.2 rounded text-[8px] font-bold border ${m.step3Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    100{m.step3Paid ? '✓' : ''}
+                                  </span>
+                                  <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold border ${m.step4Paid ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                    200{m.step4Paid ? '✓' : ''}
+                                  </span>
+                                </div>
                               </td>
-                              <td className="py-1 px-1 font-bold font-mono border-r border-slate-300 text-slate-900">
+                              <td className="py-0.5 px-1 font-bold font-mono border-r border-slate-300 text-slate-900 text-[9px]">
                                 ₹{m.cumulativeTotal}
                               </td>
-                              <td className="py-1 px-1 border-r border-slate-300 font-mono text-[9px]">
+                              <td className="py-0.5 px-1 border-r border-slate-300 font-mono text-[8.5px]">
                                 {m.isPaid ? 'जमा' : m.isPartiallyPaid ? 'अंशतः' : '-'}
                               </td>
-                              <td className="py-1 px-1">
+                              <td className="py-0.5 px-1 text-[8.5px]">
                                 {m.isPaid ? (
-                                  <span className="inline-flex items-center gap-0.5 text-emerald-700 font-bold text-[9px]">
-                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="inline-flex items-center gap-0.5 text-emerald-700 font-black">
+                                    <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
                                     <span>जमा ✓</span>
                                   </span>
                                 ) : m.isPartiallyPaid ? (
-                                  <span className="text-amber-700 font-bold text-[9px]">अंशतः</span>
+                                  <span className="text-amber-700 font-bold">अंशतः</span>
                                 ) : (
-                                  <span className="text-slate-300 text-[9px]">बाकी</span>
+                                  <span className="text-slate-300">बाकी</span>
                                 )}
                               </td>
                             </tr>
@@ -447,14 +483,14 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                   </div>
 
                   {/* Bonus & Total Banner exactly as printed on card */}
-                  <div className="bg-amber-500/20 border-t-2 border-amber-600 p-2 text-center font-bold text-xs space-y-0.5">
-                    <div className="text-amber-900 font-extrabold text-sm">
+                  <div className="bg-amber-500/20 border-t-2 border-amber-600 p-1.5 text-center font-bold text-xs space-y-0.5">
+                    <div className="text-amber-900 font-extrabold text-xs">
                       Bonus Rs. {fin.bonusAmount}/-
                     </div>
-                    <div className="text-slate-950 font-black text-base">
+                    <div className="text-slate-950 font-black text-sm">
                       Total Rs. {fin.totalMaturityValue.toLocaleString('en-IN')}/-
                     </div>
-                    <div className="text-[10px] text-slate-700">
+                    <div className="text-[9px] text-slate-700">
                       (३० महिने पूर्ण भरल्यानंतर ₹१५,००० + ₹५०० बोनस = ₹१५,५०० वस्तू अथवा परतावा)
                     </div>
                   </div>
@@ -462,47 +498,41 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
               </div>
 
               {/* Live Calculation Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-3 rounded-lg border border-slate-300 text-center font-mono">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-100 p-2 rounded-lg border border-slate-300 text-center font-mono">
                 <div>
-                  <span className="text-[10px] text-slate-600 font-sans block">योजना उद्दिष्ट</span>
-                  <span className="font-bold text-sm text-slate-900">₹{fin.schemeTarget.toLocaleString('en-IN')}</span>
+                  <span className="text-[9px] text-slate-600 font-sans block">योजना उद्दिष्ट</span>
+                  <span className="font-bold text-xs sm:text-sm text-slate-900">₹{fin.schemeTarget.toLocaleString('en-IN')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-600 font-sans block">एकूण आजवर जमा</span>
-                  <span className="font-black text-sm text-emerald-700">₹{fin.totalPaid.toLocaleString('en-IN')}</span>
+                  <span className="text-[9px] text-slate-600 font-sans block">एकूण आजवर जमा</span>
+                  <span className="font-black text-xs sm:text-sm text-emerald-700">₹{fin.totalPaid.toLocaleString('en-IN')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-600 font-sans block">शिल्लक बाकी देय</span>
-                  <span className="font-black text-sm text-rose-700">₹{fin.balanceDue.toLocaleString('en-IN')}</span>
+                  <span className="text-[9px] text-slate-600 font-sans block">शिल्लक बाकी देय</span>
+                  <span className="font-black text-xs sm:text-sm text-rose-700">₹{fin.balanceDue.toLocaleString('en-IN')}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-600 font-sans block">मॅच्युरिटी मूल्य</span>
-                  <span className="font-black text-sm text-amber-700">₹{fin.totalMaturityValue.toLocaleString('en-IN')}</span>
+                  <span className="text-[9px] text-slate-600 font-sans block">मॅच्युरिटी मूल्य</span>
+                  <span className="font-black text-xs sm:text-sm text-amber-700">₹{fin.totalMaturityValue.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
-              {/* Bottom Section from Physical Card: Bill Details + Disclaimer + QR + 16 Rules */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2 border-t-2 border-slate-900">
-                {/* Left: Bill Section & Guarantee Disclaimer (5 cols) */}
-                <div className="md:col-span-5 space-y-2 border border-slate-300 p-2.5 rounded-lg bg-slate-50 text-[10px]">
-                  <div className="font-bold text-slate-900 uppercase border-b border-slate-300 pb-1 flex justify-between items-center">
+              {/* Bottom Section: Compact Bill Details + Official Declaration & Signatures (Guaranteed 1-Page Fit) */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 pt-2 border-t-2 border-slate-900 passbook-bottom-grid">
+                {/* Left: Bill Section (5 cols) */}
+                <div className="md:col-span-5 space-y-1 border border-slate-300 p-2 rounded-lg bg-slate-50 text-[9.5px]">
+                  <div className="font-bold text-slate-900 uppercase border-b border-slate-300 pb-0.5 flex justify-between items-center">
                     <span>बिल व खरेदी नोंद (Bill Entry)</span>
-                    <span className="text-slate-700 font-semibold">
+                    <span className="text-slate-700 font-semibold text-[8.5px]">
                       {member.itemDueDt ? `देय ता.: ${member.itemDueDt}` : 'पैसे देण्याची ता.: ________'}
                     </span>
                   </div>
 
-                  <div className="space-y-1 font-mono text-[10px]">
+                  <div className="space-y-0.5 font-mono text-[9px]">
                     <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
                       <span className="font-sans text-slate-600">Bill No. :</span>
                       <span className={`font-bold ${member.itemBillNo ? 'text-slate-950 font-black' : 'text-slate-400'}`}>
                         {member.itemBillNo || '____________________'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
-                      <span className="font-sans text-slate-600">Date :</span>
-                      <span className={`font-bold ${member.itemBillDate ? 'text-slate-950' : 'text-slate-400'}`}>
-                        {member.itemBillDate ? new Date(member.itemBillDate).toLocaleDateString('en-IN') : '____________________'}
                       </span>
                     </div>
                     <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
@@ -512,76 +542,56 @@ export const CardPassbookPrintModal: React.FC<CardPassbookPrintModalProps> = ({
                       </span>
                     </div>
                     <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
-                      <span className="font-sans text-slate-600">Amt :</span>
-                      <span className={`font-bold ${member.itemTotalAmount ? 'text-slate-950 font-black' : 'text-slate-400'}`}>
-                        {member.itemTotalAmount ? `₹${member.itemTotalAmount.toLocaleString('en-IN')}` : '____________________'}
+                      <span className="font-sans text-slate-600">Total Amt / Advance :</span>
+                      <span className="font-bold text-slate-950">
+                        {member.itemTotalAmount ? `₹${member.itemTotalAmount}` : '____'} / {member.itemAdvancePaid ? `₹${member.itemAdvancePaid}` : '____'}
                       </span>
                     </div>
-                    <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
-                      <span className="font-sans text-slate-600">Advance :</span>
-                      <span className={`font-bold ${member.itemAdvancePaid ? 'text-emerald-800 font-black' : 'text-slate-400'}`}>
-                        {member.itemAdvancePaid ? `₹${member.itemAdvancePaid.toLocaleString('en-IN')}` : '____________________'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
-                      <span className="font-sans text-slate-600">Balance :</span>
+                    <div className="flex justify-between">
+                      <span className="font-sans text-slate-600">Balance Due :</span>
                       <span className={`font-bold ${member.itemBalanceDue !== undefined && member.itemBalanceDue > 0 ? 'text-rose-700 font-black' : member.itemBalanceDue === 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}`}>
-                        {member.itemBalanceDue !== undefined ? `₹${member.itemBalanceDue.toLocaleString('en-IN')}` : '____________________'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-dashed border-slate-300 pb-0.5">
-                      <span className="font-sans text-slate-600">Due Dt. :</span>
-                      <span className={`font-bold ${member.itemDueDt ? 'text-slate-950' : 'text-slate-400'}`}>
-                        {member.itemDueDt || '____________________'}
+                        {member.itemBalanceDue !== undefined ? `₹${member.itemBalanceDue}` : '____________________'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Warranty Disclaimer from card */}
-                  <div className="p-1.5 rounded bg-amber-50 border border-amber-300 text-[8.5px] leading-tight text-amber-950">
-                    <span className="font-bold">महत्त्वाची सूचना: </span>
-                    {SCHEME_WARRANTY_DISCLAIMER}
-                  </div>
-
-                  {/* QR code box */}
-                  <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
-                    <div className="w-12 h-12 bg-white p-0.5 border border-slate-400 rounded shrink-0 flex items-center justify-center">
-                      <QrCode className="w-10 h-10 text-slate-900" />
-                    </div>
-                    <span className="text-[8px] text-slate-600 leading-tight">
-                      ही पावती व योजनेची संपूर्ण माहिती अथवा कोणत्याही अडचणीकरिता हा QR कोड स्कॅन करा.
-                    </span>
+                  {/* Quick Disclaimer */}
+                  <div className="p-1 rounded bg-amber-50 border border-amber-300 text-[8px] leading-tight text-amber-950">
+                    <span className="font-bold">टीप: </span>
+                    वस्तूची गॅरंटी / वॉरंटी कंपनीच्या नियमांनुसार राहील. ३० महिन्यांच्या आत योजना बंद केल्यास बोनस मिळणार नाही.
                   </div>
                 </div>
 
-                {/* Right: All 16 Rules & Conditions (7 cols) */}
-                <div className="md:col-span-7 border border-slate-300 p-2.5 rounded-lg bg-slate-50 text-[9.5px] space-y-1.5 flex flex-col justify-between">
+                {/* Right: Official Summary, QR & Signatures (7 cols) */}
+                <div className="md:col-span-7 border border-slate-300 p-2 rounded-lg bg-slate-50 text-[9px] flex flex-col justify-between">
                   <div>
-                    <h3 className="font-black text-xs text-amber-950 uppercase border-b border-slate-300 pb-1 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                      <span>नियम व अटी :- (Rules & Conditions)</span>
+                    <h3 className="font-black text-[10px] text-amber-950 uppercase border-b border-slate-300 pb-0.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-amber-600" />
+                        <span>३०-महिने बचत योजना अधिकृत नियमावली</span>
+                      </span>
+                      <span className="text-[8px] text-slate-500 font-normal">📞 8600122978 / 8766486915</span>
                     </h3>
-                    <ol className="space-y-1 pt-1 text-slate-800 leading-tight">
-                      {SCHEME_OFFICIAL_RULES_16.map((rule, idx) => (
-                        <li key={idx} className="flex gap-1">
-                          <span className="text-slate-900 font-normal">{rule}</span>
-                        </li>
-                      ))}
-                    </ol>
+                    <div className="grid grid-cols-2 gap-1.5 pt-1 text-slate-800 text-[8.5px] leading-tight">
+                      <p>• हप्ता: दरमहा ₹५०० (साप्ताहिक ₹१००/२००)</p>
+                      <p>• ३० महिने पूर्ण भरल्यावर ₹५०० बोनस</p>
+                      <p>• लकी ड्रॉ व योजना सर्व अधिकार व्यवस्थापनाकडे</p>
+                      <p>• सविस्तर १६ नियमांकरिता स्वतंत्र '१६ नियम' प्रिंट उपलब्ध</p>
+                    </div>
                   </div>
 
                   {/* Declaration & Signatures */}
-                  <div className="pt-2 border-t border-slate-300 space-y-2">
-                    <p className="text-[8px] text-slate-600 italic">
-                      मी खाली सही करणार मला श्री साई एंटरप्रायझेस ची वस्तू खरेदी करण्याकरिता या योजनेत सहभागी होत आहे.
-                    </p>
-                    <div className="flex justify-between items-end pt-3 text-[9px] font-bold text-slate-800">
+                  <div className="pt-2 border-t border-slate-300">
+                    <div className="flex justify-between items-end text-[8.5px] font-bold text-slate-800">
                       <div className="text-center">
-                        <div className="w-24 border-b border-slate-400 mb-1"></div>
+                        <div className="w-24 border-b border-slate-500 mb-0.5"></div>
                         <span>कार्ड काढणाऱ्याची सही</span>
                       </div>
+                      <div className="text-center text-[8px] text-slate-500">
+                        <span>श्री साई इंटरप्रायजेस, वर्धा</span>
+                      </div>
                       <div className="text-center">
-                        <div className="w-24 border-b border-slate-400 mb-1"></div>
+                        <div className="w-24 border-b border-slate-500 mb-0.5"></div>
                         <span>ग्राहकाची सही</span>
                       </div>
                     </div>

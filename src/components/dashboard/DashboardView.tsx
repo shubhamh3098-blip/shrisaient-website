@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
   AlertTriangle,
@@ -32,7 +32,14 @@ import {
   Barcode,
   ShieldAlert,
   Truck,
-  Trophy
+  Trophy,
+  MapPin,
+  Building2,
+  Search,
+  X,
+  Radio,
+  Eye,
+  Compass
 } from 'lucide-react';
 import { StoreData, Transaction } from '../../types';
 import { NavTab } from '../Sidebar';
@@ -56,6 +63,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const [agentTimeframe, setAgentTimeframe] = useState<'today' | 'month'>('today');
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string>('all');
+  const [collectionDisplayTab, setCollectionDisplayTab] = useState<'agents' | 'villages'>('agents');
+  const [villageSearch, setVillageSearch] = useState<string>('');
+  const [selectedVillageModalAgent, setSelectedVillageModalAgent] = useState<any | null>(null);
+  const [selectedVillageDetail, setSelectedVillageDetail] = useState<any | null>(null);
+
+  // Helper to normalize and resolve customer/card member village
+  const resolveVillage = (info: {
+    customerId?: string;
+    customerName?: string;
+    cardMemberId?: string;
+    cardNo?: string;
+    memberName?: string;
+    address?: string;
+  }): string => {
+    // 1. Check card members by id or cardNo
+    if (info.cardMemberId || info.cardNo) {
+      const member = storeData.cardMembers.find(
+        (m) => (info.cardMemberId && m.id === info.cardMemberId) || (info.cardNo && m.cardNo === info.cardNo)
+      );
+      if (member?.village?.trim()) return member.village.trim();
+      if (member?.address?.trim()) {
+        const addr = member.address.trim();
+        return addr.length > 20 ? addr.slice(0, 20) : addr;
+      }
+    }
+    // 2. Check customer by id
+    if (info.customerId) {
+      const cust = storeData.customers.find((c) => c.id === info.customerId);
+      if (cust?.village?.trim()) return cust.village.trim();
+      if (cust?.city?.trim()) return cust.city.trim();
+      if (cust?.address?.trim()) {
+        const addr = cust.address.trim();
+        return addr.length > 20 ? addr.slice(0, 20) : addr;
+      }
+    }
+    // 3. Check by name
+    const lookupName = (info.customerName || info.memberName || '').toLowerCase().trim();
+    if (lookupName) {
+      const m = storeData.cardMembers.find((item) => item.memberName.toLowerCase().trim() === lookupName);
+      if (m?.village?.trim()) return m.village.trim();
+      const c = storeData.customers.find((item) => item.name.toLowerCase().trim() === lookupName);
+      if (c?.village?.trim()) return c.village.trim();
+      if (c?.city?.trim()) return c.city.trim();
+    }
+    if (info.address && info.address.trim()) {
+      const addr = info.address.trim();
+      return addr.length > 20 ? addr.slice(0, 20) : addr;
+    }
+    return 'वर्धा (Wardha)';
+  };
 
   // Filter agents from staff list
   const agents = storeData.staff.filter(
@@ -92,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return dateStr.startsWith(currentMonthStr);
   };
 
-  // Calculate agent-by-agent metrics
+  // Calculate agent-by-agent metrics including Village Breakdown
   const agentPerformanceList = activeAgents.map((ag) => {
     const agNameLower = ag.name.toLowerCase();
 
@@ -129,6 +186,61 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const targetAmount = agentTimeframe === 'today' ? 10000 : 250000;
     const achievementPct = Math.min(100, Math.round((totalCollected / targetAmount) * 100));
 
+    // 4. Village Breakdown for this Agent
+    const villageAgg: Record<
+      string,
+      {
+        village: string;
+        totalAmount: number;
+        count: number;
+        newBillAmount: number;
+        duesAmount: number;
+        schemeAmount: number;
+        customers: string[];
+      }
+    > = {};
+
+    newBillSales.forEach((t) => {
+      const v = resolveVillage({ customerId: t.customerId, customerName: t.customerName, address: t.customerAddress });
+      if (!villageAgg[v]) {
+        villageAgg[v] = { village: v, totalAmount: 0, count: 0, newBillAmount: 0, duesAmount: 0, schemeAmount: 0, customers: [] };
+      }
+      villageAgg[v].totalAmount += t.paidAmount;
+      villageAgg[v].newBillAmount += t.paidAmount;
+      villageAgg[v].count += 1;
+      if (t.customerName && !villageAgg[v].customers.includes(t.customerName)) {
+        villageAgg[v].customers.push(t.customerName);
+      }
+    });
+
+    duesReceipts.forEach((r) => {
+      const v = resolveVillage({ customerId: r.customerId, customerName: r.customerName });
+      if (!villageAgg[v]) {
+        villageAgg[v] = { village: v, totalAmount: 0, count: 0, newBillAmount: 0, duesAmount: 0, schemeAmount: 0, customers: [] };
+      }
+      villageAgg[v].totalAmount += r.amountPaid;
+      villageAgg[v].duesAmount += r.amountPaid;
+      villageAgg[v].count += 1;
+      if (r.customerName && !villageAgg[v].customers.includes(r.customerName)) {
+        villageAgg[v].customers.push(r.customerName);
+      }
+    });
+
+    schemeReceipts.forEach((c) => {
+      const v = resolveVillage({ cardMemberId: c.cardMemberId, cardNo: c.cardNo, memberName: c.memberName });
+      if (!villageAgg[v]) {
+        villageAgg[v] = { village: v, totalAmount: 0, count: 0, newBillAmount: 0, duesAmount: 0, schemeAmount: 0, customers: [] };
+      }
+      villageAgg[v].totalAmount += c.amount;
+      villageAgg[v].schemeAmount += c.amount;
+      villageAgg[v].count += 1;
+      if (c.memberName && !villageAgg[v].customers.includes(c.memberName)) {
+        villageAgg[v].customers.push(c.memberName);
+      }
+    });
+
+    const villageBreakdown = Object.values(villageAgg).sort((a, b) => b.totalAmount - a.totalAmount);
+
     return {
       agent: ag,
       route: agentRoutes[ag.name] || 'वर्धा शहर व ग्रामीण बीट (Field)',
@@ -143,6 +255,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       commission4Pct,
       targetAmount,
       achievementPct,
+      villageBreakdown,
     };
   });
 
@@ -153,6 +266,136 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalAllSchemeCollected = agentPerformanceList.reduce((acc, a) => acc + a.schemeCollected, 0);
   const totalAllCommission4Pct = Math.round((totalAllAgentRecovery * 4) / 100);
 
+  // Overall Village & Beat Collection Matrix across all agents
+  const overallVillageMatrix = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        village: string;
+        totalAmount: number;
+        todayAmount: number;
+        monthAmount: number;
+        schemeAmount: number;
+        duesAmount: number;
+        newBillAmount: number;
+        receiptCount: number;
+        customerList: { name: string; amount: number; type: string; date: string; agent: string }[];
+        agentsMap: Record<string, number>;
+      }
+    > = {};
+
+    const ensureEntry = (v: string) => {
+      if (!map[v]) {
+        map[v] = {
+          village: v,
+          totalAmount: 0,
+          todayAmount: 0,
+          monthAmount: 0,
+          schemeAmount: 0,
+          duesAmount: 0,
+          newBillAmount: 0,
+          receiptCount: 0,
+          customerList: [],
+          agentsMap: {},
+        };
+      }
+      return map[v];
+    };
+
+    // 1. Transactions
+    storeData.transactions.filter((t) => t.paidAmount > 0).forEach((t) => {
+      const v = resolveVillage({ customerId: t.customerId, customerName: t.customerName, address: t.customerAddress });
+      const entry = ensureEntry(v);
+      entry.totalAmount += t.paidAmount;
+      entry.newBillAmount += t.paidAmount;
+      entry.receiptCount += 1;
+      const ag = t.createdBy || 'Bhushan Lidbe';
+      entry.agentsMap[ag] = (entry.agentsMap[ag] || 0) + t.paidAmount;
+      entry.customerList.push({
+        name: t.customerName,
+        amount: t.paidAmount,
+        type: 'नवीन विक्री बिल',
+        date: t.date,
+        agent: ag,
+      });
+      if (t.date.startsWith(todayStr)) entry.todayAmount += t.paidAmount;
+      if (t.date.startsWith(currentMonthStr)) entry.monthAmount += t.paidAmount;
+    });
+
+    // 2. Bill Receipts
+    storeData.billReceipts.forEach((r) => {
+      const v = resolveVillage({ customerId: r.customerId, customerName: r.customerName });
+      const entry = ensureEntry(v);
+      entry.totalAmount += r.amountPaid;
+      entry.duesAmount += r.amountPaid;
+      entry.receiptCount += 1;
+      const ag = r.handledBy || 'Bhushan Lidbe';
+      entry.agentsMap[ag] = (entry.agentsMap[ag] || 0) + r.amountPaid;
+      entry.customerList.push({
+        name: r.customerName,
+        amount: r.amountPaid,
+        type: 'उधारी पावती',
+        date: r.date,
+        agent: ag,
+      });
+      if (r.date.startsWith(todayStr)) entry.todayAmount += r.amountPaid;
+      if (r.date.startsWith(currentMonthStr)) entry.monthAmount += r.amountPaid;
+    });
+
+    // 3. Card Transactions
+    storeData.cardTransactions.forEach((c) => {
+      const v = resolveVillage({ cardMemberId: c.cardMemberId, cardNo: c.cardNo, memberName: c.memberName });
+      const entry = ensureEntry(v);
+      entry.totalAmount += c.amount;
+      entry.schemeAmount += c.amount;
+      entry.receiptCount += 1;
+      const ag = c.collectedBy || 'Rahul Wankhede';
+      entry.agentsMap[ag] = (entry.agentsMap[ag] || 0) + c.amount;
+      entry.customerList.push({
+        name: c.memberName,
+        amount: c.amount,
+        type: 'योजना हप्ता',
+        date: c.date,
+        agent: ag,
+      });
+      if (c.date.startsWith(todayStr)) entry.todayAmount += c.amount;
+      if (c.date.startsWith(currentMonthStr)) entry.monthAmount += c.amount;
+    });
+
+    // Pre-populate key Wardha district villages / routes
+    const defaultBeats = [
+      { name: 'सावंगी मेघे (Sawangi)', agent: 'Shubham Shende' },
+      { name: 'सिंधी मेघे (Sindhi)', agent: 'Shubham Shende' },
+      { name: 'सेलू (Seloo)', agent: 'Suraj Moon' },
+      { name: 'वायफड (Waifad)', agent: 'Suraj Moon' },
+      { name: 'बोरगाव (Borgaon)', agent: 'Suraj Moon' },
+      { name: 'सेवाग्राम (Sewagram)', agent: 'Sachin Deshmukh' },
+      { name: 'हिंगणघाट (Hinganghat)', agent: 'Pravin Raut' },
+      { name: 'देवळी (Deoli)', agent: 'Pravin Raut' },
+      { name: 'नालवाडी (Nalwadi)', agent: 'Rahul Wankhede' },
+      { name: 'वर्धा मुख्य शहर (Wardha City)', agent: 'Bhushan Lidbe' },
+    ];
+
+    defaultBeats.forEach((b) => {
+      if (!map[b.name]) {
+        map[b.name] = {
+          village: b.name,
+          totalAmount: 0,
+          todayAmount: 0,
+          monthAmount: 0,
+          schemeAmount: 0,
+          duesAmount: 0,
+          newBillAmount: 0,
+          receiptCount: 0,
+          customerList: [],
+          agentsMap: { [b.agent]: 0 },
+        };
+      }
+    });
+
+    return Object.values(map);
+  }, [storeData, todayStr, currentMonthStr]);
+
   // Live recent collection activity feed across receipts, card deposits, and sales
   const recentActivities = [
     ...storeData.billReceipts.map((r) => ({
@@ -161,6 +404,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       refNo: `पावती #${r.receiptNo}`,
       agentName: r.handledBy || 'Bhushan Lidbe',
       customerName: r.customerName,
+      village: resolveVillage({ customerId: r.customerId, customerName: r.customerName }),
       type: 'जुनी उधारी वसुली (Dues Receipt)',
       typeColor: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
       mode: r.paymentMode,
@@ -173,6 +417,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       refNo: `कार्ड #${c.cardNo}`,
       agentName: c.collectedBy || 'Rahul Wankhede',
       customerName: c.memberName,
+      village: resolveVillage({ cardMemberId: c.cardMemberId, cardNo: c.cardNo, memberName: c.memberName }),
       type: 'योजना हप्ता (Scheme Installment)',
       typeColor: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
       mode: c.paymentMode,
@@ -185,6 +430,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       refNo: t.invoiceNo,
       agentName: t.createdBy || 'Bhushan Lidbe',
       customerName: t.customerName,
+      village: resolveVillage({ customerId: t.customerId, customerName: t.customerName, address: t.customerAddress }),
       type: 'नवीन विक्री बिल (New Bill Cash)',
       typeColor: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
       mode: t.paymentMode,
@@ -193,7 +439,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 6);
+    .slice(0, 8);
 
   // General Store KPIs
   const todayTransactions = storeData.transactions.filter((t) => t.date.startsWith(todayStr));
@@ -229,7 +475,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       : agentPerformanceList.filter((a) => a.agent.id === selectedAgentFilter);
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-6 sm:pb-8">
+    <div className="space-y-4 sm:space-y-6 pb-28 sm:pb-12">
       {/* Top Banner & Quick Actions */}
       <div
         className={`rounded-2xl sm:rounded-3xl border p-3.5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 ${
@@ -268,7 +514,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             size="sm"
             icon={<Plus className="w-4 h-4" />}
           >
-            <span>+ Add Bill <span className="text-[10px] font-normal opacity-85 hidden sm:inline">(नवीन बिल)</span></span>
+            <span>Add Bill <span className="text-[10px] font-normal opacity-85 hidden sm:inline">(नवीन बिल)</span></span>
           </GalaxyButton>
           <GalaxyButton
             id="btn-quick-collect-bill"
@@ -391,28 +637,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             : 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-slate-800'
         }`}
       >
-        {/* Section Header with Live Status & Timeframe Toggle */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+        {/* Section Header with Live Status, View Toggle & Timeframe Toggle */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
               <Flame className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Field Agent Collection & Live Recovery <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">(एजंट वसुली व कलेक्शन ट्रॅकिंग)</span>
+                  Field Agent & Village Live Recovery <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">(एजंट व गावनिहाय थेट वसुली)</span>
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase tracking-wide">
-                  Live Sync (थेट)
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span>Live Cloud Sync (थेट रिअल-टाइम सिंक)</span>
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                New Bills Cash, Old Dues & 30-Month Scheme Collections <span className="text-[10px] opacity-75">(नवीन बिले, जुनी उधारी व बचत हप्ते)</span>
+                New Bills Cash, Old Dues & 30-Month Scheme Collections by Agent & Village <span className="text-[10px] opacity-75">(कोणत्या एजंटचे कोणत्या गावातून किती संकलन झाले)</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+            {/* View Selector: Agent Cards vs Village Matrix */}
+            <div
+              className={`p-1 rounded-2xl border flex items-center gap-1 ${
+                isDayMode ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'
+              }`}
+            >
+              <button
+                onClick={() => setCollectionDisplayTab('agents')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  collectionDisplayTab === 'agents'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>एजंट कामगिरी</span>
+              </button>
+              <button
+                onClick={() => setCollectionDisplayTab('villages')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  collectionDisplayTab === 'villages'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>गावनिहाय बीट ट्रॅकर</span>
+              </button>
+            </div>
+
             {/* Timeframe selector */}
             <div
               className={`p-1 rounded-2xl border flex items-center gap-1 ${
@@ -427,7 +704,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Today's Collection <span className="text-[10px] font-normal opacity-80">(आजचे संकलन)</span>
+                Today <span className="text-[10px] font-normal opacity-80">(आज)</span>
               </button>
               <button
                 onClick={() => setAgentTimeframe('month')}
@@ -437,7 +714,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Current Month <span className="text-[10px] font-normal opacity-80">(चालू महिना)</span>
+                Month <span className="text-[10px] font-normal opacity-80">(महिना)</span>
               </button>
             </div>
 
@@ -554,92 +831,306 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Agent Leaderboard & Performance Grid */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Agent-Wise Breakdown & Targets <span className="text-[11px] font-normal text-slate-400 font-sans">(एजंटनिहाय वसुली स्थिती व उद्दिष्ट)</span>
-            </h4>
-            <span className="text-[11px] text-slate-500">
-              {filteredAgentCards.length} Active Field Agents (फिल्ड एजंट)
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredAgentCards.map((perf) => (
-              <div
-                key={perf.agent.id}
-                className={`p-4 rounded-2xl border transition hover:border-amber-500/50 ${
-                  isDayMode ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950 border-slate-800'
-                }`}
-              >
-                {/* Agent Header */}
-                <div className="flex items-start justify-between gap-2 mb-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 font-bold flex items-center justify-center text-sm border border-amber-500/20">
-                      {perf.agent.name.slice(0, 1)}
-                    </div>
-                    <div>
-                      <h5 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                        {perf.agent.name}
-                      </h5>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">{perf.route}</span>
-                    </div>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                    4% = ₹{perf.commission4Pct.toLocaleString('en-IN')}
-                  </span>
-                </div>
-
-                {/* Total Collected Amount */}
-                <div className="my-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Total Recovery (एकूण):</span>
-                  <span className="text-base font-extrabold text-slate-900 dark:text-white">
-                    ₹{perf.totalCollected.toLocaleString('en-IN')}
-                  </span>
-                </div>
-
-                {/* Breakdown Badges */}
-                <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] mb-3">
-                  <div className="p-1.5 rounded-lg bg-blue-500/5 border border-blue-500/15">
-                    <span className="text-slate-400 block">New Bill (नवीन)</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">
-                      ₹{perf.newBillCollected.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                    <span className="text-slate-400 block">Old Dues (बाकी)</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ₹{perf.duesRecovered.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-purple-500/5 border border-purple-500/15">
-                    <span className="text-slate-400 block">Scheme (योजना)</span>
-                    <span className="font-bold text-purple-600 dark:text-purple-400">
-                      ₹{perf.schemeCollected.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Target Progress Bar */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                    <span>Target (उद्दिष्ट): ₹{perf.targetAmount.toLocaleString('en-IN')}</span>
-                    <span className="font-bold text-amber-500">{perf.achievementPct}% achieved (साध्य)</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
-                      style={{ width: `${perf.achievementPct}%` }}
-                    ></div>
-                  </div>
-                </div>
+        {/* VIEW 1: AGENT-WISE LEADERBOARD & PERFORMANCE GRID */}
+        {collectionDisplayTab === 'agents' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-500" />
+                <span>Agent-Wise Breakdown & Targets <span className="text-[11px] font-normal text-slate-400 font-sans">(एजंटनिहाय वसुली स्थिती व उद्दिष्ट)</span></span>
+              </h4>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCollectionDisplayTab('villages')}
+                  className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>गावनिहाय मॅट्रिक्स पाहा →</span>
+                </button>
+                <span className="text-[11px] text-slate-500 hidden sm:inline">
+                  {filteredAgentCards.length} Active Field Agents (फिल्ड एजंट)
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Live Recent Collections Stream (थेट वसुली नोंदी) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredAgentCards.map((perf) => (
+                <div
+                  key={perf.agent.id}
+                  className={`p-4 rounded-2xl border transition hover:border-amber-500/50 flex flex-col justify-between ${
+                    isDayMode ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950 border-slate-800'
+                  }`}
+                >
+                  <div>
+                    {/* Agent Header */}
+                    <div className="flex items-start justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 font-bold flex items-center justify-center text-sm border border-amber-500/20">
+                          {perf.agent.name.slice(0, 1)}
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                            {perf.agent.name}
+                          </h5>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">{perf.route}</span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                        4% = ₹{perf.commission4Pct.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {/* Total Collected Amount */}
+                    <div className="my-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Total Recovery (एकूण):</span>
+                      <span className="text-base font-extrabold text-slate-900 dark:text-white">
+                        ₹{perf.totalCollected.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    {/* Breakdown Badges */}
+                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] mb-3">
+                      <div className="p-1.5 rounded-lg bg-blue-500/5 border border-blue-500/15">
+                        <span className="text-slate-400 block">New Bill (नवीन)</span>
+                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                          ₹{perf.newBillCollected.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                        <span className="text-slate-400 block">Old Dues (बाकी)</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          ₹{perf.duesRecovered.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                        <span className="text-slate-400 block">Scheme (योजना)</span>
+                        <span className="font-bold text-purple-600 dark:text-purple-400">
+                          ₹{perf.schemeCollected.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Target Progress Bar */}
+                    <div className="space-y-1 mb-3">
+                      <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                        <span>Target (उद्दिष्ट): ₹{perf.targetAmount.toLocaleString('en-IN')}</span>
+                        <span className="font-bold text-amber-500">{perf.achievementPct}% achieved (साध्य)</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${perf.achievementPct}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 📍 Village / Town Live Recovery Breakdown */}
+                  <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between text-[11px] mb-1.5">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>गावनिहाय संकलन (Villages):</span>
+                      </span>
+                      <button
+                        onClick={() => setSelectedVillageModalAgent(perf)}
+                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        <span>तपशील पाहा</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {perf.villageBreakdown && perf.villageBreakdown.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {perf.villageBreakdown.slice(0, 3).map((vb: any) => (
+                          <span
+                            key={vb.village}
+                            onClick={() => setSelectedVillageModalAgent(perf)}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-amber-500/10 text-slate-800 dark:text-slate-200 border border-amber-500/20 flex items-center gap-1 cursor-pointer hover:bg-amber-500/20 transition"
+                          >
+                            <span className="text-amber-500 font-bold">📍 {vb.village}:</span>
+                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                              ₹{vb.totalAmount.toLocaleString('en-IN')}
+                            </span>
+                          </span>
+                        ))}
+                        {perf.villageBreakdown.length > 3 && (
+                          <span
+                            onClick={() => setSelectedVillageModalAgent(perf)}
+                            className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer"
+                          >
+                            +{perf.villageBreakdown.length - 3} गावे
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Compass className="w-3 h-3 text-slate-400" />
+                          <span>बीट मार्ग: {perf.route.split('(')[0]}</span>
+                        </span>
+                        <button
+                          onClick={() => setSelectedVillageModalAgent(perf)}
+                          className="text-[10px] text-amber-500 hover:underline cursor-pointer"
+                        >
+                          नोंद पाहा
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 2: VILLAGE & BEAT LIVE COLLECTION MATRIX */}
+        {collectionDisplayTab === 'villages' && (
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-amber-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                  Village & Route Live Collection Matrix <span className="text-[11px] font-normal text-slate-400 font-sans">(गावनिहाय व बीटनिहाय थेट वसुली ट्रॅकर)</span>
+                </h4>
+              </div>
+              
+              {/* Search Bar for Villages */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={villageSearch}
+                  onChange={(e) => setVillageSearch(e.target.value)}
+                  placeholder="गाव शोधा... (उदा. सावंगी, सेलू, सिंधी...)"
+                  className={`w-full pl-8 pr-3 py-1.5 rounded-xl text-xs border outline-none ${
+                    isDayMode
+                      ? 'bg-white border-slate-200 text-slate-800 focus:border-amber-500'
+                      : 'bg-slate-950 border-slate-800 text-slate-200 focus:border-amber-500'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Quick Village Stats Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className={`p-2.5 rounded-xl border ${isDayMode ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
+                <span className="text-[10px] text-slate-400 block">एकूण गावे (Total Villages)</span>
+                <span className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {overallVillageMatrix.length} गावे / बीट्स
+                </span>
+              </div>
+              <div className={`p-2.5 rounded-xl border ${isDayMode ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
+                <span className="text-[10px] text-slate-400 block">सक्रिय फिल्ड एजंट्स</span>
+                <span className="text-base font-extrabold text-amber-500">
+                  {activeAgents.length} एजंट्स कार्यरत
+                </span>
+              </div>
+              <div className={`p-2.5 rounded-xl border ${isDayMode ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
+                <span className="text-[10px] text-slate-400 block">आजचे गावनिहाय संकलन</span>
+                <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                  ₹{overallVillageMatrix.reduce((acc, v) => acc + v.todayAmount, 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className={`p-2.5 rounded-xl border ${isDayMode ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800'}`}>
+                <span className="text-[10px] text-slate-400 block">चालू महिन्याचे संकलन</span>
+                <span className="text-base font-extrabold text-purple-600 dark:text-purple-400">
+                  ₹{overallVillageMatrix.reduce((acc, v) => acc + v.monthAmount, 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Village Matrix Table */}
+            <div
+              className={`rounded-2xl border overflow-hidden ${
+                isDayMode ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950 border-slate-800'
+              }`}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="py-2.5 px-3">गाव / परिसर (Village)</th>
+                      <th className="py-2.5 px-3">संबंधित फिल्ड एजंट (Field Agent)</th>
+                      <th className="py-2.5 px-3 text-right">योजना हप्ते</th>
+                      <th className="py-2.5 px-3 text-right">उधारी वसुली</th>
+                      <th className="py-2.5 px-3 text-right">नवीन बिल</th>
+                      <th className="py-2.5 px-3 text-right font-black text-amber-500">
+                        {agentTimeframe === 'today' ? 'आजचे संकलन' : 'चालू महिना'}
+                      </th>
+                      <th className="py-2.5 px-3 text-right">एकूण वसुली (Total)</th>
+                      <th className="py-2.5 px-3 text-center">तपशील</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {overallVillageMatrix
+                      .filter((v) => {
+                        const q = villageSearch.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          v.village.toLowerCase().includes(q) ||
+                          Object.keys(v.agentsMap).some((ag) => ag.toLowerCase().includes(q))
+                        );
+                      })
+                      .map((v) => {
+                        const activeAgentsForVillage = Object.keys(v.agentsMap).filter(
+                          (ag) => v.agentsMap[ag] > 0
+                        );
+                        const displayAgent =
+                          activeAgentsForVillage.length > 0
+                            ? activeAgentsForVillage.join(', ')
+                            : Object.keys(v.agentsMap)[0] || 'नियुक्त बीट एजंट';
+
+                        return (
+                          <tr
+                            key={v.village}
+                            className="hover:bg-amber-500/5 transition group"
+                          >
+                            <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span>{v.village}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                👤 {displayAgent}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-medium text-purple-600 dark:text-purple-400">
+                              ₹{v.schemeAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                              ₹{v.duesAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-medium text-blue-600 dark:text-blue-400">
+                              ₹{v.newBillAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-extrabold text-amber-600 dark:text-amber-400">
+                              ₹{agentTimeframe === 'today' ? v.todayAmount.toLocaleString('en-IN') : v.monthAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-black text-slate-900 dark:text-white">
+                              ₹{v.totalAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                onClick={() => setSelectedVillageDetail(v)}
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition cursor-pointer flex items-center gap-1 mx-auto"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>तपशील</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Live Recent Collections Stream (थेट वसुली नोंदी with Village Badge) */}
         <div
           className={`rounded-2xl border p-4 ${
             isDayMode ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/60 border-slate-800'
@@ -648,8 +1139,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-emerald-500" />
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Live Real-Time Activity Feed <span className="text-xs font-normal text-slate-400 font-sans">(थेट वसुली नोंदी)</span>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                <span>Live Real-Time Activity Feed</span>
+                <span className="text-xs font-normal text-slate-400 font-sans">(थेट वसुली नोंदी व गाव)</span>
               </h4>
             </div>
             <button
@@ -669,16 +1161,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${act.typeColor}`}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${act.typeColor}`}
                   >
                     {act.type}
                   </span>
                   <div>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {act.customerName}
-                    </span>
-                    <span className="text-slate-400 text-[11px] ml-2">
-                      ({act.refNo} • एजंट: <strong>{act.agentName}</strong>)
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {act.customerName}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-0.5">
+                        <MapPin className="w-2.5 h-2.5" />
+                        {act.village}
+                      </span>
+                    </div>
+                    <span className="text-slate-400 text-[11px] block mt-0.5">
+                      {act.refNo} • फिल्ड एजंट: <strong className="text-slate-700 dark:text-slate-300">{act.agentName}</strong>
                     </span>
                   </div>
                 </div>
@@ -1174,6 +1672,240 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 🗺️ MODAL 1: AGENT-WISE VILLAGE BREAKDOWN MODAL                            */}
+      {/* ========================================================================= */}
+      {selectedVillageModalAgent && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div
+            className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
+              isDayMode ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3 bg-amber-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 font-black flex items-center justify-center text-base border border-amber-500/30">
+                  {selectedVillageModalAgent.agent.name.slice(0, 1)}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>{selectedVillageModalAgent.agent.name}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      फिल्ड एजंट
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {selectedVillageModalAgent.route}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedVillageModalAgent(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Total Recovery Header Strip */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">एकूण संकलन (Total Recovery):</span>
+                <span className="text-2xl font-black text-slate-900 dark:text-white">
+                  ₹{selectedVillageModalAgent.totalCollected.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-bold">
+                  योजना: ₹{selectedVillageModalAgent.schemeCollected.toLocaleString('en-IN')}
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                  उधारी: ₹{selectedVillageModalAgent.duesRecovered.toLocaleString('en-IN')}
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-bold">
+                  नवीन: ₹{selectedVillageModalAgent.newBillCollected.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Village Breakdown Table */}
+            <div className="p-4 sm:p-5 max-h-96 overflow-y-auto">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                <span>गावनिहाय गोळा केलेली रक्कम (Village Breakdown)</span>
+              </h4>
+
+              {selectedVillageModalAgent.villageBreakdown && selectedVillageModalAgent.villageBreakdown.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {selectedVillageModalAgent.villageBreakdown.map((vb: any) => (
+                    <div key={vb.village} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                            {vb.village}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                            {vb.count} पावत्या
+                          </span>
+                        </div>
+                        {vb.customers && vb.customers.length > 0 && (
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            ग्राहक: {vb.customers.slice(0, 4).join(', ')}
+                            {vb.customers.length > 4 && ` (+${vb.customers.length - 4} अधिक)`}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 block">
+                          ₹{vb.totalAmount.toLocaleString('en-IN')}
+                        </span>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 justify-end">
+                          {vb.schemeAmount > 0 && <span>योजना: ₹{vb.schemeAmount.toLocaleString('en-IN')}</span>}
+                          {vb.duesAmount > 0 && <span>उधारी: ₹{vb.duesAmount.toLocaleString('en-IN')}</span>}
+                          {vb.newBillAmount > 0 && <span>नवीन: ₹{vb.newBillAmount.toLocaleString('en-IN')}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  <MapPin className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+                  <p className="font-bold">सध्या या निवडक कालावधीत कोणतीही पावती नोंद नाही.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    नियुक्त बीट: {selectedVillageModalAgent.route}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex justify-end">
+              <button
+                onClick={() => setSelectedVillageModalAgent(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition cursor-pointer"
+              >
+                बंद करा (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 📍 MODAL 2: VILLAGE DETAILED CUSTOMER & RECOVERY BREAKDOWN MODAL           */}
+      {/* ========================================================================= */}
+      {selectedVillageDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div
+            className={`w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
+              isDayMode ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3 bg-amber-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center border border-amber-500/30">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>{selectedVillageDetail.village}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      बीट संकलन
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    स्थानिक ग्राहक व गोळा झालेल्या पावत्यांचा तपशील
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedVillageDetail(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Village Total Recovery Strip */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">एकूण वसुली (Total Recovery):</span>
+                <span className="text-2xl font-black text-slate-900 dark:text-white">
+                  ₹{selectedVillageDetail.totalAmount.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-bold">
+                  योजना: ₹{selectedVillageDetail.schemeAmount.toLocaleString('en-IN')}
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                  उधारी: ₹{selectedVillageDetail.duesAmount.toLocaleString('en-IN')}
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-bold">
+                  नवीन: ₹{selectedVillageDetail.newBillAmount.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Customers & Receipts List */}
+            <div className="p-4 sm:p-5 max-h-96 overflow-y-auto">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-500" />
+                <span>या गावातील ग्राहक व वसुली नोंदी ({selectedVillageDetail.customerList.length})</span>
+              </h4>
+
+              {selectedVillageDetail.customerList && selectedVillageDetail.customerList.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {selectedVillageDetail.customerList.map((item: any, idx: number) => (
+                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {item.name}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {item.type}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          दिनांक: {item.date.slice(0, 10)} • संकलन एजंट: <strong className="text-slate-700 dark:text-slate-300">{item.agent}</strong>
+                        </p>
+                      </div>
+                      <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400">
+                        +₹{item.amount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  <MapPin className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+                  <p className="font-bold">या गावातील पावत्यांची नोंद अजून आलेली नाही.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    फिल्ड एजंटने ॲपवरून हप्ता जमा केल्यावर थेट येथे दिसेल.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex justify-end">
+              <button
+                onClick={() => setSelectedVillageDetail(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition cursor-pointer"
+              >
+                बंद करा (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

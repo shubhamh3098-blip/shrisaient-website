@@ -157,50 +157,73 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Crystal-Clear Day / Night Mode Segmented Switcher */}
-          <div
-            id="theme-mode-switcher"
-            className={`flex items-center p-0.5 sm:p-1 rounded-xl border shrink-0 transition-colors ${
-              isDayMode
-                ? 'bg-slate-200/80 border-slate-300'
-                : 'bg-slate-900 border-slate-700'
-            }`}
-          >
-            {/* Day Mode Tab */}
+          {/* Day / Night Mode Switcher: Compact 1-Tap on mobile, dual segmented on desktop */}
+          <div className="shrink-0">
+            {/* Mobile single-tap icon toggle */}
             <button
               type="button"
-              id="btn-theme-day"
-              onClick={() => {
-                if (!isDayMode) toggleTheme();
-              }}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+              id="btn-theme-mobile-toggle"
+              onClick={toggleTheme}
+              className={`sm:hidden p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
                 isDayMode
-                  ? 'bg-white text-amber-700 shadow-sm font-black ring-1 ring-amber-400/50'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-amber-50 border-amber-300 text-amber-700'
+                  : 'bg-slate-900 border-slate-700 text-sky-300'
               }`}
-              title="दिवस मोड सुरू करा (Day Mode — Clear White Light Theme)"
+              title={isDayMode ? 'रात्र मोड सुरू करा (Night Mode)' : 'दिवस मोड सुरू करा (Day Mode)'}
+              aria-label="Toggle Day / Night Mode"
             >
-              <Sun className={`w-3.5 h-3.5 shrink-0 ${isDayMode ? 'text-amber-500 fill-amber-400' : 'text-slate-400'}`} />
-              <span className="text-[11px] font-bold">दिवस</span>
+              {isDayMode ? (
+                <Sun className="w-4 h-4 text-amber-500 fill-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-sky-300" />
+              )}
             </button>
 
-            {/* Night Mode Tab */}
-            <button
-              type="button"
-              id="btn-theme-night"
-              onClick={() => {
-                if (isDayMode) toggleTheme();
-              }}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
-                !isDayMode
-                  ? 'bg-slate-800 text-sky-200 shadow-sm font-black ring-1 ring-sky-400/50'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
+            {/* Desktop Segmented Dual Switcher */}
+            <div
+              id="theme-mode-switcher"
+              className={`hidden sm:flex items-center p-0.5 sm:p-1 rounded-xl border shrink-0 transition-colors ${
+                isDayMode
+                  ? 'bg-slate-200/80 border-slate-300'
+                  : 'bg-slate-900 border-slate-700'
               }`}
-              title="रात्र मोड सुरू करा (Night Mode — Dark Clear Obsidian Theme)"
             >
-              <Moon className={`w-3.5 h-3.5 shrink-0 ${!isDayMode ? 'text-sky-300 fill-sky-400/30' : 'text-slate-500'}`} />
-              <span className="text-[11px] font-bold">रात्र</span>
-            </button>
+              {/* Day Mode Tab */}
+              <button
+                type="button"
+                id="btn-theme-day"
+                onClick={() => {
+                  if (!isDayMode) toggleTheme();
+                }}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+                  isDayMode
+                    ? 'bg-white text-amber-700 shadow-sm font-black ring-1 ring-amber-400/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+                title="दिवस मोड सुरू करा (Day Mode — Clear White Light Theme)"
+              >
+                <Sun className={`w-3.5 h-3.5 shrink-0 ${isDayMode ? 'text-amber-500 fill-amber-400' : 'text-slate-400'}`} />
+                <span className="text-[11px] font-bold">दिवस</span>
+              </button>
+
+              {/* Night Mode Tab */}
+              <button
+                type="button"
+                id="btn-theme-night"
+                onClick={() => {
+                  if (isDayMode) toggleTheme();
+                }}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+                  !isDayMode
+                    ? 'bg-slate-800 text-sky-200 shadow-sm font-black ring-1 ring-sky-400/50'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/60'
+                }`}
+                title="रात्र मोड सुरू करा (Night Mode — Dark Clear Obsidian Theme)"
+              >
+                <Moon className={`w-3.5 h-3.5 shrink-0 ${!isDayMode ? 'text-sky-300 fill-sky-400/30' : 'text-slate-500'}`} />
+                <span className="text-[11px] font-bold">रात्र</span>
+              </button>
+            </div>
           </div>
 
           {/* Real-time Order & Cart Notifications Bell */}
@@ -217,8 +240,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="sm:hidden">दुकान</span>
           </button>
 
-          {/* User Account Switcher */}
-          <div className={`flex items-center gap-1 border rounded-xl p-1 shrink-0 ${
+          {/* User Account Switcher - Visible on desktop, accessible via mobile sidebar on phone */}
+          <div className={`hidden sm:flex items-center gap-1 border rounded-xl p-1 shrink-0 ${
             isDayMode
               ? 'bg-slate-100 border-slate-200 text-slate-700'
               : 'bg-slate-800 border-slate-700 text-slate-200'
@@ -246,7 +269,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onLogout && (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-500/30 transition cursor-pointer active:scale-95 shrink-0"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-500/30 transition cursor-pointer active:scale-95 shrink-0"
               title="लॉगआउट करा आणि लँडिंग पेजवर जा (Logout)"
             >
               <LogOut className="w-3.5 h-3.5" />

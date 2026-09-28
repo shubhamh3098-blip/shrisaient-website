@@ -72,19 +72,46 @@ app.get("/api/sync", (_req, res) => {
 
 // 2. Push client updates to server (from mobile agent phone or counter computer)
 app.post("/api/sync", (req, res) => {
-  const { data, sourceDeviceId } = req.body;
+  const { data, sourceDeviceId, isExplicitReset } = req.body;
   if (!data) {
     return res.status(400).json({ success: false, message: "Missing store data payload" });
+  }
+
+  const incomingCount = (data.customers?.length || 0) +
+                        (data.cardMembers?.length || 0) +
+                        (data.transactions?.length || 0) +
+                        (data.cardTransactions?.length || 0) +
+                        (data.billReceipts?.length || 0);
+
+  const existingCount = (serverStoreData?.customers?.length || 0) +
+                        (serverStoreData?.cardMembers?.length || 0) +
+                        (serverStoreData?.transactions?.length || 0) +
+                        (serverStoreData?.cardTransactions?.length || 0) +
+                        (serverStoreData?.billReceipts?.length || 0);
+
+  // Safeguard: Do NOT allow a newly booted empty client (e.g. fresh mobile phone)
+  // to overwrite a populated database!
+  if (!isExplicitReset && existingCount > 0 && incomingCount === 0) {
+    console.log(`[Realtime Sync] Shielded database (${existingCount} records) against empty overwrite from ${sourceDeviceId}`);
+    return res.json({
+      success: true,
+      conflict: true,
+      data: serverStoreData,
+      version: serverStoreData?.updatedAt || new Date().toISOString(),
+      connectedDevices: sseClients.size,
+    });
   }
 
   // Stamp updated timestamp
   data.updatedAt = new Date().toISOString();
   serverStoreData = data;
 
-  // Persist to disk asynchronously
-  fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), "utf-8", (err) => {
-    if (err) console.error("[Realtime Sync] Error saving store data to file:", err);
-  });
+  // Persist to disk synchronously so it survives restarts
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Realtime Sync] Error saving store data to file:", err);
+  }
 
   // Broadcast in real-time to all connected mobile agents and desktops
   broadcastSyncUpdate(data, sourceDeviceId);

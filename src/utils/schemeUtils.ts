@@ -127,24 +127,52 @@ export function resolveCardScheme(card: Partial<CardMember>): number {
 
   const notes = (card.notes || '').toLowerCase();
   const cardNo = (card.cardNo || '').toLowerCase();
+  const schemeName = (card.schemeName || '').toLowerCase();
+  const sheetNo = (card.sheetNo || '').toLowerCase();
 
-  if (notes.includes('scheme 2') || notes.includes('योजना २') || cardNo.includes('sch2')) {
+  if (
+    notes.includes('scheme 2') || 
+    notes.includes('योजना २') || 
+    notes.includes('योजना 2') || 
+    cardNo.includes('sch2') || 
+    cardNo.startsWith('s2-') || 
+    schemeName.includes('scheme 2') || 
+    schemeName.includes('योजना २') || 
+    schemeName.includes('योजना 2') ||
+    sheetNo.includes('sch2') || 
+    sheetNo.includes('scheme 2')
+  ) {
     return 2;
   }
-  if (notes.includes('scheme 3') || notes.includes('योजना ३') || cardNo.includes('sch3')) {
+  if (
+    notes.includes('scheme 3') || 
+    notes.includes('योजना ३') || 
+    notes.includes('योजना 3') || 
+    cardNo.includes('sch3') || 
+    cardNo.startsWith('s3-') || 
+    schemeName.includes('scheme 3') || 
+    schemeName.includes('योजना ३') || 
+    schemeName.includes('योजना 3') ||
+    sheetNo.includes('sch3') || 
+    sheetNo.includes('scheme 3')
+  ) {
     return 3;
   }
-  if (notes.includes('scheme 4') || notes.includes('योजना ४') || cardNo.includes('sch4')) {
+  if (
+    notes.includes('scheme 4') || 
+    notes.includes('योजना ४') || 
+    cardNo.includes('sch4') || 
+    schemeName.includes('scheme 4')
+  ) {
     return 4;
   }
-  if (notes.includes('scheme 5') || notes.includes('योजना ५') || cardNo.includes('sch5')) {
+  if (
+    notes.includes('scheme 5') || 
+    notes.includes('योजना ५') || 
+    cardNo.includes('sch5') || 
+    schemeName.includes('scheme 5')
+  ) {
     return 5;
-  }
-
-  // Check card number range
-  const num = extractCardNumber(card.cardNo || '');
-  if (num > 3000 && num <= 6000) {
-    return 3; // Scheme 1 & 2 are 1001-3000, so >3000 must be Scheme 3
   }
 
   return 1; // Default to Scheme 1

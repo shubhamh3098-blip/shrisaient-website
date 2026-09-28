@@ -165,22 +165,24 @@ PRAKASH BUDHBAWARE,ANTERGAON,23-02-2023,1003,8262988399,MANDIR 21'',4000,2000,20
   const executeDirectImport = (
     parsed: { headers: string[]; rows: string[][] },
     targetType: ImportType = importType,
-    fileName?: string
+    fileName?: string,
+    overrideSchemeNo?: number
   ) => {
     try {
       setIsProcessing(true);
       let res: TolerantImportResult;
       let typeLabel = '';
       let targetTab: NavTab = 'customers';
+      const effectiveScheme = overrideSchemeNo !== undefined ? overrideSchemeNo : selectedSchemeBatch;
 
       if (targetType === 'customers') {
         typeLabel = 'ग्राहक';
         targetTab = 'customers';
         res = importCustomersTolerant(parsed.headers, parsed.rows, storeData, duplicateMode);
       } else if (targetType === 'scheme_cards') {
-        typeLabel = 'कार्ड सभासद';
+        typeLabel = effectiveScheme ? `कार्ड सभासद (योजना ${effectiveScheme})` : 'कार्ड सभासद';
         targetTab = 'scheme';
-        res = importSchemeCardsTolerant(parsed.headers, parsed.rows, storeData, selectedSchemeBatch);
+        res = importSchemeCardsTolerant(parsed.headers, parsed.rows, storeData, effectiveScheme, fileName);
       } else if (targetType === 'bills') {
         typeLabel = 'विक्री बिले';
         targetTab = 'all-transactions';
@@ -264,10 +266,30 @@ PRAKASH BUDHBAWARE,ANTERGAON,23-02-2023,1003,8262988399,MANDIR 21'',4000,2000,20
         setImportType('receipts');
       }
 
+      // Scheme detection from filename if uploading scheme cards
+      const fnLower = file.name.toLowerCase();
+      let fileScheme: number | undefined = selectedSchemeBatch;
+      if (fnLower.includes('scheme 2') || fnLower.includes('scheme2') || fnLower.includes('योजना २') || fnLower.includes('योजना 2') || fnLower.includes('sch2') || fnLower.includes('sch-2') || fnLower.includes('batch 2')) {
+        fileScheme = 2;
+        setSelectedSchemeBatch(2);
+      } else if (fnLower.includes('scheme 3') || fnLower.includes('scheme3') || fnLower.includes('योजना ३') || fnLower.includes('योजना 3') || fnLower.includes('sch3') || fnLower.includes('sch-3') || fnLower.includes('batch 3')) {
+        fileScheme = 3;
+        setSelectedSchemeBatch(3);
+      } else if (fnLower.includes('scheme 4') || fnLower.includes('scheme4') || fnLower.includes('योजना ४') || fnLower.includes('योजना 4') || fnLower.includes('sch4')) {
+        fileScheme = 4;
+        setSelectedSchemeBatch(4);
+      } else if (fnLower.includes('scheme 5') || fnLower.includes('scheme5') || fnLower.includes('योजना ५') || fnLower.includes('योजना 5') || fnLower.includes('sch5')) {
+        fileScheme = 5;
+        setSelectedSchemeBatch(5);
+      } else if (fnLower.includes('scheme 1') || fnLower.includes('scheme1') || fnLower.includes('योजना १') || fnLower.includes('योजना 1') || fnLower.includes('sch1')) {
+        fileScheme = 1;
+        setSelectedSchemeBatch(1);
+      }
+
       setPastedData(parsed.rawText);
 
       // Save immediately into storage
-      executeDirectImport(parsed, detectedType, file.name);
+      executeDirectImport(parsed, detectedType, file.name, fileScheme);
     } catch (err: any) {
       console.error('File read error:', err);
       // Fallback: read plain text

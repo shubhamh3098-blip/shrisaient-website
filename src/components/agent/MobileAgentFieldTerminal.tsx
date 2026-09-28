@@ -606,8 +606,8 @@ export const MobileAgentFieldTerminal: React.FC<MobileAgentFieldTerminalProps> =
         </div>
       </header>
 
-      {/* Main Mode Sub-Navigation Tabs */}
-      <div className={`sticky top-[93px] z-20 px-3 py-2 border-b backdrop-blur-md flex items-center gap-2 overflow-x-auto scrollbar-none ${
+      {/* Main Mode Sub-Navigation Tabs (Visible on tablet/desktop, mobile uses thumb-friendly bottom bar) */}
+      <div className={`hidden sm:flex sticky top-[93px] z-20 px-3 py-2 border-b backdrop-blur-md items-center gap-2 overflow-x-auto scrollbar-none ${
         isDayMode ? 'bg-white/90 border-slate-200' : 'bg-[#090d1f]/90 border-slate-800'
       }`}>
         <button

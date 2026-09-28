@@ -88,15 +88,24 @@ export const InteractiveDigitalCard: React.FC<InteractiveDigitalCardProps> = ({
   );
 
   // Compute 30 months data - strictly ₹15,000 scheme (₹500/month, ₹500 bonus, ₹15,500 maturity)
+  // Each month = 4 weekly installments: ₹100 + ₹100 + ₹100 + ₹200 = ₹500
   const monthlyTarget = 500;
-  const weeklySteps = [100, 100, 100, 100, 200];
+  const weeklySteps = [100, 100, 100, 200];
 
   const monthsList = Array.from({ length: 30 }, (_, idx) => {
     const monthNum = idx + 1;
+    const monthStart = (monthNum - 1) * 500;
     const cumulativeTotal = monthNum * 500;
     const isFullyPaid = fin.totalPaid >= cumulativeTotal;
-    const isPartiallyPaid = !isFullyPaid && fin.totalPaid > (monthNum - 1) * 500;
-    const isNextDue = !isFullyPaid && (monthNum === 1 || fin.totalPaid >= (monthNum - 1) * 500);
+    const isPartiallyPaid = !isFullyPaid && fin.totalPaid > monthStart;
+    const isNextDue = !isFullyPaid && (monthNum === 1 || fin.totalPaid >= monthStart);
+
+    // Calculate individual weekly installment status: [100, 100, 100, 200]
+    const paidInThisMonth = Math.max(0, Math.min(500, fin.totalPaid - monthStart));
+    const step1Paid = paidInThisMonth >= 100;
+    const step2Paid = paidInThisMonth >= 200;
+    const step3Paid = paidInThisMonth >= 300;
+    const step4Paid = paidInThisMonth >= 500;
     
     // Find receipt if available
     const tx = memberTx.find((t) => (t.monthNumber || 0) === monthNum);
@@ -107,6 +116,11 @@ export const InteractiveDigitalCard: React.FC<InteractiveDigitalCardProps> = ({
       isFullyPaid,
       isPartiallyPaid,
       isNextDue,
+      step1Paid,
+      step2Paid,
+      step3Paid,
+      step4Paid,
+      paidInThisMonth,
       txDate: tx ? new Date(tx.date).toLocaleDateString('en-IN') : null,
       txAmount: tx ? tx.amount : null,
     };
@@ -515,9 +529,49 @@ export const InteractiveDigitalCard: React.FC<InteractiveDigitalCardProps> = ({
                           <td className="py-1 px-0.5 font-bold font-mono border-r border-slate-300 bg-slate-50">
                             {m.monthNum}
                           </td>
-                          <td className="py-1 px-0.5 border-r border-slate-300 font-mono text-[9px] leading-tight">
-                            <div>{weeklySteps.slice(0, 2).join(' ')}</div>
-                            <div>{weeklySteps.slice(2).join(' ')}</div>
+                          <td className="py-1 px-0.5 border-r border-slate-300 font-mono">
+                            <div className="flex items-center justify-center gap-0.5 flex-wrap">
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step1Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता १: ₹१००"
+                              >
+                                100{m.step1Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step2Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता २: ₹१००"
+                              >
+                                100{m.step2Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step3Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता ३: ₹१००"
+                              >
+                                100{m.step3Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step4Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता ४: ₹२००"
+                              >
+                                200{m.step4Paid ? '✓' : ''}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-1 px-0.5 font-bold font-mono border-r border-slate-300 text-slate-900">
                             ₹{m.cumulativeTotal}
@@ -586,9 +640,49 @@ export const InteractiveDigitalCard: React.FC<InteractiveDigitalCardProps> = ({
                           <td className="py-1 px-0.5 font-bold font-mono border-r border-slate-300 bg-slate-50">
                             {m.monthNum}
                           </td>
-                          <td className="py-1 px-0.5 border-r border-slate-300 font-mono text-[9px] leading-tight">
-                            <div>{weeklySteps.slice(0, 2).join(' ')}</div>
-                            <div>{weeklySteps.slice(2).join(' ')}</div>
+                          <td className="py-1 px-0.5 border-r border-slate-300 font-mono">
+                            <div className="flex items-center justify-center gap-0.5 flex-wrap">
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step1Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता १: ₹१००"
+                              >
+                                100{m.step1Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step2Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता २: ₹१००"
+                              >
+                                100{m.step2Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step3Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता ३: ₹१००"
+                              >
+                                100{m.step3Paid ? '✓' : ''}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold border ${
+                                  m.step4Paid
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400 font-black shadow-xs'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                                title="हप्ता ४: ₹२००"
+                              >
+                                200{m.step4Paid ? '✓' : ''}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-1 px-0.5 font-bold font-mono border-r border-slate-300 text-slate-900">
                             ₹{m.cumulativeTotal}

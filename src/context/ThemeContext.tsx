@@ -10,8 +10,8 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'night', // Default to Cosmic Galaxy Glow theme requested by user
-  isDayMode: false,
+  theme: 'day', // Default to clean, crystal-clear day mode
+  isDayMode: true,
   toggleTheme: () => {},
   setTheme: () => {},
 });
@@ -19,8 +19,8 @@ const ThemeContext = createContext<ThemeContextType>({
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<AppTheme>(() => {
     const saved = localStorage.getItem('sse_app_theme');
-    // If not explicitly set to day, default to cosmic night mode
-    return saved === 'day' ? 'day' : 'night';
+    // Default to clean, simple Day mode for maximum clarity and readability
+    return saved === 'night' ? 'night' : 'day';
   });
 
   useEffect(() => {

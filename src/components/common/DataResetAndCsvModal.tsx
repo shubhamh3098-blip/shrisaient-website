@@ -96,7 +96,7 @@ export const DataResetAndCsvModal: React.FC<DataResetAndCsvModalProps> = ({
         transactions: userShowroomTransactions,
         billReceipts: userShowroomReceipts,
         cardMembers: userShowroomCards,
-        isDemoWiped: false,
+        isDemoWiped: true,
       };
       StorageService.saveData(updated);
       onRefreshData();

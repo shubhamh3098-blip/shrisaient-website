@@ -350,10 +350,12 @@ function AppContent() {
           onOpenQuickHisab={() => setIsQuickHisabModalOpen(true)}
           onOpenCustomerShowroom={() => setIsCustomerShowroomOpen(true)}
           onOpenDailyBackupModal={() => setIsDailyBackupModalOpen(true)}
+          activeUser={activeUser}
+          onLogout={handleAdminLogout}
         />
 
         {/* Dynamic Main Workspace View */}
-        <main className={`flex-1 overflow-y-auto px-2.5 sm:px-5 md:px-6 py-2.5 sm:py-5 md:py-6 pb-28 md:pb-8 transition-colors duration-300 ${
+        <main className={`flex-1 overflow-y-auto px-2.5 sm:px-5 md:px-6 py-2.5 sm:py-5 md:py-6 pb-32 md:pb-8 transition-colors duration-300 ${
           isDayMode ? 'bg-slate-100/40' : 'bg-transparent'
         }`}>
           <div className="max-w-7xl mx-auto">

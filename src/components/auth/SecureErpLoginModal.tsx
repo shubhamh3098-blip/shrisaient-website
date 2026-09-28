@@ -41,8 +41,13 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
   const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'recovery' | 'approvals'>('login');
 
   // Form Fields - Login
-  const [identifier, setIdentifier] = useState('');
-  const [secret, setSecret] = useState('');
+  const [identifier, setIdentifier] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sai_erp_remembered_id') || 'admin';
+    }
+    return 'admin';
+  });
+  const [secret, setSecret] = useState('1079');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginError, setLoginError] = useState('');
@@ -50,6 +55,24 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
 
   // Rate Limiting / Lockout Countdown State
   const [lockoutState, setLockoutState] = useState(() => SecurityService.getLockoutState());
+
+  // 1-Tap Quick Owner/Admin Login
+  const handleQuickOwnerLogin = () => {
+    setIdentifier('admin');
+    setSecret('1079');
+    setLoginError('');
+    setIsSubmitting(true);
+    setTimeout(() => {
+      const res = SecurityService.authenticateUser('admin', '1079');
+      setIsSubmitting(false);
+      if (res.success && res.user) {
+        onLoginSuccess(res.user);
+        onClose();
+      } else {
+        setLoginError(res.error || 'लॉगिन अयशस्वी!');
+      }
+    }, 150);
+  };
 
   // Form Fields - Staff Sign Up
   const [signupName, setSignupName] = useState('');
@@ -274,8 +297,8 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col text-slate-100 relative">
+    <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="my-auto bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col text-slate-100 relative animate-in fade-in duration-150">
         {/* Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -285,15 +308,15 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
-                  साई कृपा ERP - सुरक्षित पोर्टल
+                  श्री साई इंटरप्रायजेस ERP • लॉगिन
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  सुरक्षित (256-Bit)
+                  सुरक्षित
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                अधिकृत कर्मचारी व ॲडमिन प्रवेश (Authorized Staff & Admin Access)
+                अधिकृत कर्मचारी व ॲडमिन प्रवेश (Admin & Staff Access)
               </p>
             </div>
           </div>
@@ -369,6 +392,25 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
         {/* Tab 1: Secure Login */}
         {activeTab === 'login' && (
           <div className="p-5 sm:p-6 space-y-4">
+            {/* 1-Click Instant Owner Login Button */}
+            <button
+              type="button"
+              onClick={handleQuickOwnerLogin}
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm transition shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/40 active:scale-98"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>⚡ १-क्लिक ॲडमिन थेट लॉगिन (Instant ERP Access)</span>
+            </button>
+
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-slate-800 w-full"></div>
+              <span className="bg-slate-900 px-3 text-[11px] text-slate-500 font-bold uppercase tracking-wider shrink-0">
+                किंवा युझरनेम/पासवर्डने लॉगिन करा
+              </span>
+              <div className="border-t border-slate-800 w-full"></div>
+            </div>
+
             {/* Brute-force Lockout Alert */}
             {lockoutState.isLocked && (
               <div className="p-4 rounded-2xl bg-rose-950/80 border-2 border-rose-500 text-rose-200 text-xs space-y-2 animate-bounce-subtle">

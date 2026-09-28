@@ -398,17 +398,44 @@ export function importSchemeCards(
     const cardDigits = rawCardNo.match(/\d+/g);
     const cardNum = cardDigits ? parseInt(cardDigits[cardDigits.length - 1], 10) : (2000 + i);
 
-    // Determine Scheme based on user rule:
-    // Scheme 1: 1001-3000
-    // Scheme 2: 1001-3000
-    // Scheme 3: 1001-6000
-    // Scheme 4 & 5: 1001-6000
+    // Determine Scheme accurately:
     let schemeNo = explicitSchemeNo || 1;
     if (!explicitSchemeNo) {
-      if (cardNum > 3000 && cardNum <= 6000) {
-        schemeNo = 3;
-      } else if (sheetNo.toLowerCase().includes('sch2') || sheetNo.toLowerCase().includes('scheme 2')) {
+      const combined = `${sheetNo} ${rawCardNo}`.toLowerCase();
+      if (
+        combined.includes('sch2') || 
+        combined.includes('scheme 2') || 
+        combined.includes('योजना २') || 
+        combined.includes('योजना 2') ||
+        rawCardNo.toUpperCase().startsWith('SCH2')
+      ) {
         schemeNo = 2;
+      } else if (
+        combined.includes('sch3') || 
+        combined.includes('scheme 3') || 
+        combined.includes('योजना ३') || 
+        combined.includes('योजना 3') ||
+        rawCardNo.toUpperCase().startsWith('SCH3')
+      ) {
+        schemeNo = 3;
+      } else if (
+        combined.includes('sch4') || 
+        combined.includes('scheme 4') || 
+        combined.includes('योजना ४')
+      ) {
+        schemeNo = 4;
+      } else if (
+        combined.includes('sch5') || 
+        combined.includes('scheme 5') || 
+        combined.includes('योजना ५')
+      ) {
+        schemeNo = 5;
+      } else if (
+        combined.includes('sch1') || 
+        combined.includes('scheme 1') || 
+        combined.includes('योजना १')
+      ) {
+        schemeNo = 1;
       } else {
         schemeNo = 1;
       }

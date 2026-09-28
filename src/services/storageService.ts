@@ -87,45 +87,27 @@ export class StorageService {
           parsed.staff = [...initialStoreData.staff];
         }
 
-        // Check if legacy dummy products or dummy customers exist in storage, purge them!
-        const hasDummyCustomers = parsed.customers?.some((c: any) => c.name === 'VIJAY GADE' || c.id === 'cust-1');
-        const hasDummyStock = parsed.stock?.some((s: any) => s.id === 'stk-1' || s.code === 'ELE-SAM-55Q');
-        if (hasDummyCustomers || hasDummyStock || !parsed.isDemoWiped) {
-          parsed.customers = [];
-          parsed.transactions = [];
-          parsed.cardMembers = [];
-          parsed.cardTransactions = [];
-          parsed.billReceipts = [];
-          parsed.stock = [];
-          parsed.purchases = [];
-          parsed.expenses = [];
-          parsed.dealerPayments = [];
-          parsed.agentAdvances = [];
-          parsed.isDemoWiped = true;
-          this.saveData(parsed);
-        }
-
-        if (parsed.isDemoWiped) {
-          // Keep customer/transaction collections wiped/clean
-          if (!parsed.billReceipts) parsed.billReceipts = [];
-          if (!parsed.cardTransactions) parsed.cardTransactions = [];
-          if (!parsed.customers) parsed.customers = [];
-          if (!parsed.transactions) parsed.transactions = [];
-          if (!parsed.cardMembers) parsed.cardMembers = [];
-          if (!parsed.expenses) parsed.expenses = [];
-          if (!parsed.purchases) parsed.purchases = [];
-          if (!parsed.dealerPayments) parsed.dealerPayments = [];
-          if (!parsed.agentAdvances) parsed.agentAdvances = [];
-        }
+        // Ensure all collection arrays are guaranteed to be initialized as arrays
+        parsed.customers = Array.isArray(parsed.customers) ? parsed.customers : [];
+        parsed.transactions = Array.isArray(parsed.transactions) ? parsed.transactions : [];
+        parsed.cardMembers = Array.isArray(parsed.cardMembers) ? parsed.cardMembers : [];
+        parsed.cardTransactions = Array.isArray(parsed.cardTransactions) ? parsed.cardTransactions : [];
+        parsed.billReceipts = Array.isArray(parsed.billReceipts) ? parsed.billReceipts : [];
+        parsed.stock = Array.isArray(parsed.stock) ? parsed.stock : [];
+        parsed.purchases = Array.isArray(parsed.purchases) ? parsed.purchases : [];
+        parsed.expenses = Array.isArray(parsed.expenses) ? parsed.expenses : [];
+        parsed.dealers = Array.isArray(parsed.dealers) ? parsed.dealers : [];
+        parsed.dealerPayments = Array.isArray(parsed.dealerPayments) ? parsed.dealerPayments : [];
+        parsed.agentAdvances = Array.isArray(parsed.agentAdvances) ? parsed.agentAdvances : [];
 
         // Ensure stock has showroom showcase catalog so customer showroom is always full & ready
-        if (!parsed.stock || !Array.isArray(parsed.stock) || parsed.stock.length === 0) {
+        if (parsed.stock.length === 0) {
           parsed.stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
             ...p,
             id: `stk-show-${idx + 1}`,
             updatedAt: new Date().toISOString(),
           }));
-          this.saveData(parsed);
+          this.saveData(parsed, false);
         }
 
         // Sanitize legacy dummy phone number (9822000000) from stored transactions so they are not grouped together
@@ -150,12 +132,34 @@ export class StorageService {
     }
 
     // Default initialization with crisp clean store (zero dummy products / customers)
-    this.cachedData = { ...initialStoreData, isDemoWiped: true };
-    this.saveData(this.cachedData);
+    this.cachedData = {
+      ...initialStoreData,
+      customers: [],
+      transactions: [],
+      cardMembers: [],
+      cardTransactions: [],
+      billReceipts: [],
+      purchases: [],
+      expenses: [],
+      dealers: [],
+      dealerPayments: [],
+      agentAdvances: [],
+      stock: SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
+        ...p,
+        id: `stk-show-${idx + 1}`,
+        updatedAt: new Date().toISOString(),
+      })),
+      isDemoWiped: true,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.cachedData));
+    } catch {}
+    // DO NOT push empty data to server on initial boot of fresh device/tab!
+    // Instead, let initRealtimeSync / pullFromServer fetch existing data from server.
     return this.cachedData;
   }
 
-  public static saveData(data: StoreData, pushToServer: boolean = true): void {
+  public static saveData(data: StoreData, pushToServer: boolean = true, isExplicitReset: boolean = false): void {
     data.updatedAt = new Date().toISOString();
     this.cachedData = data;
     try {
@@ -182,14 +186,14 @@ export class StorageService {
 
     // 2. Real-time Push to Central Server for multi-device sync (Mobile agent <-> Counter desktop)
     if (pushToServer && typeof window !== 'undefined') {
-      this.pushToServer(data);
+      this.pushToServer(data, isExplicitReset);
     }
   }
 
   /**
    * Pushes store data to central server endpoint
    */
-  public static async pushToServer(data: StoreData): Promise<boolean> {
+  public static async pushToServer(data: StoreData, isExplicitReset: boolean = false): Promise<boolean> {
     try {
       const res = await fetch('/api/sync', {
         method: 'POST',
@@ -199,11 +203,23 @@ export class StorageService {
         body: JSON.stringify({
           data,
           sourceDeviceId: this.getDeviceId(),
+          isExplicitReset,
         }),
       });
       if (res.ok) {
+        const json = await res.json();
         this.isConnected = true;
         this.lastSyncTimestamp = new Date().toISOString();
+        if (json.conflict && json.data) {
+          // Server had records and protected them against empty overwrite. Adopt server data!
+          this.cachedData = json.data;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(json.data));
+          } catch {}
+          this.syncListeners.forEach((fn) => {
+            try { fn(json.data); } catch {}
+          });
+        }
         return true;
       }
     } catch {
@@ -225,8 +241,20 @@ export class StorageService {
           this.lastSyncTimestamp = new Date().toISOString();
           const serverData: StoreData = json.data;
 
-          // Merge if server data is newer or has records
           const current = this.loadData();
+          
+          const serverCount = (serverData.customers?.length || 0) +
+                              (serverData.cardMembers?.length || 0) +
+                              (serverData.transactions?.length || 0) +
+                              (serverData.cardTransactions?.length || 0) +
+                              (serverData.billReceipts?.length || 0);
+
+          const localCount = (current.customers?.length || 0) +
+                             (current.cardMembers?.length || 0) +
+                             (current.transactions?.length || 0) +
+                             (current.cardTransactions?.length || 0) +
+                             (current.billReceipts?.length || 0);
+
           const serverTime = new Date(serverData.updatedAt || 0).getTime();
           const localTime = new Date(current.updatedAt || 0).getTime();
 
@@ -241,12 +269,19 @@ export class StorageService {
             }));
           }
 
-          if (serverTime >= localTime || (serverData.cardTransactions?.length || 0) > (current.cardTransactions?.length || 0)) {
+          // Case 1: Fresh mobile device (localCount === 0 while server has records) -> ALWAYS adopt server data
+          // Case 2: Server has more records than local -> adopt server data
+          // Case 3: Server timestamp is newer and server is not empty -> adopt server data
+          if ((serverCount > 0 && localCount === 0) || serverCount > localCount || (serverTime >= localTime && serverCount > 0)) {
             this.cachedData = serverData;
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
             } catch {}
             return serverData;
+          } else if (localCount > serverCount && localCount > 0) {
+            // Local device (PC) has imported data that is newer or larger than server! Push to server immediately
+            await this.pushToServer(current);
+            return current;
           }
         }
       }
@@ -429,7 +464,7 @@ export class StorageService {
       transactions: [...cleanDemoTransactions],
       cardMembers: [...cleanDemoCards],
       billReceipts: [...cleanDemoBillReceipts],
-      isDemoWiped: false,
+      isDemoWiped: true,
     };
     this.cachedData = demoData;
     this.saveData(demoData);
@@ -467,7 +502,7 @@ export class StorageService {
       isDemoWiped: true,
     };
     this.cachedData = cleanData;
-    this.saveData(cleanData);
+    this.saveData(cleanData, true, true);
     return cleanData;
   }
 

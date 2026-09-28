@@ -289,12 +289,12 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
             <span className="text-[11px] hidden lg:inline font-mono">सिंक चालू</span>
           </div>
 
-          {/* Field Agent Mobile Terminal */}
+          {/* Field Agent Mobile Terminal (Only on tablet/desktop since mobile has it in bottom nav) */}
           {onOpenMobileAgentTerminal && (
             <button
               type="button"
               onClick={() => handleAction(onOpenMobileAgentTerminal)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs shrink-0 whitespace-nowrap ${
+              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs shrink-0 whitespace-nowrap ${
                 isDayMode
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700'
                   : 'bg-emerald-600/90 hover:bg-emerald-500 text-white border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
@@ -302,8 +302,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
               title="मोबाईल एजंट हप्ता वसुली व दैनिक विक्री हिशोब टर्मिनल"
             >
               <Smartphone className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
-              <span className="hidden sm:inline">एजंट टर्मिनल</span>
-              <span className="sm:hidden">एजंट</span>
+              <span>एजंट टर्मिनल</span>
             </button>
           )}
 
@@ -312,7 +311,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
             <button
               type="button"
               onClick={() => handleAction(onOpenQuickHisabModal)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+              className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer shrink-0 whitespace-nowrap ${
                 isDayMode
                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
                   : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-500/30'
@@ -320,7 +319,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
               title="झटपट काऊंटर हिशोब"
             >
               <Calculator className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden md:inline">हिशोब</span>
+              <span>हिशोब</span>
             </button>
           )}
 
@@ -329,7 +328,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
             <button
               type="button"
               onClick={() => handleAction(onOpenSeoModal)}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+              className={`hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer shrink-0 whitespace-nowrap ${
                 isDayMode
                   ? 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200'
                   : 'bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border-blue-500/30'
@@ -337,16 +336,16 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
               title="Google SEO, पत्ता, नंबर आणि रँकिंग माहिती"
             >
               <Search className="w-3.5 h-3.5 text-blue-500" />
-              <span className="hidden lg:inline">Google SEO</span>
+              <span>Google SEO</span>
             </button>
           )}
 
-          {/* Return to Dashboard */}
+          {/* Return to Dashboard (On desktop/tablet when outside dashboard) */}
           {currentTab !== 'dashboard' && (
             <button
               type="button"
               onClick={() => onNavigate('dashboard')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer border ${
+              className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer border shrink-0 whitespace-nowrap ${
                 isDayMode
                   ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -354,7 +353,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
               title="डॅशबोर्डवर परत जा"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">डॅशबोर्ड</span>
+              <span>डॅशबोर्ड</span>
             </button>
           )}
         </div>

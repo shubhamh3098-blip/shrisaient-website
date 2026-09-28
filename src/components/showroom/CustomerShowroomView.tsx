@@ -53,6 +53,7 @@ import {
   Copy,
   ExternalLink,
   Navigation,
+  BookOpen,
 } from 'lucide-react';
 import { StoreData, StockItem, CardMember, AdminUser } from '../../types';
 import { StorageService } from '../../services/storageService';
@@ -62,6 +63,7 @@ import { FinanceEmiModal } from '../common/FinanceEmiModal';
 import { getGenuineProductImage } from '../../utils/productImages';
 import { SecureErpLoginModal } from '../auth/SecureErpLoginModal';
 import { MobileAgentFieldTerminal } from '../agent/MobileAgentFieldTerminal';
+import { CardPassbookPrintModal } from '../scheme/CardPassbookPrintModal';
 import { getActiveLandingConfig } from '../../utils/defaultLandingConfig';
 
 interface CustomerShowroomViewProps {
@@ -115,6 +117,8 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
   const [passbookCardQuery, setPassbookCardQuery] = useState('');
   const [searchedMember, setSearchedMember] = useState<CardMember | null>(null);
   const [passbookError, setPassbookError] = useState('');
+  const [isCardPassbookModalOpen, setIsCardPassbookModalOpen] = useState(false);
+  const [selectedPassbookMember, setSelectedPassbookMember] = useState<CardMember | null>(null);
 
   // Quick View Product Detail Modal
   const [quickViewProduct, setQuickViewProduct] = useState<StockItem | null>(null);
@@ -495,7 +499,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               {landingConfig.announcement?.enabled ? (
                 <>
                   <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase shrink-0 shadow-xs">
-                    {landingConfig.announcement.badge || 'ऑफर'}
+                    {landingConfig.announcement.badge || 'OFFER'}
                   </span>
                   <span className="truncate text-white font-medium text-xs">
                     {landingConfig.announcement.text}
@@ -508,7 +512,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 </>
               ) : (
                 <span className="text-slate-300 font-medium text-xs truncate">
-                  🚩 <strong className="text-amber-400">श्री साई इंटरप्रायजेस, वर्धा</strong> • ३०-महिने योजना व सणवार विशेष ऑफर्स
+                  🚩 <strong className="text-amber-400">Shri Sai Enterprises, Wardha</strong> • 30-Month Savings Scheme & Festive Special Offers
                 </span>
               )}
             </div>
@@ -518,7 +522,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <a
                 href={`tel:${landingConfig.contactInfo.helpline1 || '8766486915'}`}
                 className="hidden sm:flex items-center gap-1 text-slate-300 hover:text-white transition"
-                title="कॉल करा"
+                title="Call Showroom"
               >
                 <Phone className="w-3 h-3 text-amber-400" />
                 <span className="font-mono">{landingConfig.contactInfo.helpline1 || '8766486915'}</span>
@@ -531,7 +535,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-bold text-xs transition"
-                title="WhatsApp द्वारे थेट संपर्क करा"
+                title="Connect Directly via WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
                 <span>WhatsApp</span>
@@ -1101,18 +1105,18 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                       HOT DEALS
                     </span>
                     <h2 className="text-base sm:text-xl font-black text-white tracking-tight">
-                      आजच्या भव्य ऑफर्स व फेस्टिव्हल सवलती
+                      Today's Mega Offers & Festive Discounts
                     </h2>
                   </div>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    मर्यादित कालावधीच्या खास सवलती • WhatsApp वर एका क्लिकमध्ये ऑफर क्लेम करा
+                    Limited Period Special Discounts • Claim Your Offer in One Click via WhatsApp
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <span className="text-xs text-amber-400 font-bold">
-                  {landingConfig.offers.filter(o => o.active).length} सक्रिय ऑफर्स उपलब्ध
+                  {landingConfig.offers.filter(o => o.active).length} Active Offers Available
                 </span>
               </div>
             </div>
@@ -1173,14 +1177,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
                     <a
                       href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
-                        offer.whatsappMessage || `नमस्कार, मला "${offer.title}" या ऑफरबद्दल माहिती हवी आहे.`
+                        offer.whatsappMessage || `Hello, I would like to inquire about the "${offer.title}" offer.`
                       )}`}
                       target="_blank"
                       rel="noreferrer"
                       className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
                     >
                       <MessageCircle className="w-3.5 h-3.5" />
-                      <span>ऑफर मिळवा (WhatsApp)</span>
+                      <span>Claim Offer (WhatsApp)</span>
                     </a>
                   </div>
                 </div>
@@ -1202,14 +1206,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500 text-black">
-                    अधिकृत पत्ता (Official Address)
+                    Official Showroom Address
                   </span>
                   <span className="text-xs text-emerald-400 font-bold">
-                    {landingConfig.contactInfo.timings || 'दुकान चालू आहे (Open Daily 9:30 AM – 9:30 PM)'}
+                    {landingConfig.contactInfo.timings || 'Open Daily 9:30 AM – 9:30 PM (All 7 Days)'}
                   </span>
                 </div>
                 <h3 className="text-base sm:text-lg font-black text-white mt-1">
-                  {landingConfig.contactInfo.addressHindi || 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१'}
+                  {landingConfig.contactInfo.addressHindi || 'Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001'}
                 </h3>
                 <p className="text-xs text-slate-300">
                   {landingConfig.contactInfo.landmark ? `${landingConfig.contactInfo.landmark}, Wardha (Maharashtra)` : 'Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha 442001 (Maharashtra)'}
@@ -1253,7 +1257,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   className="px-3.5 py-2 rounded-xl bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black text-xs transition flex items-center gap-1.5 shadow active:scale-95 cursor-pointer"
                 >
                   <Navigation className="w-3.5 h-3.5" />
-                  <span>गुगल मॅप दिशा</span>
+                  <span>Google Maps Directions</span>
                 </a>
 
                 <a
@@ -1390,10 +1394,10 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             </div>
             <div className="space-y-2 max-w-md mx-auto">
               <h3 className="text-lg font-bold text-white">
-                शोरूम नवीन स्टॉकसाठी सज्ज आहे (Showroom Ready)
+                Showroom Ready for New Stock
               </h3>
               <p className="text-xs text-slate-400">
-                सर्व डमी / डेमो उत्पादने डिलीट झाली आहेत. तुमच्या दुकानातील खरी उत्पादने जोडण्यासाठी खालील बटनावर क्लिक करून ERP पोर्टल उघडा.
+                Ready for your genuine store products. Click below to login to the ERP portal and add your products or import from Excel.
               </p>
             </div>
             <div className="pt-2">
@@ -1402,7 +1406,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 onClick={() => setIsAdminPinModalOpen(true)}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-lg transition cursor-pointer"
               >
-                🔐 ERP पोर्टल लॉगिन (+ नवीन माल जोडा)
+                🔐 ERP Portal Login (+ Add New Products)
               </button>
             </div>
           </div>
@@ -1641,28 +1645,27 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <div className="max-w-3xl space-y-4">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black tracking-wide uppercase shadow-sm">
                   <Gift className="w-4 h-4 text-amber-400" />
-                  <span>{landingConfig.schemeBanner?.badge || "३०-महिने साप्ताहिक बचत व मासिक लकी ड्रॉ योजना • WARDHA'S #1 SAVINGS SCHEME"}</span>
+                  <span>{landingConfig.schemeBanner?.badge || "30-MONTH SAVINGS & MONTHLY LUCKY DRAW SCHEME • WARDHA'S #1 SAVINGS SCHEME"}</span>
                 </div>
 
-                {/* Exact Marathi Highlight requested by User */}
                 <h2 className="text-2xl sm:text-4xl lg:text-4xl font-black text-white leading-tight">
-                  "{landingConfig.schemeBanner?.title || 'वर्ध्यात सर्वात सोप्या हप्त्यांवर आणि ३० महिन्यांच्या बचत योजनेवर फर्निचर व इलेक्ट्रॉनिक्स खरेदी करा!'}"
+                  "{landingConfig.schemeBanner?.title || 'Buy Premium Furniture & Electronics on Wardha’s #1 30-Month Weekly Savings Scheme!'}"
                 </h2>
 
                 <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-medium">
-                  {landingConfig.schemeBanner?.subtitle || 'दर आठवड्याला फक्त ₹१०० किंवा ₹२०० बचत करा! दरमहा पारदर्शक लकी सोडत — जर तुमचा नंबर ड्रॉ मध्ये लागला, तर सर्व पुढील हप्ते १००% मोफत आणि वस्तू लगेच घरी! ३० महिन्यांनी ड्रॉ न लागल्यास पूर्ण जमा रकमेचे फर्निचर किंवा इलेक्ट्रॉनिक्स हमखास उपलब्ध. कोणताही तोटा नाही!'}
+                  {landingConfig.schemeBanner?.subtitle || 'Save just ₹100 or ₹200 weekly! Enjoy transparent monthly lucky draws — if your card number is picked, you win your selected appliance or furniture immediately with zero remaining installments! After 30 months, all participants receive their full savings plus bonus guarantee. Zero risk!'}
                 </p>
 
                 {/* Key Features Badges */}
                 <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.weeklyBadge1 || 'हप्ता फक्त ₹१०० किंवा ₹२०० / आठवडा'}
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.weeklyBadge1 || 'Weekly Installment: Just ₹100 or ₹200 / Week'}
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {landingConfig.schemeBanner?.weeklyBadge2 || 'दरमहा लकी ड्रॉ बंपर बक्षीस'}
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {landingConfig.schemeBanner?.weeklyBadge2 || 'Monthly Lucky Draw Bumper Gifts'}
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.highlightNote || '१००% सुरक्षित खरेदी हमी'}
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.highlightNote || '100% Safe & Guaranteed Delivery'}
                   </span>
                 </div>
               </div>
@@ -1670,10 +1673,10 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               {/* Quick Action Box */}
               <div className="w-full lg:w-80 shrink-0 space-y-3 p-5 rounded-2xl bg-black/60 border border-amber-500/40 backdrop-blur-md shadow-xl text-center">
                 <span className="text-[11px] font-black uppercase text-amber-400 tracking-wider block">
-                  लकी ड्रॉ पासबुक व नवीन नोंदणी
+                  Digital Passbook & New Registration
                 </span>
                 <p className="text-xs text-slate-300">
-                  तुमच्या कार्डचे हप्ते ऑनलाइन तपासा किंवा घरबसल्या WhatsApp वर नवीन कार्ड उघडा.
+                  Check your card installments online or open a new savings card on WhatsApp instantly.
                 </p>
 
                 <button
@@ -1684,17 +1687,17 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   className="w-full py-3 px-4 bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black rounded-xl text-xs transition cursor-pointer shadow-lg hover:shadow-[#ffd814]/25 flex items-center justify-center gap-2 active:scale-95"
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>योजना पासबुक शोधा (Check Passbook)</span>
+                  <span>Check Scheme Passbook</span>
                 </button>
 
                 <a
                   href="https://wa.me/918600122978?text=Hello%20Shri%20Sai%20Enterprises,%20I%20want%20to%20enroll%20in%20the%2030-Month%20Savings%20Scheme%20in%20Wardha."
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2.5 px-4 bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer border border-emerald-400/40 active:scale-95"
+                  className="w-full py.2.5 px-4 bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer border border-emerald-400/40 active:scale-95"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp वर नाव नोंदवा</span>
+                  <span>Enroll via WhatsApp</span>
                 </a>
               </div>
             </div>
@@ -1902,16 +1905,16 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
                 <Tv className="w-3.5 h-3.5" />
-                <span>Electronics in Wardha • स्थानिक इलेक्ट्रॉनिक्स महासेल</span>
+                <span>Electronics in Wardha • Mega Showroom Expo</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 Electronics in Wardha
               </h2>
               <p className="text-sm font-bold text-amber-400">
-                "वर्ध्यात ब्रँडेड इलेक्ट्रॉनिक्सवर विशेष सवलत"
+                "Special Discounts on Branded Home Electronics in Wardha"
               </p>
               <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                स्मार्ट 4K UHD टीव्ही (LED TV), ड्युअल इन्व्हर्टर फ्रिज (Refrigerators), ५-स्टार वॉशिंग मशीन, कुलर आणि स्प्लिट एसी. अधिकृत शोरूम जीएसटी बिल, ब्रँड वॉरंटी, मोफत होम डिलिव्हरी व ०% डाऊनपेमेंट सुलभ हप्ते.
+                Smart 4K UHD LED TVs, Dual Inverter Refrigerators, 5-Star Washing Machines, Desert Coolers, and Split ACs. Authorized GST Invoice, Brand Warranty, Free Home Delivery & 0% Downpayment Easy EMI.
               </p>
             </div>
 
@@ -1923,7 +1926,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               }}
               className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
             >
-              <span>सर्व इलेक्ट्रॉनिक्स पहा (View All)</span>
+              <span>View All Electronics</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -1947,19 +1950,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  32" ते 65" UHD
+                  32" to 65" UHD
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  स्मार्ट 4K UHD टीव्ही (Smart LED TVs)
+                  Smart 4K UHD LED TVs
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Samsung, LG, Sony आणि Mi Smart TVs. व्हॉइस रिमोट, नेटफ्लिक्स व युट्यूब सपोर्टसह.
+                  Samsung, LG, Sony and Mi Smart TVs. Voice Remote, Netflix, Prime & YouTube support.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">हप्ता: ₹१०० - ₹२०० / wk</span>
-                  <span className="text-blue-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">EMI: ₹100 - ₹200 / wk</span>
+                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -1981,19 +1984,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  इन्व्हर्टर फ्रिज
+                  Inverter Fridge
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  फ्रिज (Inverter Refrigerators)
+                  Inverter Refrigerators
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  LG, Whirlpool आणि Godrej सिंगल व डबल डोअर. १० वर्षे कॉम्प्रेसर वॉरंटी व वीज बचत.
+                  LG, Whirlpool and Godrej single & double door. 10-Year compressor warranty & energy saving.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹१४,९९० पासून</span>
-                  <span className="text-blue-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹14,990</span>
+                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2015,19 +2018,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  ५-स्टार वॉशिंग मशीन
+                  5-Star Washing Machine
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  वॉशिंग मशीन (Washing Machines)
+                  Fully Automatic Washing Machines
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Whirlpool व Samsung सेमी व फुल्ली ऑटोमॅटिक. हेवी मोटर व क्विक ड्रायर.
+                  Whirlpool & Samsung semi and fully automatic. Heavy-duty motor and quick dryer.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹११,९९० पासून</span>
-                  <span className="text-blue-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹11,990</span>
+                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2049,19 +2052,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  कुलर आणि एसी
+                  Coolers & AC
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  कुलर आणि एसी (Coolers & Split AC)
+                  Air Coolers & Inverter Split AC
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Voltas इन्व्हर्टर स्प्लिट एसी आणि हेवी ड्युटी डेझर्ट कुलर्स. वीज बचत व तीव्र थंडावा.
+                  Voltas Inverter Split ACs and heavy-duty desert air coolers with high air throw.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹६,४९० पासून</span>
-                  <span className="text-blue-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹6,490</span>
+                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2080,16 +2083,16 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
                 <Sofa className="w-3.5 h-3.5" />
-                <span>Furniture in Wardha • अस्सल चंद्रपूर सागवान व स्टील फर्निचर</span>
+                <span>Furniture in Wardha • Pure Chandrapur Teakwood & Steel Furniture</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 Furniture in Wardha
               </h2>
               <p className="text-sm font-bold text-amber-400">
-                "वर्ध्यात सर्वोत्तम गुणवत्तेचे फर्निचर थेट कारखान्याच्या भावात"
+                "Top Quality Furniture at Direct Factory Wholesale Rates in Wardha"
               </p>
               <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                लाकडी व मॉड्युलर सोफा सेट, डबल बेड, स्टोरेज दिवाण, वॉर्डरोब (कपाट), डायनिंग टेबल आणि ऑफिस चेअर्स. थेट फॅक्टरी होलसेल दर, आयुष्यभराची लाकूड हमी आणि ५ वर्षे शोरूम वॉरंटी.
+                Solid wood & modular sofa sets, double beds, hydraulic storage diwans, heavy wardrobes, dining tables and ergonomic chairs. Direct factory pricing, lifetime wood durability guarantee, and 5-year showroom warranty.
               </p>
             </div>
 
@@ -2101,7 +2104,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               }}
               className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
             >
-              <span>सर्व फर्निचर पहा (View All)</span>
+              <span>View All Furniture</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -2125,19 +2128,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  अस्सल सागवान
+                  Pure Teakwood
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  सागवान सोफा सेट (Teakwood Sofas)
+                  Teakwood Sofas (3+1+1)
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  ३+१+१ रॉयल डिझायनर सागवान सोफा. चंद्रपूर अस्सल लाकूड, कुशन व ५ वर्षे वॉरंटी.
+                  3+1+1 Royal Designer Teak Sofa. Genuine Chandrapur wood, high-density foam cushions & 5-year warranty.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">थेट फॅक्टरी भाव</span>
-                  <span className="text-amber-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Direct Factory Rate</span>
+                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2145,6 +2148,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             <div
               onClick={() => {
                 setSelectedCategory('Diwan');
+                setSearchQuery('Diwan');
                 const el = document.getElementById('products-catalog-section');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
@@ -2158,19 +2162,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  स्टोरेज बॉक्स दिवाण
+                  Storage Diwan
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  स्टोरेज दिवाण व कॉट (Box Diwans & Beds)
+                  Storage Box Diwans & Beds
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  ४x६ आणि ५x६ हेवी स्टोरेज बॉक्स दिवाण व शीशम कॉट. हायड्रोलिक लिफ्ट व मजबूत प्लाय.
+                  4x6 and 5x6 Heavy Storage Box Diwan and Sheesham Cot. Smooth hydraulic lift & heavy commercial ply.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹८,९९० पासून</span>
-                  <span className="text-amber-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹8,990</span>
+                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2192,19 +2196,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  टाटा स्टील कपाट
+                  Heavy Steel Almirah
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  वॉर्डरोब व स्टील कपाट (Almirahs)
+                  Steel Wardrobes & Almirahs
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  हेवी गेज स्टील कपाट व ३-डोअर डिझायनर वॉर्डरोब. सुरक्षित तिजोरी लॉकर व आरसा.
+                  Heavy-gauge steel almirah and 3-door designer wardrobe. High-security locker box and dressing mirror.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹९,४९० पासून</span>
-                  <span className="text-amber-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹9,490</span>
+                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2226,19 +2230,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  डायनिंग व चेअर्स
+                  Dining & Chairs
                 </span>
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  डायनिंग टेबल व ऑफिस चेअर्स (Dining & Chairs)
+                  Dining Tables & Office Chairs
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  ४ व ६ सीटर सागवान डायनिंग टेबल आणि अर्गोनॉमिक ऑफिस रिव्हॉल्व्हिंग चेअर्स.
+                  4 & 6-Seater solid teakwood dining tables and ergonomic high-back revolving office chairs.
                 </p>
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">किंमत: ₹५,९९० पासून</span>
-                  <span className="text-amber-400 text-[11px] font-bold">एक्सप्लोर करा →</span>
+                  <span className="text-[#febd69] font-bold">Starting from ₹5,990</span>
+                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
                 </div>
               </div>
             </div>
@@ -2264,21 +2268,21 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <BadgeCheck className="w-3.5 h-3.5" /> अधिकृत शोरूम (Verified Showroom)
+                    <BadgeCheck className="w-3.5 h-3.5" /> Verified Showroom
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    वर्धा मुख्य शाखा
+                    Wardha Main Branch
                   </span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">
-                  श्री साई इंटरप्रायजेस • इलेक्ट्रॉनिक्स व फर्निचर शोरूम, वर्धा
+                  Shree Sai Enterprises • Electronics & Furniture Showroom, Wardha
                 </h3>
                 <p className="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-amber-400 font-bold">१००% अस्सल चंद्रपूर सागवान लाकूड</span>
+                  <span className="text-amber-400 font-bold">100% Genuine Teakwood</span>
                   <span>•</span>
-                  <span>ब्रँडेड स्मार्ट टीव्ही, कुलर व उपकरणे</span>
+                  <span>Branded Smart TVs & Appliances</span>
                   <span>•</span>
-                  <span className="text-emerald-400 font-bold">दररोज सकाळी ९:३० ते रात्री ९:३०</span>
+                  <span className="text-emerald-400 font-bold">Open Daily 9:30 AM to 9:30 PM</span>
                 </p>
               </div>
             </div>
@@ -2294,8 +2298,8 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 </div>
               </div>
               <div className="text-[11px] text-slate-300 border-l border-slate-700 pl-3">
-                <span className="font-bold block text-white">३५०+ ग्राहकांचे उत्तम रिव्ह्यूज</span>
-                <span className="text-emerald-400 font-semibold">वर्ध्यात सर्वाधिक विश्वासू</span>
+                <span className="font-bold block text-white">350+ Verified Reviews</span>
+                <span className="text-emerald-400 font-semibold">#1 Most Trusted in Wardha</span>
               </div>
             </div>
           </div>
@@ -2317,25 +2321,25 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <div className="relative z-10 p-4 flex items-center justify-between">
                 <span className="px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white text-xs font-bold flex items-center gap-1.5">
                   <Store className="w-3.5 h-3.5 text-amber-400" />
-                  <span>प्रत्यक्ष शोरूमला भेट द्या (Visit Our Showroom)</span>
+                  <span>Visit Our Showroom in Wardha</span>
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-600/90 text-white text-[11px] font-black uppercase shadow">
-                  दुकान चालू आहे • OPEN
+                  OPEN TODAY
                 </span>
               </div>
 
               {/* Bottom Info Overlay */}
               <div className="relative z-10 p-5 space-y-2.5">
                 <h4 className="text-lg sm:text-xl font-black text-white drop-shadow">
-                  श्री साई इंटरप्रायजेस • भव्य इलेक्ट्रॉनिक्स व फर्निचर शोरूम
+                  Shree Sai Enterprises • Grand Electronics & Furniture Showroom
                 </h4>
                 <p className="text-xs text-slate-200 drop-shadow max-w-xl leading-relaxed">
-                  दोन मजली भव्य शोरूम — तळमजल्यावर सॅमसंग व एलजी स्मार्ट टीव्ही, फ्रिज, वॉशिंग मशीन आणि पहिल्या मजल्यावर चंद्रपूर अस्सल सागवान सोफा, स्टोरेज दिवाण व कपाट प्रदर्शन.
+                  Two-storey grand showroom: Ground floor features Samsung & LG 4K Smart TVs, Refrigerators & Washing Machines. First floor showcases genuine Chandrapur Teakwood Sofas, Storage Box Diwans and Heavy Steel Almirahs.
                 </p>
 
                 <div className="text-xs text-amber-300 font-medium flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                  <span>मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१</span>
+                  <span>Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001</span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-2 text-xs">
@@ -2346,7 +2350,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="px-4 py-2 rounded-xl bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black transition flex items-center gap-1.5 shadow-lg active:scale-95 cursor-pointer"
                   >
                     <Navigation className="w-3.5 h-3.5" />
-                    <span>गुगल मॅप्सवर दिशा पहा (Directions)</span>
+                    <span>Get Google Maps Directions</span>
                   </a>
 
                   <a
@@ -2354,11 +2358,11 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold backdrop-blur-md border border-white/30 transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
                   >
                     <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>कॉल करा: 8600122978</span>
+                    <span>Call: 8600122978</span>
                   </a>
 
                   <a
-                    href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent('नमस्कार, मला शोरूमला भेट द्यायची आहे / चौकशी करायची आहे.')}`}
+                    href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent('Hello Shri Sai Enterprises, I want to visit the showroom / inquire about products.')}`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
@@ -2376,40 +2380,40 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <span className="font-black text-sm text-white flex items-center gap-1.5">
                     <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span>समाधानी ग्राहकांचे अनुभव (Customer Reviews)</span>
+                    <span>Verified Customer Reviews</span>
                   </span>
-                  <span className="text-[11px] font-bold text-amber-400">१००% खात्रीशीर</span>
+                  <span className="text-[11px] font-bold text-amber-400">100% Genuine</span>
                 </div>
 
                 {/* 3 Real Customer Testimonials */}
                 <div className="space-y-2.5 mt-3">
                   <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">अमोल देशमुख (वर्धा)</span>
+                      <span className="font-bold text-xs text-white">Amol Deshmukh (Wardha)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "३०-महिन्यांच्या योजनेत दर आठवड्याला फक्त ₹१०० भरून दिवाळीला अस्सल सागवान सोफा मिळाला. लाकूड व फिनिशिंग १ नंबर आहे!"
+                      "Enrolled in the 30-month savings scheme paying just ₹100 weekly. Won a genuine teakwood sofa in the Diwali lucky draw. The wood quality and finishing are truly top class!"
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">प्रदीप ठाकरे (आर्वी)</span>
+                      <span className="font-bold text-xs text-white">Pradeep Thakare (Arvi)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "सॅमसंग ५५-इंच स्मार्ट टीव्ही नागपूरपेक्षा कमी भावात वर्ध्यात मिळाला. मोफत होम डिलिव्हरी व इन्स्टॉलेशन लगेच झाले."
+                      "Got Samsung 55-inch 4K Smart TV at a price cheaper than Nagpur wholesale dealers. Free home delivery and installation were completed on the same day."
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-white">सौ. सुनीता वानखेडे (सेवाग्राम)</span>
+                      <span className="font-bold text-xs text-white">Sunita Wankhede (Sewagram)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "स्टोरेज बॉक्स दिवाण आणि स्टील कपाट अतिशय हेवी व मजबूत आहे. दुकानातील सर्व स्टाफचे बोलणे व मार्गदर्शन खूप आदरातिथ्यपूर्ण आहे."
+                      "The hydraulic storage diwan and heavy steel cupboard are exceptionally solid and well built. The showroom team was very polite and helpful."
                     </p>
                   </div>
                 </div>
@@ -2420,9 +2424,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#1a2536] border border-slate-700/60">
                   <Clock className="w-4 h-4 text-[#febd69] shrink-0" />
                   <div>
-                    <span className="font-bold text-white block">वेळ (Opening Hours):</span>
+                    <span className="font-bold text-white block">Showroom Timings:</span>
                     <span className="text-slate-300 text-[11px]">
-                      सोमवार ते रविवार: सकाळी ९:३० ते रात्री ९:३० (आठवड्याचे सातही दिवस खुले)
+                      Monday to Sunday: 9:30 AM to 9:30 PM (Open all 7 days)
                     </span>
                   </div>
                 </div>
@@ -2455,6 +2459,117 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
       )}
 
       {/* ========================================================================================= */}
+      {/* 11.5 WARDHA LOCAL RANKING & FAQ SECTION (MAXIMUM GOOGLE LOCAL SEO RELEVANCE)              */}
+      {/* ========================================================================================= */}
+      <section id="wardha-faq" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-6 w-full scroll-mt-20">
+        <div className="rounded-3xl bg-gradient-to-br from-[#0e1626] via-[#121c30] to-[#0a101d] border border-[#23354f] p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-[#1e2f47]">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Wardha’s #1 Store • Best Rates, Quality &amp; Budget Guarantee</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Best Electronics, Home Appliances &amp; Furniture in Wardha
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Looking for the best electronics, branded home appliances, or durable teakwood furniture at genuine wholesale rates in Wardha? Shri Sai Enterprises offers unmatched quality, wholesale direct pricing, budget-friendly installment options, and prompt delivery across Wardha district.
+              </p>
+            </div>
+            
+            <a
+              href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent('Hello Shri Sai Enterprises, I want to inquire about best rates on electronics and furniture in Wardha.')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Inquire Best Rates</span>
+            </a>
+          </div>
+
+          {/* 3 Core Value Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Award className="w-4 h-4" />
+                <span>Guaranteed Best Rates &amp; Budget</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Factory-direct wholesale pricing with zero middlemen margin. Compare our rates on Sony, LG, Samsung Smart TVs, and seasoned Teakwood furniture across Wardha &amp; Nagpur.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <ShieldCheck className="w-4 h-4" />
+                <span>100% Genuine Brand Bill &amp; Warranty</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Every television, refrigerator, cooler, and washing machine includes official brand GST invoice, manufacturer warranty, and authorized local technician support.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                <Truck className="w-4 h-4" />
+                <span>Free Wardha District Delivery</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Fast doorstep delivery and free wall-mount / unboxing installation in Wardha, Sevagram, Deoli, Arvi, Hinganghat, Seloo, Pulgaon, and surrounding towns.
+              </p>
+            </div>
+          </div>
+
+          {/* Frequently Asked Questions */}
+          <div className="pt-2 space-y-3">
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <span>Frequently Asked Questions (Wardha Local Guide)</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+                <h4 className="font-bold text-slate-100">
+                  Q: Which is the best showroom for electronics and furniture in Wardha?
+                </h4>
+                <p className="text-slate-300 leading-relaxed">
+                  A: Shri Sai Enterprises (Opp. Matoshree Sabhagruh, Arvi Road, Wardha) is rated 4.9/5 by 500+ local customers for offering genuine branded electronics, pure Chandrapur teakwood furniture, and flexible 30-Month Weekly Savings Scheme.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+                <h4 className="font-bold text-slate-100">
+                  Q: Can I buy good quality furniture on a low monthly/weekly budget?
+                </h4>
+                <p className="text-slate-300 leading-relaxed">
+                  A: Yes! You can join our 30-Month Weekly Savings Scheme starting at just ₹100 or ₹200/week, or choose 0% downpayment finance through TVS &amp; Bajaj Finance right at our counter.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+                <h4 className="font-bold text-slate-100">
+                  Q: What are the showroom timings and contact numbers?
+                </h4>
+                <p className="text-slate-300 leading-relaxed">
+                  A: We are open all 7 days from 9:30 AM to 9:30 PM. Call our helpline at 8600122978 / 9175537365 / 8766486915 or visit us opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+                <h4 className="font-bold text-slate-100">
+                  Q: How does the 30-Month Savings Scheme lucky draw work?
+                </h4>
+                <p className="text-slate-300 leading-relaxed">
+                  A: A transparent monthly draw is conducted. If your card number is picked, you immediately win your appliance or furniture gift and all future weekly installments are 100% waived off!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================================= */}
       {/* 12. RICH FOOTER WITH LOCAL WARDHA SEO KEYWORDS & COPYRIGHT                                */}
       {/* ========================================================================================= */}
       <footer className="bg-[#0b1019] text-white border-t border-[#1e2a3b] mt-8">
@@ -2471,13 +2586,13 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                वर्ध्यातील सर्वात विश्वासू व आघाडीचे फर्निचर आणि इलेक्ट्रॉनिक्स खरेदी केंद्र. ३० महिन्यांची साप्ताहिक बचत योजना व मासिक भाग्यशाली सोडत.
+                Wardha's most trusted showroom for furniture and electronics. Featuring our signature 30-Month Weekly Savings Scheme and transparent monthly lucky draws.
               </p>
               <div className="pt-1 text-xs text-slate-300 space-y-1">
-                <p>📍 मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१</p>
+                <p>📍 Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001</p>
                 <p className="text-[11px] text-slate-400 font-mono">(Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony)</p>
-                <p className="text-amber-300 font-medium">📞 संपर्क: {landingConfig.contactInfo.helpline1 || '8766486915'} / {landingConfig.contactInfo.helpline2 || '8600122978'} / {landingConfig.contactInfo.helpline3 || '9175537365'}</p>
-                <p>🌐 वेबसाइट: https://shrisaient.in</p>
+                <p className="text-amber-300 font-medium">📞 Helpline: {landingConfig.contactInfo.helpline1 || '8766486915'} / {landingConfig.contactInfo.helpline2 || '8600122978'} / {landingConfig.contactInfo.helpline3 || '9175537365'}</p>
+                <p>🌐 Website: https://shrisaient.in</p>
               </div>
             </div>
 
@@ -2488,7 +2603,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               </h5>
               <ul className="space-y-1.5 text-slate-300">
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Electronics')}>
-                  • Smart 4K UHD LED TV (32" ते 65")
+                  • Smart 4K UHD LED TVs (32" to 65")
                 </li>
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Appliances')}>
                   • Inverter Double Door Refrigerators (LG, Whirlpool)
@@ -2510,18 +2625,18 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               </h5>
               <ul className="space-y-1.5 text-slate-300">
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Furniture')}>
-                  • चंद्रपूर अस्सल सागवान सोफा सेट (3+1+1)
+                  • Royal Pure Teakwood Sofa Set (3+1+1)
                 </li>
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Diwan')}>
-                  • हेवी स्टोरेज बॉक्स दिवाण (4x6 व 5x6)
+                  • Heavy Storage Box Diwan (4x6 & 5x6)
                 </li>
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Diwan')}>
-                  • शीशम लाकडी किंग व क्वीन कॉट
+                  • Sheesham Wooden King & Queen Cots
                 </li>
                 <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Furniture')}>
-                  • हेवी गेज स्टील कपाट व वॉर्डरोब
+                  • Heavy-Gauge Steel Wardrobes & Almirahs
                 </li>
-                <li className="text-slate-400">• थेट फॅक्टरी होलसेल दर व ५ वर्षे वॉरंटी</li>
+                <li className="text-slate-400">• Direct Factory Wholesale Rates & 5-Yr Warranty</li>
               </ul>
             </div>
 
@@ -2531,7 +2646,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 30-Month Savings Scheme
               </h5>
               <p className="text-slate-400 leading-relaxed">
-                दर आठवड्याला ₹१००/₹२०० बचत करून लकी ड्रॉ जिंका किंवा ३० महिन्यांनी पूर्ण हमीचे सामान घरी न्या.
+                Save just ₹100 or ₹200 every week to win monthly lucky draws or take home 100% guaranteed furniture and appliances after 30 months.
               </p>
               <div className="pt-2 flex flex-col gap-2">
                 <button
@@ -2541,14 +2656,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   }}
                   className="w-full py-2 rounded-lg bg-[#232f3e] hover:bg-[#2e3e52] text-amber-300 font-bold border border-slate-700 transition cursor-pointer text-center"
                 >
-                  पासबुक तपासा (Check Passbook)
+                  Check Digital Passbook
                 </button>
                 <button
                   onClick={() => setIsAdminPinModalOpen(true)}
                   className="w-full py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold border border-amber-500/30 transition cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  <span>ERP पोर्टल (Staff & Admin)</span>
+                  <span>ERP Portal (Staff & Admin)</span>
                 </button>
                 <button
                   onClick={() => {
@@ -2558,7 +2673,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   className="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition cursor-pointer text-center flex items-center justify-center gap-1.5 text-[11px]"
                 >
                   <Smartphone className="w-3 h-3 text-emerald-500" />
-                  <span>फील्ड एजंट टर्मिनल (Field Agent)</span>
+                  <span>Field Agent Terminal</span>
                 </button>
               </div>
             </div>
@@ -2569,7 +2684,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             <p>© {new Date().getFullYear()} Shri Sai Enterprises, Wardha. All rights reserved.</p>
             <div className="flex flex-wrap items-center gap-3">
               <p className="flex items-center gap-1">
-                <span>अधिकृत वेबसाइट:</span>
+                <span>Official Website:</span>
                 <a href="https://shrisaient.in" className="text-amber-400 font-bold hover:underline">
                   https://shrisaient.in
                 </a>
@@ -2889,12 +3004,41 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    {/* Open Full Official 30-Month Passbook Card & 1-Page Print */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPassbookMember(searchedMember);
+                          setIsCardPassbookModalOpen(true);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <BookOpen className="w-4 h-4 text-slate-950" />
+                        <span>📜 Open Full 30-Month Passbook Card & Print 1-Page</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
         </div>
+      )}
+
+      {/* 10.1 FULL 30-MONTH PASSBOOK CARD & 1-PAGE PRINT MODAL */}
+      {isCardPassbookModalOpen && selectedPassbookMember && (
+        <CardPassbookPrintModal
+          member={selectedPassbookMember}
+          transactions={storeData.cardTransactions}
+          settings={storeData.settings}
+          isOpen={isCardPassbookModalOpen}
+          onClose={() => {
+            setIsCardPassbookModalOpen(false);
+            setSelectedPassbookMember(null);
+          }}
+        />
       )}
 
       {/* 11. SECURE ADMIN ERP LOGIN, SIGN UP & ADMIN APPROVALS MODAL */}
