@@ -15,13 +15,17 @@ import {
   User,
   MapPin,
   FileText,
-  CalendarCheck
+  CalendarCheck,
+  Camera,
+  Image
 } from 'lucide-react';
 import { CardMember, CardTransaction, StoreData } from '../../types';
 import { StorageService } from '../../services/storageService';
 import { NotificationService } from '../../services/notificationService';
 import { useTheme } from '../../context/ThemeContext';
 import { extractCardNumber, resolveCardScheme } from '../../utils/schemeUtils';
+import { getLivePassbookUrl, getWhatsAppGroupDisplay } from '../../utils/passbookUtils';
+import { shareThermalReceiptOnWhatsApp } from '../../services/receiptImageService';
 
 interface WeeklyCardCollectionModalProps {
   isOpen: boolean;
@@ -312,6 +316,7 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
         hour12: true
       });
       const waGroupUrl = storeData.settings.whatsappGroupLink || 'https://chat.whatsapp.com/invite/shrisaienterprises';
+      const groupDisplay = getWhatsAppGroupDisplay(storeData.settings);
       const upiUrl = `upi://pay?pa=8766486915@ybl&pn=Shri%20Sai%20Enterprises&am=${todayPaid}&cu=INR`;
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(upiUrl)}`;
       const waQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(waGroupUrl)}`;
@@ -386,11 +391,11 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
           <div class="row"><span>वसुली प्रतिनिधी:</span><span class="row-val">${tx.collectedBy}</span></div>
           <div class="divider"></div>
           <div class="bold" style="font-size: ${is80 ? '10.5px' : '9px'};">🎁 लकी ड्रॉ, बंपर योजना व ऑफर्ससाठी ग्रुपला जॉईन व्हा:</div>
-          <div style="font-size: ${is80 ? '9.5px' : '8px'}; word-break: break-all; margin: 2px 0;">${waGroupUrl}</div>
+          <div style="font-size: ${is80 ? '9.5px' : '8px'}; word-break: break-all; margin: 2px 0;">${groupDisplay.url}</div>
           <div class="qr-box">
             <img src="${qrApiUrl}" alt="Payment / WhatsApp QR" />
           </div>
-          <div style="font-size: ${is80 ? '9px' : '8px'};">Scan QR for UPI / WhatsApp Group • UPI: 8766486915@ybl</div>
+          <div style="font-size: ${is80 ? '9px' : '8px'};">Scan QR for Live Digital Passbook • UPI: 8766486915@ybl</div>
           <div class="divider-double"></div>
           <div class="footer">
             श्री साई एंटरप्रायझेसवर विश्वास ठेवल्याबद्दल मनःपूर्वक धन्यवाद! 🙏<br/>
@@ -416,7 +421,22 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
     handlePrintThermalReceipt(tx, '80mm');
   };
 
-  // Exact Marathi WhatsApp Collection Slip Template Matching Specifications
+  // Direct 80mm / 58mm Thermal Receipt Photo Sharing on WhatsApp
+  const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
+  const handleShareThermalPhoto = async (tx: CardTransaction, format: '80mm' | '58mm' = '80mm') => {
+    setIsGeneratingPhoto(true);
+    try {
+      const res = await shareThermalReceiptOnWhatsApp(tx, currentMember, storeData.settings, format);
+      NotificationService.success(res.message);
+    } catch (e: any) {
+      console.error('Failed to share receipt image:', e);
+      NotificationService.error('पावती फोटो तयार करताना त्रुटी आली.');
+    } finally {
+      setIsGeneratingPhoto(false);
+    }
+  };
+
+  // Exact Marathi WhatsApp Collection Slip Template with 100% Working Links
   const handleWhatsAppShare = (tx: CardTransaction) => {
     const phoneToUse = editPhone.trim() || currentMember.phone;
     if (!phoneToUse || phoneToUse === '0') {
@@ -441,8 +461,8 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
       hour12: true
     });
 
-    const passbookUrl = `https://shrisaient.in/passbook?card=${cardNum}`;
-    const waGroupUrl = storeData.settings.whatsappGroupLink || `https://chat.whatsapp.com/invite/shrisaienterprises`;
+    const passbookUrl = getLivePassbookUrl(cardNum);
+    const groupDisplay = getWhatsAppGroupDisplay(storeData.settings);
 
     const templateText =
 `*श्री साई एंटरप्रायझेस, वर्धा*
@@ -465,7 +485,7 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
 ✅ *हिशोब पडताळणी: ₹${totalSavings} + ₹${remainingBalance} = ₹${targetVal} (१००% अचूक)*
 ------------------------------------
 🎁 *लकी ड्रॉ, बंपर बक्षीस व स्पेशल ऑफर्ससाठी आमच्या अधिकृत व्हॉट्सॲप ग्रुपला जॉईन व्हा:*
-👉 *ग्रुप लिंक:* ${waGroupUrl}
+${groupDisplay.displayText}
 🌐 *लाईव्ह पासबुक पाहण्यासाठी:* ${passbookUrl}
 ------------------------------------
 👨‍💼 *वसुली प्रतिनिधी:* ${tx.collectedBy}
@@ -933,8 +953,8 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
                 </span>
               </div>
 
-              {/* 2. Instant Thermal Print & WhatsApp Share Buttons (Right at bottom where thumb is!) */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* 2. Instant Thermal Print & Direct WhatsApp Photo/Slip Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => handlePrintThermalReceipt(collectionSuccess, '80mm')}
@@ -957,12 +977,27 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
 
                 <button
                   type="button"
+                  disabled={isGeneratingPhoto}
+                  onClick={() => handleShareThermalPhoto(collectionSuccess, '80mm')}
+                  className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+                  title="Share 80mm/58mm graphical thermal receipt slip photo directly on WhatsApp"
+                >
+                  {isGeneratingPhoto ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                  )}
+                  <span>📸 पावती फोटो WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleWhatsAppShare(collectionSuccess)}
                   className="py-2.5 px-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
-                  title="Send Marathi WhatsApp Receipt"
+                  title="Send Marathi WhatsApp Receipt Text"
                 >
                   <Share2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>WhatsApp</span>
+                  <span>WhatsApp स्लिप</span>
                 </button>
               </div>
 

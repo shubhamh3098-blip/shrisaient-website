@@ -48,6 +48,7 @@ import {
   getCardBalanceDue,
   SchemeConfig
 } from '../../utils/schemeUtils';
+import { getLivePassbookUrl, getWhatsAppGroupDisplay } from '../../utils/passbookUtils';
 
 interface SchemeManagerViewProps {
   storeData: StoreData;
@@ -333,8 +334,8 @@ export const SchemeManagerView: React.FC<SchemeManagerViewProps> = ({
     const cardNum = extractCardNumber(member.cardNo) || member.cardNo;
     const sNo = resolveCardScheme(member);
     const conf = getSchemeConfig(sNo);
-    const passbookUrl = `https://shrisaient.in/passbook?card=${cardNum}`;
-    const waGroupUrl = `https://chat.whatsapp.com/invite/shrisaienterprises`;
+    const passbookUrl = getLivePassbookUrl(cardNum);
+    const groupDisplay = getWhatsAppGroupDisplay(storeData.settings);
 
     const welcomeMsg =
 `*श्री साई इंटरप्राइजेस, वर्धा - आपले सहर्ष स्वागत!*
@@ -350,7 +351,7 @@ ${passbookUrl}
 (येथे आपण जमा केलेले सर्व हप्ते, पावत्या आणि लकी ड्रॉ निकाल कधीही पाहू शकता)
 ------------------------------------
 👥 *श्री साई इंटरप्राइजेस अधिकृत ग्राहक व्हॉट्सॲप ग्रुप:*
-${waGroupUrl}
+${groupDisplay.displayText}
 (नवीन योजना, सणांच्या ऑफर्स आणि लकी ड्रॉ निकालासाठी लगेच ग्रुप जॉईन करा)
 ====================================
 🙏 श्री साई इंटरप्राइजेस परिवारात सामील झाल्याबद्दल आपले मनःपूर्वक आभार!
@@ -2266,7 +2267,7 @@ ${waGroupUrl}
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">लाईव्ह पासबुक:</span>
-                  <span className="text-emerald-500 font-mono text-[11px] truncate">shrisaient.in/passbook?card={extractCardNumber(welcomeMember.cardNo)}</span>
+                  <span className="text-emerald-500 font-mono text-[11px] truncate">{getLivePassbookUrl(welcomeMember.cardNo)}</span>
                 </div>
               </div>
 

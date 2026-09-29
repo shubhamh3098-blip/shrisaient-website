@@ -25,13 +25,16 @@ import {
   Check,
   User,
   Building2,
-  Calculator
+  Calculator,
+  Camera
 } from 'lucide-react';
 import { CardMember, CardTransaction, Customer, StoreData, StockItem } from '../../types';
 import { StorageService } from '../../services/storageService';
 import { NotificationService } from '../../services/notificationService';
 import { useTheme } from '../../context/ThemeContext';
 import { getCardFinancialSummary } from '../../utils/schemeUtils';
+import { getLivePassbookUrl, getWhatsAppGroupDisplay } from '../../utils/passbookUtils';
+import { shareThermalReceiptOnWhatsApp } from '../../services/receiptImageService';
 
 interface MobileAgentFieldTerminalProps {
   storeData: StoreData;
@@ -347,9 +350,9 @@ export const MobileAgentFieldTerminal: React.FC<MobileAgentFieldTerminalProps> =
     const totalSavings = fin.totalPaid;
     const targetVal = fin.schemeTarget;
     const exactBalance = Math.max(0, targetVal - totalSavings);
-    const waGroupUrl = storeData.settings.whatsappGroupLink || 'https://chat.whatsapp.com/invite/shrisaienterprises';
     const cardCleanNum = member.cardNo.replace(/\D/g, '') || member.cardNo;
-    const passbookUrl = `https://shrisaient.in/passbook?card=${cardCleanNum}`;
+    const passbookUrl = getLivePassbookUrl(cardCleanNum);
+    const groupDisplay = getWhatsAppGroupDisplay(storeData.settings);
 
     let msg = `🚩 *श्री साई एंटरप्रायजेस, वर्धा* 🚩\n`;
     msg += `*(इलेक्ट्रॉनिक्स व फर्निचर शोरूम • ३०-महिने बचत योजना)*\n`;
@@ -371,7 +374,7 @@ export const MobileAgentFieldTerminal: React.FC<MobileAgentFieldTerminalProps> =
     msg += `✅ *हिशोब पडताळणी: ₹${totalSavings} + ₹${exactBalance} = ₹${targetVal} (१००% अचूक)*\n`;
     msg += `------------------------------------\n`;
     msg += `🎁 *लकी ड्रॉ, बंपर बक्षीस व स्पेशल ऑफर्ससाठी आमच्या अधिकृत व्हॉट्सॲप ग्रुपला जॉईन व्हा:*\n`;
-    msg += `👉 *ग्रुप लिंक:* ${waGroupUrl}\n`;
+    msg += `${groupDisplay.displayText}\n`;
     msg += `🌐 *लाईव्ह पासबुक पाहण्यासाठी:* ${passbookUrl}\n`;
     msg += `------------------------------------\n`;
     msg += `👨‍💼 *वसुली प्रतिनिधी:* ${tx.collectedBy || currentAgent}\n`;
@@ -383,6 +386,21 @@ export const MobileAgentFieldTerminal: React.FC<MobileAgentFieldTerminalProps> =
     const phoneParam = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const url = `https://wa.me/${phoneParam}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
+  };
+
+  // Direct 80mm Graphical Thermal Receipt Photo Sharing on WhatsApp
+  const [isSharingPhoto, setIsSharingPhoto] = useState(false);
+  const handleShareThermalPhoto = async (tx: CardTransaction, member: CardMember, format: '80mm' | '58mm' = '80mm') => {
+    setIsSharingPhoto(true);
+    try {
+      const res = await shareThermalReceiptOnWhatsApp(tx, member, storeData.settings, format);
+      NotificationService.success(res.message);
+    } catch (e: any) {
+      console.error('Failed to share receipt image:', e);
+      NotificationService.error('पावती फोटो तयार करताना त्रुटी आली.');
+    } finally {
+      setIsSharingPhoto(false);
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -737,18 +755,31 @@ export const MobileAgentFieldTerminal: React.FC<MobileAgentFieldTerminalProps> =
                 <div className="pt-1 flex flex-wrap gap-2">
                   <button
                     onClick={() => handleSendWhatsAppReceipt(lastCollectedTx.tx, lastCollectedTx.member)}
-                    className="flex-1 min-w-[140px] py-2 px-3 rounded-xl bg-white text-emerald-900 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    className="flex-1 min-w-[130px] py-2 px-2.5 rounded-xl bg-white text-emerald-900 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
                   >
-                    <MessageCircle className="w-4 h-4 text-emerald-600" />
-                    <span>WhatsApp पावती पाठवा</span>
+                    <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>WhatsApp स्लिप</span>
+                  </button>
+                  <button
+                    onClick={() => handleShareThermalPhoto(lastCollectedTx.tx, lastCollectedTx.member, '80mm')}
+                    disabled={isSharingPhoto}
+                    className="py-2 px-2.5 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-800 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    title="80mm थर्मल पावती फोटो थेट WhatsApp वर पाठवा"
+                  >
+                    {isSharingPhoto ? (
+                      <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-amber-300 shrink-0" />
+                    )}
+                    <span>📸 पावती फोटो WhatsApp</span>
                   </button>
                   <button
                     onClick={() => handlePrint80mmThermalReceipt(lastCollectedTx.tx, lastCollectedTx.member)}
-                    className="py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    className="py-2 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
                     title="80mm Thermal Receipt (80 थर्मल प्रिंट)"
                   >
-                    <Printer className="w-4 h-4" />
-                    <span>80mm थर्मल प्रिंट</span>
+                    <Printer className="w-4 h-4 shrink-0" />
+                    <span>80mm प्रिंट</span>
                   </button>
                 </div>
               </div>

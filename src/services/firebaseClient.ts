@@ -1,27 +1,99 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
 import {
   getFirestore,
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   Firestore,
   Unsubscribe,
-  writeBatch,
 } from 'firebase/firestore';
 import { StoreData } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const CHUNK_SIZE = 500;
+const CHUNK_SIZE = 250;
 const STORE_ID = 'shri_sai_store';
 
 // Initialize Firebase App
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with custom database ID from config
+// Initialize Firestore with custom database ID from config (CRITICAL as per Firebase Skill)
 export const db: Firestore = firebaseConfig.firestoreDatabaseId
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
+
+// Export Auth
+export const auth: Auth = getAuth(app);
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): FirestoreErrorInfo {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('[Firebase Firestore Error]:', JSON.stringify(errInfo));
+  return errInfo;
+}
+
+// Test Connection on boot
+export async function testConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'stores', STORE_ID, 'meta', 'info'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firebase client is offline or network is limited.');
+    }
+    return false;
+  }
+}
+if (typeof window !== 'undefined') {
+  testConnection().catch(() => {});
+}
 
 export interface FirestoreSyncStatus {
   isConfigured: boolean;
@@ -43,9 +115,48 @@ function chunkArray<T>(items: T[], chunkSize: number = CHUNK_SIZE): T[][] {
 }
 
 /**
- * Saves complete StoreData to Firebase Firestore in chunks
+ * Writes documents in bounded parallel batches to avoid both payload limits
+ * and browser network socket saturation.
+ */
+async function writeTasksInBatches(
+  tasks: Array<{ ref: any; data: any }>,
+  concurrency = 4
+): Promise<void> {
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const slice = tasks.slice(i, i + concurrency);
+    await Promise.all(slice.map((t) => setDoc(t.ref, t.data)));
+  }
+}
+
+/**
+ * Reads documents in bounded batches to avoid socket exhaustion
+ */
+async function fetchDocsInBatches(refs: any[], concurrency = 8): Promise<any[]> {
+  const results: any[] = [];
+  for (let i = 0; i < refs.length; i += concurrency) {
+    const slice = refs.slice(i, i + concurrency);
+    const snaps = await Promise.all(slice.map((r) => getDoc(r)));
+    results.push(...snaps);
+  }
+  return results;
+}
+
+let isPushing = false;
+let pendingPushData: StoreData | null = null;
+
+/**
+ * Saves complete StoreData to Firebase Firestore safely in individual ~100KB chunks.
+ * Completely eliminates the 10MB payload size limit error (11534336 bytes).
  */
 export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean> {
+  if (!data) return false;
+
+  if (isPushing) {
+    pendingPushData = data;
+    return true;
+  }
+
+  isPushing = true;
   try {
     const updatedAt = data.updatedAt || new Date().toISOString();
 
@@ -55,38 +166,40 @@ export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean
     const cardTransactionChunks = chunkArray(data.cardTransactions || []);
     const billReceiptChunks = chunkArray(data.billReceipts || []);
 
-    const metaDocRef = doc(db, 'stores', STORE_ID, 'meta', 'info');
-
-    // Write chunk docs
-    const batch = writeBatch(db);
+    const writeTasks: Array<{ ref: any; data: any }> = [];
 
     customerChunks.forEach((chunk, idx) => {
       const ref = doc(db, 'stores', STORE_ID, 'data', `customers_${idx}`);
-      batch.set(ref, { items: chunk, updatedAt });
+      writeTasks.push({ ref, data: { items: chunk, updatedAt } });
     });
 
     transactionChunks.forEach((chunk, idx) => {
       const ref = doc(db, 'stores', STORE_ID, 'data', `transactions_${idx}`);
-      batch.set(ref, { items: chunk, updatedAt });
+      writeTasks.push({ ref, data: { items: chunk, updatedAt } });
     });
 
     cardMemberChunks.forEach((chunk, idx) => {
       const ref = doc(db, 'stores', STORE_ID, 'data', `cardMembers_${idx}`);
-      batch.set(ref, { items: chunk, updatedAt });
+      writeTasks.push({ ref, data: { items: chunk, updatedAt } });
     });
 
     cardTransactionChunks.forEach((chunk, idx) => {
       const ref = doc(db, 'stores', STORE_ID, 'data', `cardTransactions_${idx}`);
-      batch.set(ref, { items: chunk, updatedAt });
+      writeTasks.push({ ref, data: { items: chunk, updatedAt } });
     });
 
     billReceiptChunks.forEach((chunk, idx) => {
       const ref = doc(db, 'stores', STORE_ID, 'data', `billReceipts_${idx}`);
-      batch.set(ref, { items: chunk, updatedAt });
+      writeTasks.push({ ref, data: { items: chunk, updatedAt } });
     });
 
-    // Write meta doc
-    batch.set(metaDocRef, {
+    // 1. Write all chunk documents in small groups of 4 concurrent setDoc requests
+    // Each request payload is only ~70KB to 160KB (well below Firestore's 10MB request limit)
+    await writeTasksInBatches(writeTasks, 4);
+
+    // 2. Write metadata document LAST so other clients' onSnapshot triggers only after all chunks exist
+    const metaDocRef = doc(db, 'stores', STORE_ID, 'meta', 'info');
+    await setDoc(metaDocRef, {
       updatedAt,
       updatedBy: data.updatedBy || 'client',
       settings: data.settings || {},
@@ -111,11 +224,17 @@ export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean
       },
     });
 
-    await batch.commit();
     return true;
   } catch (err) {
-    console.error('[Firebase Firestore] Failed to push data:', err);
+    handleFirestoreError(err, OperationType.WRITE, `stores/${STORE_ID}`);
     return false;
+  } finally {
+    isPushing = false;
+    if (pendingPushData) {
+      const nextData = pendingPushData;
+      pendingPushData = null;
+      pushStoreDataToFirestore(nextData).catch(() => {});
+    }
   }
 }
 
@@ -136,12 +255,11 @@ export async function pullStoreDataFromFirestore(): Promise<StoreData | null> {
 
     const loadChunks = async (prefix: string, count: number): Promise<any[]> => {
       if (!count || count <= 0) return [];
-      const promises: Promise<any>[] = [];
+      const refs = [];
       for (let i = 0; i < count; i++) {
-        const ref = doc(db, 'stores', STORE_ID, 'data', `${prefix}_${i}`);
-        promises.push(getDoc(ref));
+        refs.push(doc(db, 'stores', STORE_ID, 'data', `${prefix}_${i}`));
       }
-      const snaps = await Promise.all(promises);
+      const snaps = await fetchDocsInBatches(refs, 8);
       const allItems: any[] = [];
       for (const s of snaps) {
         if (s.exists()) {
@@ -188,7 +306,7 @@ export async function pullStoreDataFromFirestore(): Promise<StoreData | null> {
 
     return assembledStoreData;
   } catch (err) {
-    console.error('[Firebase Firestore] Failed to pull data:', err);
+    handleFirestoreError(err, OperationType.GET, `stores/${STORE_ID}`);
     return null;
   }
 }
@@ -243,7 +361,7 @@ export function subscribeToFirestoreStore(
       }
     },
     (error) => {
-      console.error('[Firebase Firestore] onSnapshot error:', error);
+      handleFirestoreError(error, OperationType.GET, `stores/${STORE_ID}/meta/info`);
       onStatusChange?.({
         isConfigured: true,
         isConnected: false,

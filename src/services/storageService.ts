@@ -281,49 +281,144 @@ export class StorageService {
       const serverData: StoreData = cloudData;
 
       const current = this.loadData();
-      
-      const serverCount = (serverData.customers?.length || 0) +
-                          (serverData.cardMembers?.length || 0) +
-                          (serverData.transactions?.length || 0) +
-                          (serverData.cardTransactions?.length || 0) +
-                          (serverData.billReceipts?.length || 0);
 
-      const localCount = (current.customers?.length || 0) +
-                         (current.cardMembers?.length || 0) +
-                         (current.transactions?.length || 0) +
-                         (current.cardTransactions?.length || 0) +
-                         (current.billReceipts?.length || 0);
+      // Non-destructive smart merge so local schemes/cards are NEVER wiped out by an older or empty cloud snapshot
+      const { merged, hasLocalChanges } = StorageService.mergeStoreData(current, serverData);
+      this.cachedData = merged;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      } catch {}
 
-      const serverTime = new Date(serverData.updatedAt || 0).getTime();
-      const localTime = new Date(current.updatedAt || 0).getTime();
-
-      // Preserve stock catalog if server had empty stock
-      if ((!serverData.stock || serverData.stock.length === 0) && current.stock && current.stock.length > 0) {
-        serverData.stock = current.stock;
-      } else if (!serverData.stock || serverData.stock.length === 0) {
-        serverData.stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
-          ...p,
-          id: `stk-show-${idx + 1}`,
-          updatedAt: new Date().toISOString(),
-        }));
+      // If local had schemes/customers that cloud was missing, push merged state to cloud immediately
+      if (hasLocalChanges) {
+        this.pushToServer(merged).catch(() => {});
       }
 
-      // Case 1: Fresh mobile device (localCount === 0 while server has records) -> ALWAYS adopt server data
-      // Case 2: Server has more records than local -> adopt server data
-      // Case 3: Server timestamp is newer and server is not empty -> adopt server data
-      if ((serverCount > 0 && localCount === 0) || serverCount > localCount || (serverTime >= localTime && serverCount > 0)) {
-        this.cachedData = serverData;
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
-        } catch {}
-        return serverData;
-      } else if (localCount > serverCount && localCount > 0) {
-        // Local device (PC) has imported data that is newer or larger than server! Push to cloud immediately
-        await this.pushToServer(current);
-        return current;
-      }
+      return merged;
     }
     return null;
+  }
+
+  /**
+   * Smart non-destructive two-way merger:
+   * Combines local & cloud data by unique ID and keys so freshly added schemes, members,
+   * installments, or customers can NEVER be accidentally erased on refresh.
+   */
+  public static mergeStoreData(
+    local: StoreData,
+    remote: StoreData
+  ): { merged: StoreData; hasLocalChanges: boolean } {
+    if (!remote) return { merged: local, hasLocalChanges: false };
+    if (!local) return { merged: remote, hasLocalChanges: true };
+
+    // 1. Merge Card Members by ID / Card Number
+    const cardMembersMap = new Map<string, CardMember>();
+    (remote.cardMembers || []).forEach((m) => {
+      const key = (m.id || m.cardNo).trim().toLowerCase();
+      cardMembersMap.set(key, m);
+    });
+
+    let hasLocalChanges = false;
+
+    (local.cardMembers || []).forEach((m) => {
+      const key = (m.id || m.cardNo).trim().toLowerCase();
+      const existing = cardMembersMap.get(key);
+      if (!existing) {
+        cardMembersMap.set(key, m);
+        hasLocalChanges = true;
+      } else {
+        // Keep whichever version has more paid months or newer payment
+        const localMonths = m.totalPaidMonths || 0;
+        const remoteMonths = existing.totalPaidMonths || 0;
+        if (localMonths > remoteMonths || (localMonths === remoteMonths && (m.totalAmountPaid || 0) > (existing.totalAmountPaid || 0))) {
+          cardMembersMap.set(key, { ...existing, ...m });
+          hasLocalChanges = true;
+        }
+      }
+    });
+
+    // 2. Merge Card Transactions by ID or receipt number
+    const cardTxMap = new Map<string, CardTransaction>();
+    (remote.cardTransactions || []).forEach((t) => {
+      const key = (t.id || t.receiptNo).trim().toLowerCase();
+      cardTxMap.set(key, t);
+    });
+
+    (local.cardTransactions || []).forEach((t) => {
+      const key = (t.id || t.receiptNo).trim().toLowerCase();
+      if (!cardTxMap.has(key)) {
+        cardTxMap.set(key, t);
+        hasLocalChanges = true;
+      }
+    });
+
+    // 3. Merge Customers by ID or clean phone
+    const custMap = new Map<string, Customer>();
+    (remote.customers || []).forEach((c) => {
+      custMap.set(c.id, c);
+    });
+
+    (local.customers || []).forEach((c) => {
+      const existing = custMap.get(c.id);
+      if (!existing) {
+        custMap.set(c.id, c);
+        hasLocalChanges = true;
+      } else {
+        if ((c.currentBalance || 0) !== (existing.currentBalance || 0) || (c.totalPurchased || 0) > (existing.totalPurchased || 0)) {
+          custMap.set(c.id, { ...existing, ...c });
+          hasLocalChanges = true;
+        }
+      }
+    });
+
+    // 4. Merge Bill Receipts by ID or receipt number
+    const billMap = new Map<string, BillReceipt>();
+    (remote.billReceipts || []).forEach((b) => {
+      billMap.set(b.id || String(b.receiptNo), b);
+    });
+
+    (local.billReceipts || []).forEach((b) => {
+      const key = b.id || String(b.receiptNo);
+      if (!billMap.has(key)) {
+        billMap.set(key, b);
+        hasLocalChanges = true;
+      }
+    });
+
+    // 5. Merge general transactions
+    const txMap = new Map<string, Transaction>();
+    (remote.transactions || []).forEach((t) => txMap.set(t.id, t));
+    (local.transactions || []).forEach((t) => {
+      if (!txMap.has(t.id)) {
+        txMap.set(t.id, t);
+        hasLocalChanges = true;
+      }
+    });
+
+    // Stock preservation: always keep whichever has stock catalog items
+    let stock = (remote.stock && remote.stock.length > 0) ? remote.stock : local.stock;
+    if (!stock || stock.length === 0) {
+      stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
+        ...p,
+        id: `stk-show-${idx + 1}`,
+        updatedAt: new Date().toISOString(),
+      }));
+    }
+
+    const merged: StoreData = {
+      ...remote,
+      ...local,
+      settings: { ...remote.settings, ...local.settings },
+      stock,
+      cardMembers: Array.from(cardMembersMap.values()),
+      cardTransactions: Array.from(cardTxMap.values()),
+      customers: Array.from(custMap.values()),
+      billReceipts: Array.from(billMap.values()),
+      transactions: Array.from(txMap.values()),
+      updatedAt: new Date().toISOString(),
+    };
+
+    return { merged, hasLocalChanges };
   }
 
   /**
@@ -424,24 +519,10 @@ export class StorageService {
           this.lastSyncTimestamp = new Date().toISOString();
 
           const current = this.loadData();
-          const firestoreCount = (firestoreData.customers?.length || 0) +
-                                 (firestoreData.cardMembers?.length || 0) +
-                                 (firestoreData.transactions?.length || 0) +
-                                 (firestoreData.cardTransactions?.length || 0) +
-                                 (firestoreData.billReceipts?.length || 0);
-
-          const localCount = (current.customers?.length || 0) +
-                             (current.cardMembers?.length || 0) +
-                             (current.transactions?.length || 0) +
-                             (current.cardTransactions?.length || 0) +
-                             (current.billReceipts?.length || 0);
-
-          const firestoreTime = new Date(firestoreData.updatedAt || 0).getTime();
-          const localTime = new Date(current.updatedAt || 0).getTime();
-
-          // Adopt Firestore data if it has records and is newer or local is empty/fresh
-          if (firestoreCount > 0 && (localCount === 0 || firestoreCount > localCount || firestoreTime > localTime)) {
-            notifyListeners(firestoreData);
+          const { merged, hasLocalChanges } = StorageService.mergeStoreData(current, firestoreData);
+          notifyListeners(merged);
+          if (hasLocalChanges) {
+            pushStoreDataToFirestore(merged).catch(() => {});
           }
         },
         (status) => {

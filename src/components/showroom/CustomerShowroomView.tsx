@@ -141,6 +141,34 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Automatic Live Digital Passbook detection from URL parameters (?passbook=1021 or ?card=1021)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const cardParam = params.get('passbook') || params.get('card');
+    if (cardParam) {
+      const q = cardParam.trim().toLowerCase();
+      const cleanNum = q.replace(/\D/g, '');
+      const found = storeData.cardMembers.find(
+        (m) =>
+          m.cardNo.toLowerCase() === q ||
+          m.cardNo.replace(/\D/g, '') === cleanNum ||
+          m.cardNo.toLowerCase().includes(q) ||
+          (cleanNum && m.phone.replace(/[^0-9]/g, '').includes(cleanNum))
+      );
+      if (found) {
+        setOnPageCardQuery(found.cardNo);
+        setOnPageMember(found);
+        setSelectedPassbookMember(found);
+        setIsCardPassbookModalOpen(true);
+      } else {
+        setOnPageCardQuery(cardParam);
+        const el = document.getElementById('passbook-portal-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [storeData.cardMembers]);
+
   const categories = [
     { id: 'All', label: 'All Categories', icon: Store },
     { id: 'Electronics', label: 'Smart 4K TVs', icon: Tv },

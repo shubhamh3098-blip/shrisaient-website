@@ -1,26 +1,49 @@
 {
   "entities": {
-    "StoreData": {
-      "collection": "stores",
-      "fields": {
-        "updatedAt": { "type": "string", "description": "Last updated timestamp" },
-        "updatedBy": { "type": "string", "description": "Device or source name" },
-        "settings": { "type": "object", "description": "Business settings" },
-        "stock": { "type": "array", "description": "Inventory list" },
-        "customers": { "type": "array", "description": "Customer list" },
-        "transactions": { "type": "array", "description": "Invoices and sales" },
-        "purchases": { "type": "array", "description": "Purchases from suppliers" },
-        "dealers": { "type": "array", "description": "Dealers list" },
-        "dealerPayments": { "type": "array", "description": "Dealer payments" },
-        "cardMembers": { "type": "array", "description": "Card scheme members" },
-        "cardTransactions": { "type": "array", "description": "Card deposits and refunds" },
-        "staff": { "type": "array", "description": "Staff members" },
-        "expenses": { "type": "array", "description": "Expenses" },
-        "agentAdvances": { "type": "array", "description": "Agent advance payments and salary deductions" },
-        "billReceipts": { "type": "array", "description": "Against-bill payment receipts numbered from 1079" },
-        "authSessions": { "type": "array", "description": "Recent authenticated login records" },
-        "adminUsers": { "type": "array", "description": "Authorized admin and staff credentials" }
+    "Store": {
+      "title": "Store",
+      "description": "Shri Sai Enterprises ERP centralized store data document including customers, transactions, card members, and settings",
+      "type": "object",
+      "properties": {
+        "customers": {
+          "type": "array",
+          "description": "Registered showroom and scheme customers"
+        },
+        "cardMembers": {
+          "type": "array",
+          "description": "30-month scheme card members"
+        },
+        "transactions": {
+          "type": "array",
+          "description": "Sales and payment transactions"
+        },
+        "cardTransactions": {
+          "type": "array",
+          "description": "Weekly and monthly card installment collections"
+        },
+        "billReceipts": {
+          "type": "array",
+          "description": "Bill receipts collected by counter or field agents"
+        },
+        "inventory": {
+          "type": "array",
+          "description": "Showroom stock and appliances"
+        },
+        "agents": {
+          "type": "array",
+          "description": "Field recovery and collection agents"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
       }
+    }
+  },
+  "firestore": {
+    "/stores/{storeId}": {
+      "schema": "Store",
+      "description": "Centralized real-time cloud data sync document for multi-device cross-platform synchronization"
     }
   }
 }

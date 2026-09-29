@@ -177,6 +177,22 @@ export class NotificationService {
     return newNotif;
   }
 
+  public static success(message: string, title: string = 'यशस्वी'): AppNotification {
+    return this.addNotification({
+      type: 'payment_received',
+      title,
+      message,
+    });
+  }
+
+  public static error(message: string, title: string = 'त्रुटी'): AppNotification {
+    return this.addNotification({
+      type: 'payment_received',
+      title,
+      message,
+    });
+  }
+
   public static markAsRead(id: string): void {
     const list = this.getNotifications();
     const updated = list.map((n) => (n.id === id ? { ...n, isRead: true } : n));
