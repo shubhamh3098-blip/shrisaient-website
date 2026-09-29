@@ -572,6 +572,7 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
 
     // Finance calculations
     const isFin = isFinance;
+    const isInHouseFinance = isFin && financeProvider.includes('इन-हाऊस');
     const downPaymentVal = isFin ? (parseFloat(financeDownPayment) || 0) : paidVal;
     const loanAmountVal = isFin ? Math.max(0, totalVal - downPaymentVal) : Math.max(0, totalVal - paidVal);
     const tenureMonths = financeTenureMonths || 10;
@@ -696,6 +697,10 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
       grandTotal: totalVal,
       paidAmount: isFin ? downPaymentVal : paidVal,
       balanceDue: isFin ? loanAmountVal : Math.max(0, totalVal - paidVal),
+      previousBalance: currentCustBalance,
+      netTotalDue: isFin
+        ? (currentCustBalance + (isInHouseFinance ? loanAmountVal : 0))
+        : Math.max(0, currentCustBalance + totalVal - paidVal),
       deliveryStatus: deliveryStatus,
       status: isFin
         ? (downPaymentVal >= totalVal ? 'Paid' : 'Partial')
@@ -1299,11 +1304,15 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
                   कमाल मर्यादा: ₹{customerCreditLimit.toLocaleString('en-IN')}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[11px] opacity-90">
+              <div className="flex items-center justify-between text-[11px] opacity-90 flex-wrap gap-2">
                 <span>सध्याची जुनी उधारी: <b>₹{currentCustBalance.toLocaleString('en-IN')}</b></span>
-                {newBillRemaining > 0 && (
-                  <span>नवीन बिलासह एकूण: <b className={isCreditLimitExceeded ? 'text-rose-400 font-black' : ''}>₹{projectedTotalDue.toLocaleString('en-IN')}</b></span>
+                <span>नवीन बिल: <b>₹{(parseFloat(totalAmount) || 0).toLocaleString('en-IN')}</b></span>
+                {(parseFloat(payingNow) || 0) > 0 && (
+                  <span className="text-emerald-300">घेतलेला हप्ता/जमा: <b>₹{(parseFloat(payingNow) || 0).toLocaleString('en-IN')}</b></span>
                 )}
+                <span>अंतिम एकूण बाकी: <b className={isCreditLimitExceeded ? 'text-rose-400 font-black' : 'text-amber-300 font-bold'}>
+                  ₹{Math.max(0, currentCustBalance + (parseFloat(totalAmount) || 0) - (parseFloat(payingNow) || 0)).toLocaleString('en-IN')}
+                </b></span>
               </div>
 
               {isCreditLimitExceeded && (
@@ -1821,11 +1830,40 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
               />
             </div>
             {totalAmount && (
-              <div className="mt-1 text-[11px] flex justify-between">
-                <span className="text-slate-400">{isFinance ? 'Loan Amount (लोन शिल्लक):' : 'Remaining Balance (बाकी):'}</span>
-                <span className="font-semibold text-amber-500">
-                  ₹{Math.max(0, (parseFloat(totalAmount) || 0) - (parseFloat(payingNow) || 0)).toLocaleString('en-IN')}
-                </span>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">{isFinance ? 'Loan Amount (लोन शिल्लक):' : 'या बिलाची शिल्लक बाकी:'}</span>
+                  <span className="font-semibold text-amber-500">
+                    ₹{Math.max(0, (parseFloat(totalAmount) || 0) - (parseFloat(payingNow) || 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {currentCustBalance > 0 && (
+                  <div className="p-2.5 rounded-xl border bg-slate-900/80 border-slate-800 text-xs space-y-1">
+                    <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center justify-between">
+                      <span>संपूर्ण ताळमेळ (Account Calculation)</span>
+                      <span>सूत्र: (जुनी बाकी + नवीन) - हप्ता = बाकी</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300 text-[11px]">
+                      <span>१. मागील जुनी बाकी (Old Balance):</span>
+                      <span className="font-bold text-amber-300">₹{currentCustBalance.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300 text-[11px]">
+                      <span>२. नवीन बिल खरेदी (New Entry):</span>
+                      <span className="font-bold text-white">+ ₹{(parseFloat(totalAmount) || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-400 text-[11px]">
+                      <span>३. आज घेतलेला हप्ता / जमा (Paid Now / Hafta):</span>
+                      <span className="font-bold">- ₹{(parseFloat(payingNow) || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between font-black text-xs text-amber-400 pt-1 border-t border-slate-700/60">
+                      <span>अंतिम एकूण शिल्लक बाकी (Net Total Due):</span>
+                      <span className="text-sm">
+                        ₹{Math.max(0, currentCustBalance + (parseFloat(totalAmount) || 0) - (parseFloat(payingNow) || 0)).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

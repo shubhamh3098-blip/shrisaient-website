@@ -106,14 +106,28 @@ export const FastReceiptModal: React.FC<FastReceiptModalProps> = ({
           </div>
 
           {currentSelectedCust && (
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
-              <div className="flex justify-between font-semibold">
-                <span className="text-slate-400">शिल्लक उधारी (Due):</span>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5">
+              <div className="flex justify-between font-semibold text-xs">
+                <span className="text-slate-400">मागील जुनी बाकी (Old Balance):</span>
                 <span className="text-amber-400 font-bold">
                   ₹{currentSelectedCust.currentBalance.toLocaleString('en-IN')}
                 </span>
               </div>
-              <div className="flex justify-between text-[11px] text-slate-400">
+              {parseFloat(amount) > 0 && (
+                <>
+                  <div className="flex justify-between text-xs text-emerald-400">
+                    <span>आज जमा होणारा हप्ता (Paying Now):</span>
+                    <span className="font-bold">- ₹{(parseFloat(amount) || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-black pt-1 border-t border-slate-800 text-white">
+                    <span className="text-slate-300">पावतीनंतर उर्वरित बाकी (New Due):</span>
+                    <span className="text-amber-300">
+                      ₹{Math.max(0, currentSelectedCust.currentBalance - (parseFloat(amount) || 0)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between text-[11px] text-slate-500 pt-0.5">
                 <span>पत्ता:</span>
                 <span>{currentSelectedCust.address || currentSelectedCust.city || 'Wardha'}</span>
               </div>

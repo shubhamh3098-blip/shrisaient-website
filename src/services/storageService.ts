@@ -29,6 +29,7 @@ import {
   pushStoreDataToFirestore,
   pullStoreDataFromFirestore,
   subscribeToFirestoreStore,
+  isFirestoreQuotaExceeded,
 } from './firebaseClient';
 
 const STORAGE_KEY = 'shri_sai_enterprises_store_data_v3';
@@ -129,8 +130,20 @@ export class StorageService {
           }
         }
 
-        this.cachedData = parsed;
-        return parsed;
+        // Automatic deduplication: clean up duplicate customers, cards, and receipts
+        const deduped = StorageService.deduplicateStoreData(parsed);
+        if (
+          deduped.customers.length !== parsed.customers.length ||
+          deduped.cardMembers.length !== parsed.cardMembers.length ||
+          deduped.cardTransactions.length !== parsed.cardTransactions.length
+        ) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(deduped));
+          } catch {}
+        }
+
+        this.cachedData = deduped;
+        return deduped;
       }
     } catch (e) {
       console.error('Failed to parse stored store data, loading initial dataset:', e);
@@ -165,10 +178,11 @@ export class StorageService {
   }
 
   public static saveData(data: StoreData, pushToServer: boolean = true, isExplicitReset: boolean = false): void {
-    data.updatedAt = new Date().toISOString();
-    this.cachedData = data;
+    const cleanData = StorageService.deduplicateStoreData(data);
+    cleanData.updatedAt = new Date().toISOString();
+    this.cachedData = cleanData;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
     }
@@ -182,7 +196,7 @@ export class StorageService {
         this.broadcastChannel.postMessage({
           type: 'LOCAL_SYNC_UPDATE',
           deviceId: this.getDeviceId(),
-          data,
+          data: cleanData,
         });
       }
     } catch {
@@ -191,7 +205,7 @@ export class StorageService {
 
     // 2. Real-time Push to Central Server for multi-device sync (Mobile agent <-> Counter desktop)
     if (pushToServer && typeof window !== 'undefined') {
-      this.pushToServer(data, isExplicitReset);
+      this.pushToServer(cleanData, isExplicitReset);
     }
   }
 
@@ -199,15 +213,17 @@ export class StorageService {
    * Pushes store data to central server endpoint and Firebase Firestore
    */
   public static async pushToServer(data: StoreData, isExplicitReset: boolean = false): Promise<boolean> {
-    // 1. Push to Firebase Firestore (ensures multi-device live sync even on GitHub Pages / static hosting)
-    pushStoreDataToFirestore(data).then((ok) => {
-      if (ok) {
-        this.isConnected = true;
-        this.lastSyncTimestamp = new Date().toISOString();
-      }
-    }).catch((err) => {
-      console.warn('[Firebase Firestore] Cloud push warning:', err);
-    });
+    // 1. Push to Firebase Firestore only if cloud quota is not exceeded
+    if (!isFirestoreQuotaExceeded()) {
+      pushStoreDataToFirestore(data).then((ok) => {
+        if (ok) {
+          this.isConnected = true;
+          this.lastSyncTimestamp = new Date().toISOString();
+        }
+      }).catch((err) => {
+        console.warn('[Firebase Firestore] Cloud push warning:', err);
+      });
+    }
 
     // 2. Push to Node server endpoint (if running locally or in Docker)
     try {
@@ -300,103 +316,218 @@ export class StorageService {
   }
 
   /**
+   * Helper to compute unique customer business key (phone if available, or name + village)
+   */
+  public static getCustomerBusinessKey(c: Partial<Customer>): string {
+    const cleanPhone = (c.phone || '').replace(/\D/g, '');
+    const cleanName = (c.name || '').trim().toLowerCase();
+    const cleanVillage = (c.village || c.city || c.address || '').trim().toLowerCase();
+    if (cleanPhone.length >= 10) {
+      return 'p:' + cleanPhone.slice(-10);
+    }
+    return 'nv:' + cleanName + '|' + cleanVillage;
+  }
+
+  /**
+   * Automatic Deduplication:
+   * Prevents double-counting or duplicated customer cards, members, and transactions.
+   * Merges records by true business keys (cardNo, phone/name, receiptNo, invoiceNo).
+   */
+  public static deduplicateStoreData(data: StoreData): StoreData {
+    if (!data) return data;
+
+    // 1. Deduplicate Customers by phone or name+village
+    const custMap = new Map<string, Customer>();
+    (data.customers || []).forEach((c) => {
+      const key = StorageService.getCustomerBusinessKey(c);
+      if (!custMap.has(key)) {
+        custMap.set(key, c);
+      } else {
+        const existing = custMap.get(key)!;
+        const cBal = c.currentBalance || 0;
+        const exBal = existing.currentBalance || 0;
+        const cPurch = c.totalPurchased || c.totalPurchase || 0;
+        const exPurch = existing.totalPurchased || existing.totalPurchase || 0;
+        if (cBal > exBal || (cBal === exBal && cPurch >= exPurch)) {
+          custMap.set(key, { ...existing, ...c });
+        } else {
+          custMap.set(key, { ...c, ...existing });
+        }
+      }
+    });
+
+    // 2. Deduplicate CardMembers by cardNo (business key)
+    const cardMap = new Map<string, CardMember>();
+    (data.cardMembers || []).forEach((m) => {
+      const key = (m.cardNo || m.id).trim().toLowerCase();
+      if (!cardMap.has(key)) {
+        cardMap.set(key, m);
+      } else {
+        const existing = cardMap.get(key)!;
+        const mMonths = m.totalPaidMonths || m.paidMonthsCount || 0;
+        const exMonths = existing.totalPaidMonths || existing.paidMonthsCount || 0;
+        const mPaid = m.totalAmountPaid || m.totalPaid || 0;
+        const exPaid = existing.totalAmountPaid || existing.totalPaid || 0;
+        if (mMonths > exMonths || (mMonths === exMonths && mPaid >= exPaid)) {
+          cardMap.set(key, { ...existing, ...m });
+        } else {
+          cardMap.set(key, { ...m, ...existing });
+        }
+      }
+    });
+
+    // 3. Deduplicate CardTransactions by receiptNo or cardNo+week
+    const ctxMap = new Map<string, CardTransaction>();
+    (data.cardTransactions || []).forEach((t) => {
+      const key = (t.receiptNo || (t.cardNo + '_' + (t.weekNumber || t.monthNumber))).trim().toLowerCase();
+      if (!ctxMap.has(key)) {
+        ctxMap.set(key, t);
+      }
+    });
+
+    // 4. Deduplicate Transactions by invoiceNo
+    const txMap = new Map<string, Transaction>();
+    (data.transactions || []).forEach((t) => {
+      const key = (t.invoiceNo || t.id).trim().toLowerCase();
+      if (!txMap.has(key)) {
+        txMap.set(key, t);
+      }
+    });
+
+    // 5. Deduplicate BillReceipts by receiptNo
+    const billMap = new Map<string, BillReceipt>();
+    (data.billReceipts || []).forEach((b) => {
+      const key = String(b.receiptNo || b.id).trim().toLowerCase();
+      if (!billMap.has(key)) {
+        billMap.set(key, b);
+      }
+    });
+
+    return {
+      ...data,
+      customers: Array.from(custMap.values()),
+      cardMembers: Array.from(cardMap.values()),
+      cardTransactions: Array.from(ctxMap.values()),
+      transactions: Array.from(txMap.values()),
+      billReceipts: Array.from(billMap.values()),
+    };
+  }
+
+  /**
    * Smart non-destructive two-way merger:
-   * Combines local & cloud data by unique ID and keys so freshly added schemes, members,
-   * installments, or customers can NEVER be accidentally erased on refresh.
+   * Combines local & cloud data by business keys so freshly added schemes, members,
+   * installments, or customers can NEVER be accidentally erased on refresh,
+   * and duplicates are automatically unified.
    */
   public static mergeStoreData(
     local: StoreData,
     remote: StoreData
   ): { merged: StoreData; hasLocalChanges: boolean } {
-    if (!remote) return { merged: local, hasLocalChanges: false };
-    if (!local) return { merged: remote, hasLocalChanges: true };
+    if (!remote) return { merged: StorageService.deduplicateStoreData(local), hasLocalChanges: false };
+    if (!local) return { merged: StorageService.deduplicateStoreData(remote), hasLocalChanges: true };
 
-    // 1. Merge Card Members by ID / Card Number
+    const dedupedLocal = StorageService.deduplicateStoreData(local);
+    const dedupedRemote = StorageService.deduplicateStoreData(remote);
+
+    // 1. Merge Card Members by business card number
     const cardMembersMap = new Map<string, CardMember>();
-    (remote.cardMembers || []).forEach((m) => {
-      const key = (m.id || m.cardNo).trim().toLowerCase();
+    (dedupedRemote.cardMembers || []).forEach((m) => {
+      const key = (m.cardNo || m.id).trim().toLowerCase();
       cardMembersMap.set(key, m);
     });
 
     let hasLocalChanges = false;
 
-    (local.cardMembers || []).forEach((m) => {
-      const key = (m.id || m.cardNo).trim().toLowerCase();
+    (dedupedLocal.cardMembers || []).forEach((m) => {
+      const key = (m.cardNo || m.id).trim().toLowerCase();
       const existing = cardMembersMap.get(key);
       if (!existing) {
         cardMembersMap.set(key, m);
         hasLocalChanges = true;
       } else {
         // Keep whichever version has more paid months or newer payment
-        const localMonths = m.totalPaidMonths || 0;
-        const remoteMonths = existing.totalPaidMonths || 0;
-        if (localMonths > remoteMonths || (localMonths === remoteMonths && (m.totalAmountPaid || 0) > (existing.totalAmountPaid || 0))) {
+        const localMonths = m.totalPaidMonths || m.paidMonthsCount || 0;
+        const remoteMonths = existing.totalPaidMonths || existing.paidMonthsCount || 0;
+        const localPaid = m.totalAmountPaid || m.totalPaid || 0;
+        const remotePaid = existing.totalAmountPaid || existing.totalPaid || 0;
+        if (localMonths > remoteMonths || (localMonths === remoteMonths && localPaid > remotePaid)) {
           cardMembersMap.set(key, { ...existing, ...m });
           hasLocalChanges = true;
         }
       }
     });
 
-    // 2. Merge Card Transactions by ID or receipt number
+    // 2. Merge Card Transactions by receipt number or cardNo+week
     const cardTxMap = new Map<string, CardTransaction>();
-    (remote.cardTransactions || []).forEach((t) => {
-      const key = (t.id || t.receiptNo).trim().toLowerCase();
+    (dedupedRemote.cardTransactions || []).forEach((t) => {
+      const key = (t.receiptNo || (t.cardNo + '_' + (t.weekNumber || t.monthNumber))).trim().toLowerCase();
       cardTxMap.set(key, t);
     });
 
-    (local.cardTransactions || []).forEach((t) => {
-      const key = (t.id || t.receiptNo).trim().toLowerCase();
+    (dedupedLocal.cardTransactions || []).forEach((t) => {
+      const key = (t.receiptNo || (t.cardNo + '_' + (t.weekNumber || t.monthNumber))).trim().toLowerCase();
       if (!cardTxMap.has(key)) {
         cardTxMap.set(key, t);
         hasLocalChanges = true;
       }
     });
 
-    // 3. Merge Customers by ID or clean phone
+    // 3. Merge Customers by business key (phone or name+village)
     const custMap = new Map<string, Customer>();
-    (remote.customers || []).forEach((c) => {
-      custMap.set(c.id, c);
+    (dedupedRemote.customers || []).forEach((c) => {
+      const key = StorageService.getCustomerBusinessKey(c);
+      custMap.set(key, c);
     });
 
-    (local.customers || []).forEach((c) => {
-      const existing = custMap.get(c.id);
+    (dedupedLocal.customers || []).forEach((c) => {
+      const key = StorageService.getCustomerBusinessKey(c);
+      const existing = custMap.get(key);
       if (!existing) {
-        custMap.set(c.id, c);
+        custMap.set(key, c);
         hasLocalChanges = true;
       } else {
-        if ((c.currentBalance || 0) !== (existing.currentBalance || 0) || (c.totalPurchased || 0) > (existing.totalPurchased || 0)) {
-          custMap.set(c.id, { ...existing, ...c });
+        const localBal = c.currentBalance || 0;
+        const remoteBal = existing.currentBalance || 0;
+        const localPurch = c.totalPurchased || c.totalPurchase || 0;
+        const remotePurch = existing.totalPurchased || existing.totalPurchase || 0;
+        if (localBal > remoteBal || (localBal === remoteBal && localPurch > remotePurch)) {
+          custMap.set(key, { ...existing, ...c });
           hasLocalChanges = true;
         }
       }
     });
 
-    // 4. Merge Bill Receipts by ID or receipt number
+    // 4. Merge Bill Receipts by receipt number
     const billMap = new Map<string, BillReceipt>();
-    (remote.billReceipts || []).forEach((b) => {
-      billMap.set(b.id || String(b.receiptNo), b);
+    (dedupedRemote.billReceipts || []).forEach((b) => {
+      const key = String(b.receiptNo || b.id).trim().toLowerCase();
+      billMap.set(key, b);
     });
 
-    (local.billReceipts || []).forEach((b) => {
-      const key = b.id || String(b.receiptNo);
+    (dedupedLocal.billReceipts || []).forEach((b) => {
+      const key = String(b.receiptNo || b.id).trim().toLowerCase();
       if (!billMap.has(key)) {
         billMap.set(key, b);
         hasLocalChanges = true;
       }
     });
 
-    // 5. Merge general transactions
+    // 5. Merge general transactions by invoice number
     const txMap = new Map<string, Transaction>();
-    (remote.transactions || []).forEach((t) => txMap.set(t.id, t));
-    (local.transactions || []).forEach((t) => {
-      if (!txMap.has(t.id)) {
-        txMap.set(t.id, t);
+    (dedupedRemote.transactions || []).forEach((t) => {
+      const key = (t.invoiceNo || t.id).trim().toLowerCase();
+      txMap.set(key, t);
+    });
+    (dedupedLocal.transactions || []).forEach((t) => {
+      const key = (t.invoiceNo || t.id).trim().toLowerCase();
+      if (!txMap.has(key)) {
+        txMap.set(key, t);
         hasLocalChanges = true;
       }
     });
 
     // Stock preservation: always keep whichever has stock catalog items
-    let stock = (remote.stock && remote.stock.length > 0) ? remote.stock : local.stock;
+    let stock = (dedupedRemote.stock && dedupedRemote.stock.length > 0) ? dedupedRemote.stock : dedupedLocal.stock;
     if (!stock || stock.length === 0) {
       stock = SAMPLE_SHOWROOM_PRODUCTS.map((p, idx) => ({
         ...p,
@@ -405,10 +536,10 @@ export class StorageService {
       }));
     }
 
-    const merged: StoreData = {
-      ...remote,
-      ...local,
-      settings: { ...remote.settings, ...local.settings },
+    const mergedRaw: StoreData = {
+      ...dedupedRemote,
+      ...dedupedLocal,
+      settings: { ...dedupedRemote.settings, ...dedupedLocal.settings },
       stock,
       cardMembers: Array.from(cardMembersMap.values()),
       cardTransactions: Array.from(cardTxMap.values()),
@@ -417,6 +548,8 @@ export class StorageService {
       transactions: Array.from(txMap.values()),
       updatedAt: new Date().toISOString(),
     };
+
+    const merged = StorageService.deduplicateStoreData(mergedRaw);
 
     return { merged, hasLocalChanges };
   }
@@ -1317,16 +1450,31 @@ export class StorageService {
 
     // Calculate actuals
     const calcPurchased = custTransactions.reduce((acc, t) => acc + (t.grandTotal || 0), 0);
-    const invoiceDues = custTransactions.reduce((acc, t) => acc + (t.balanceDue || 0), 0);
-    const receiptsPaid = custReceipts.reduce((acc, r) => acc + (r.amountPaid || 0), 0);
+    const receiptInvoiceNos = new Set(
+      custReceipts
+        .filter((r) => r.invoiceNo && r.invoiceNo.trim().length > 0)
+        .map((r) => r.invoiceNo!.trim().toLowerCase())
+    );
 
-    // If transactions exist, net balance is remaining dues on transactions minus standalone receipts
+    // Sum standalone or non-receipt invoice advance payments
+    const directInvoiceAdvances = custTransactions.reduce((acc, t) => {
+      const hasMatchingReceipt = t.invoiceNo && receiptInvoiceNos.has(t.invoiceNo.trim().toLowerCase());
+      return acc + (hasMatchingReceipt ? 0 : (t.paidAmount || 0));
+    }, 0);
+
+    const totalReceiptsPaid = custReceipts.reduce((acc, r) => acc + (r.amountPaid || 0), 0);
+    const totalCredits = totalReceiptsPaid + directInvoiceAdvances;
+
+    // Account for any historical opening balance if totalPurchased was recorded higher than individual bills
+    const openingDebit = Math.max(0, (cust.totalPurchased || 0) - calcPurchased);
+    const effectiveTotalDebits = calcPurchased + openingDebit;
+
     let calcBalance = 0;
     if (custTransactions.length > 0) {
-      calcBalance = Math.max(0, invoiceDues - receiptsPaid);
+      calcBalance = Math.max(0, effectiveTotalDebits - totalCredits);
     } else {
-      // If customer was imported without transactions, keep current or 0
-      calcBalance = Math.max(0, cust.currentBalance - receiptsPaid);
+      // If customer was imported without individual transactions, subtract receipts from current
+      calcBalance = Math.max(0, (cust.currentBalance || 0) - totalReceiptsPaid);
     }
 
     cust.totalPurchased = calcPurchased > 0 ? calcPurchased : cust.totalPurchased;

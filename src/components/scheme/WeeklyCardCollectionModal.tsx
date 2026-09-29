@@ -586,8 +586,24 @@ ${groupDisplay.displayText}
               <span>Sheet: {currentMember.sheetNo || 'N/A'}</span>
             </div>
 
-            <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mt-2">
-              Current Deposited Balance: ₹{currentMember.totalAmountPaid || 0}
+            {/* Live Scheme Collection Calculation Breakdown */}
+            <div className={`mt-2.5 p-2.5 rounded-xl border space-y-1 text-xs ${
+              isDayMode ? 'bg-emerald-50/70 border-emerald-200' : 'bg-emerald-950/40 border-emerald-800/80'
+            }`}>
+              <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300">
+                <span>१. मागील जुनी जमा (Old Deposited Balance):</span>
+                <span className="font-bold text-slate-800 dark:text-white">₹{(currentMember.totalAmountPaid || 0).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-emerald-700 dark:text-emerald-400">
+                <span>२. आज घेतलेला हप्ता (New Hafta Entry):</span>
+                <span className="font-bold">+ ₹{(amount || 0).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-800/80 text-xs font-black">
+                <span className="text-emerald-800 dark:text-emerald-300">एकूण नवीन जमा (New Total Deposited):</span>
+                <span className="text-emerald-700 dark:text-emerald-400 text-sm">
+                  ₹{((currentMember.totalAmountPaid || 0) + (amount || 0)).toLocaleString('en-IN')}
+                </span>
+              </div>
             </div>
 
             {/* Quick Card Switcher Dropdown */}

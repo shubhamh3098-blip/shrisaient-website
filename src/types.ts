@@ -229,6 +229,8 @@ export interface Transaction {
   deliveryStatus: 'Delivered' | 'Pending Delivery' | 'Dispatched';
   linkedCardId?: string;
   linkedCardNo?: string;
+  previousBalance?: number;
+  netTotalDue?: number;
   schemeDiscount?: number;
   financeDetails?: {
     isFinance: boolean;

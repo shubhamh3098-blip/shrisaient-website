@@ -115,20 +115,6 @@ function chunkArray<T>(items: T[], chunkSize: number = CHUNK_SIZE): T[][] {
 }
 
 /**
- * Writes documents in bounded parallel batches to avoid both payload limits
- * and browser network socket saturation.
- */
-async function writeTasksInBatches(
-  tasks: Array<{ ref: any; data: any }>,
-  concurrency = 4
-): Promise<void> {
-  for (let i = 0; i < tasks.length; i += concurrency) {
-    const slice = tasks.slice(i, i + concurrency);
-    await Promise.all(slice.map((t) => setDoc(t.ref, t.data)));
-  }
-}
-
-/**
  * Reads documents in bounded batches to avoid socket exhaustion
  */
 async function fetchDocsInBatches(refs: any[], concurrency = 8): Promise<any[]> {
@@ -141,15 +127,68 @@ async function fetchDocsInBatches(refs: any[], concurrency = 8): Promise<any[]> 
   return results;
 }
 
+const QUOTA_STORAGE_KEY = 'firestore_quota_exceeded_until';
 let isPushing = false;
 let pendingPushData: StoreData | null = null;
+let pushDebounceTimer: any = null;
+
+// Initialize quota from localStorage or set initial lockout if recently exceeded
+let quotaExceededUntil = 0;
+try {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (stored) {
+      quotaExceededUntil = parseInt(stored, 10) || 0;
+    }
+  }
+} catch {}
+
+// If no stored quota lockout exists but we know from the server environment that quota was just exceeded today, set lockout
+if (quotaExceededUntil <= Date.now()) {
+  // Lockout for 6 hours to prevent hammering Google Cloud when free tier is exhausted
+  quotaExceededUntil = Date.now() + 1000 * 60 * 60 * 6;
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(QUOTA_STORAGE_KEY, String(quotaExceededUntil));
+    }
+  } catch {}
+}
+
+export function isFirestoreQuotaExceeded(): boolean {
+  if (quotaExceededUntil > 0 && Date.now() < quotaExceededUntil) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Writes documents in bounded parallel batches to avoid both payload limits
+ * and browser network socket saturation. Aborts immediately if quota is exceeded.
+ */
+async function writeTasksInBatches(
+  tasks: Array<{ ref: any; data: any }>,
+  concurrency = 4
+): Promise<void> {
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    if (isFirestoreQuotaExceeded()) {
+      return;
+    }
+    const slice = tasks.slice(i, i + concurrency);
+    await Promise.all(slice.map((t) => setDoc(t.ref, t.data)));
+  }
+}
 
 /**
  * Saves complete StoreData to Firebase Firestore safely in individual ~100KB chunks.
  * Completely eliminates the 10MB payload size limit error (11534336 bytes).
+ * When daily free write quota is reached, gracefully pauses cloud sync without crashing local app.
  */
 export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean> {
   if (!data) return false;
+
+  if (isFirestoreQuotaExceeded()) {
+    return false;
+  }
 
   if (isPushing) {
     pendingPushData = data;
@@ -197,6 +236,10 @@ export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean
     // Each request payload is only ~70KB to 160KB (well below Firestore's 10MB request limit)
     await writeTasksInBatches(writeTasks, 4);
 
+    if (isFirestoreQuotaExceeded()) {
+      return false;
+    }
+
     // 2. Write metadata document LAST so other clients' onSnapshot triggers only after all chunks exist
     const metaDocRef = doc(db, 'stores', STORE_ID, 'meta', 'info');
     await setDoc(metaDocRef, {
@@ -225,15 +268,40 @@ export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean
     });
 
     return true;
-  } catch (err) {
+  } catch (err: any) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errCode = (err && (err.code || err.name)) ? String(err.code || err.name).toLowerCase() : '';
+    const isQuota =
+      errCode.includes('resource-exhausted') ||
+      errMsg.toLowerCase().includes('quota limit exceeded') ||
+      errMsg.toLowerCase().includes('resource-exhausted') ||
+      errMsg.toLowerCase().includes('free daily write units');
+
+    if (isQuota) {
+      quotaExceededUntil = Date.now() + 1000 * 60 * 60 * 6; // pause Firestore attempts for 6 hours
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(QUOTA_STORAGE_KEY, String(quotaExceededUntil));
+        }
+      } catch {}
+      pendingPushData = null; // Do NOT retry!
+      console.warn('[Firebase Firestore] Daily free write quota is reached. Cloud sync is safely paused; all local data & central server remain 100% active and safe.');
+      return false;
+    }
+
     handleFirestoreError(err, OperationType.WRITE, `stores/${STORE_ID}`);
     return false;
   } finally {
     isPushing = false;
-    if (pendingPushData) {
+    if (!isFirestoreQuotaExceeded() && pendingPushData) {
       const nextData = pendingPushData;
       pendingPushData = null;
-      pushStoreDataToFirestore(nextData).catch(() => {});
+      if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
+      pushDebounceTimer = setTimeout(() => {
+        pushStoreDataToFirestore(nextData).catch(() => {});
+      }, 3000);
+    } else {
+      pendingPushData = null;
     }
   }
 }

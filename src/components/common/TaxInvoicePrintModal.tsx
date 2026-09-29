@@ -290,12 +290,31 @@ export const TaxInvoicePrintModal: React.FC<TaxInvoicePrintModalProps> = ({
                     <span>Paid ({transaction.paymentMode}):</span>
                     <span className="font-mono">₹{transaction.paidAmount.toLocaleString('en-IN')}</span>
                   </div>
-                  {transaction.balanceDue > 0 && (
+                  {transaction.previousBalance && transaction.previousBalance > 0 ? (
+                    <div className="pt-1.5 mt-1 border-t border-dashed border-slate-300 text-[10px] space-y-0.5">
+                      <div className="flex justify-between text-slate-700">
+                        <span>१. मागील जुनी बाकी (Old Balance):</span>
+                        <span className="font-mono">₹{transaction.previousBalance.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-700">
+                        <span>२. चालू बिल रक्कम (Current Bill):</span>
+                        <span className="font-mono">+₹{transaction.grandTotal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-800 font-semibold">
+                        <span>३. आज जमा रक्कम (Paid Now / Hafta):</span>
+                        <span className="font-mono">-₹{transaction.paidAmount.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-rose-700 font-black text-xs border-t border-slate-400 pt-1">
+                        <span>अंतिम एकूण बाकी (Net Total Due):</span>
+                        <span className="font-mono">₹{(transaction.netTotalDue ?? (transaction.previousBalance + transaction.balanceDue)).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ) : transaction.balanceDue > 0 ? (
                     <div className="flex justify-between text-rose-600 font-bold text-[11px]">
                       <span>Balance Dues (बाकी):</span>
                       <span className="font-mono">₹{transaction.balanceDue.toLocaleString('en-IN')}</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -391,7 +410,27 @@ export const TaxInvoicePrintModal: React.FC<TaxInvoicePrintModalProps> = ({
                     )}
                   </div>
                 )}
-                {transaction.balanceDue > 0 && !transaction.financeDetails?.isFinance && (
+                {transaction.previousBalance && transaction.previousBalance > 0 && (
+                  <div className="pt-1 my-1 border-t border-dashed border-slate-400 text-[10px] space-y-0.5">
+                    <div className="flex justify-between text-slate-700">
+                      <span>मागील जुनी बाकी (Old Due):</span>
+                      <span>₹{transaction.previousBalance.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>चालू बिल (New Bill):</span>
+                      <span>+₹{transaction.grandTotal.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>आज जमा हप्ता (Paid Now):</span>
+                      <span>-₹{transaction.paidAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 font-black border-t border-slate-300 pt-0.5">
+                      <span>अंतिम एकूण बाकी (Net Due):</span>
+                      <span>₹{(transaction.netTotalDue ?? (transaction.previousBalance + transaction.balanceDue)).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                )}
+                {transaction.balanceDue > 0 && !transaction.financeDetails?.isFinance && !transaction.previousBalance && (
                   <div className="flex justify-between text-rose-600 font-bold">
                     <span>Balance Due:</span>
                     <span>₹{transaction.balanceDue.toLocaleString('en-IN')}</span>
@@ -458,7 +497,27 @@ export const TaxInvoicePrintModal: React.FC<TaxInvoicePrintModalProps> = ({
                     )}
                   </div>
                 )}
-                {transaction.balanceDue > 0 && !transaction.financeDetails?.isFinance && (
+                {transaction.previousBalance && transaction.previousBalance > 0 && (
+                  <div className="pt-0.5 my-0.5 border-t border-dashed border-slate-400 text-[9px] space-y-0.5">
+                    <div className="flex justify-between text-slate-700">
+                      <span>OLD DUE:</span>
+                      <span>₹{transaction.previousBalance}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>BILL:</span>
+                      <span>+₹{transaction.grandTotal}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700">
+                      <span>PAID:</span>
+                      <span>-₹{transaction.paidAmount}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 font-bold border-t border-slate-300 pt-0.5">
+                      <span>NET DUE:</span>
+                      <span>₹{transaction.netTotalDue ?? (transaction.previousBalance + transaction.balanceDue)}</span>
+                    </div>
+                  </div>
+                )}
+                {transaction.balanceDue > 0 && !transaction.financeDetails?.isFinance && !transaction.previousBalance && (
                   <div className="flex justify-between text-rose-600">
                     <span>DUE:</span>
                     <span>₹{transaction.balanceDue}</span>

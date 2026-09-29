@@ -113,21 +113,39 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
               )}
             </div>
 
-            {/* Amount Box */}
-            <div className="bg-amber-50 border-2 border-amber-400/80 p-3.5 rounded-xl flex items-center justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-amber-900 block">
-                  Amount Received (Net)
-                </span>
-                <span className="text-xl font-black text-slate-950">
-                  ₹{receipt.amountPaid.toLocaleString('en-IN')}.00
-                </span>
+            {/* Amount Box with complete Old Balance -> Hafta Received -> Remaining Balance */}
+            <div className="bg-amber-50/70 border-2 border-amber-400/80 p-3.5 rounded-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-900 block">
+                    आज जमा घेतलेला हप्ता / रक्कम (Amount Received)
+                  </span>
+                  <span className="text-xl font-black text-emerald-800">
+                    ₹{receipt.amountPaid.toLocaleString('en-IN')}.00
+                  </span>
+                </div>
+                <div className="text-right text-[10px]">
+                  <span className="text-slate-600 block">अंतिम शिल्लक बाकी (Remaining Due):</span>
+                  <span className="font-bold text-rose-600 text-sm">
+                    ₹{receipt.balanceRemaining.toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
-              <div className="text-right text-[10px]">
-                <span className="text-slate-600 block">Remaining Due:</span>
-                <span className="font-bold text-rose-600 text-xs">
-                  ₹{receipt.balanceRemaining.toLocaleString('en-IN')}
-                </span>
+
+              {/* Exact Equation Breakdown */}
+              <div className="pt-2 border-t border-dashed border-amber-300 grid grid-cols-3 gap-2 text-[10px] text-center">
+                <div className="bg-white/80 p-1.5 rounded border border-amber-200">
+                  <span className="text-slate-500 block">१. मागील जुनी बाकी:</span>
+                  <span className="font-bold text-slate-800">₹{(receipt.balanceRemaining + receipt.amountPaid).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="bg-emerald-50 p-1.5 rounded border border-emerald-300">
+                  <span className="text-emerald-700 block">२. जमा हप्ता:</span>
+                  <span className="font-bold text-emerald-800">- ₹{receipt.amountPaid.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="bg-white/80 p-1.5 rounded border border-amber-200">
+                  <span className="text-slate-500 block">३. नवीन बाकी:</span>
+                  <span className="font-bold text-rose-600">₹{receipt.balanceRemaining.toLocaleString('en-IN')}</span>
+                </div>
               </div>
             </div>
 

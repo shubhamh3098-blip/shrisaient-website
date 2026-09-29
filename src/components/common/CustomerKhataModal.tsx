@@ -199,7 +199,12 @@ export const CustomerKhataModal: React.FC<CustomerKhataModalProps> = ({
         refTx: tx,
       });
 
-      if (tx.paidAmount && tx.paidAmount > 0) {
+      // Avoid double-counting: only add tx.paidAmount as ADVANCE if there is no separate BillReceipt for this invoice
+      const hasMatchingReceipt = receipts.some(
+        (rc) => rc.invoiceNo && rc.invoiceNo.trim().toLowerCase() === tx.invoiceNo.trim().toLowerCase()
+      );
+
+      if (!hasMatchingReceipt && tx.paidAmount && tx.paidAmount > 0) {
         rawEntries.push({
           id: `tx-adv-${tx.id}`,
           date: tx.date,
@@ -538,6 +543,17 @@ Contacts: 8600122978 | 9175537365 | 8766486915`;
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Account Formula & Balance Check Bar */}
+          <div className="px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <span className="flex items-center gap-1.5 text-slate-300">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>हिशोब सूत्र: <strong className="text-white">(जुनी बाकी + नवीन खरेदी) - जमा घेतलेले हप्ते = अंतिम शिल्लक बाकी</strong></span>
+            </span>
+            <span className="font-mono font-bold text-amber-300 text-xs">
+              ₹{totalDebit.toLocaleString('en-IN')} - ₹{totalCredit.toLocaleString('en-IN')} = ₹{currentDue.toLocaleString('en-IN')}
+            </span>
           </div>
 
           {/* TAB 1: FULL LEDGER STATEMENT */}
