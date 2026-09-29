@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="mr">
+  <head>
+    <meta charset="utf-8" />
+    <title>श्री साई एंटरप्रायझेस, वर्धा</title>
+    <script type="text/javascript">
+      // GitHub Pages SPA Redirector for Single Page Applications
+      // Preserves passbook card queries and routes cleanly to root index.html
+      (function() {
+        var pathSegmentsToKeep = 1;
+        var l = window.location;
+        var search = l.search;
+        var pathname = l.pathname;
+
+        // Check if legacy /passbook?card=XXXX was visited
+        if (pathname.indexOf('/passbook') !== -1) {
+          var params = new URLSearchParams(search);
+          var card = params.get('card') || params.get('passbook');
+          var basePath = pathname.replace(/\/passbook.*$/, '');
+          if (!basePath) basePath = '';
+          if (card) {
+            window.location.replace(l.protocol + '//' + l.host + basePath + '/?passbook=' + encodeURIComponent(card));
+            return;
+          }
+        }
+
+        // General GitHub Pages SPA redirect
+        window.location.replace(
+          l.protocol + '//' + l.host +
+          pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+          pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash
+        );
+      })();
+    </script>
+  </head>
+  <body style="font-family: sans-serif; text-align: center; padding: 40px; color: #334155;">
+    <h2>श्री साई एंटरप्रायझेस</h2>
+    <p>पान उघडत आहे, कृपया प्रतीक्षा करा... (Loading Shri Sai Enterprises...)</p>
+  </body>
+</html>
