@@ -54,6 +54,8 @@ import {
   ExternalLink,
   Navigation,
   BookOpen,
+  Instagram,
+  Facebook,
 } from 'lucide-react';
 import { StoreData, StockItem, CardMember, AdminUser } from '../../types';
 import { StorageService } from '../../services/storageService';
@@ -2621,6 +2623,53 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <p className="text-[11px] text-slate-400 font-mono">(Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony)</p>
                 <p className="text-amber-300 font-medium">📞 Helpline: {landingConfig.contactInfo.helpline1 || '8766486915'} / {landingConfig.contactInfo.helpline2 || '8600122978'} / {landingConfig.contactInfo.helpline3 || '9175537365'}</p>
                 <p>🌐 Website: https://shrisaient.in</p>
+                
+                {/* Official Directory & Social Badges for Google & Customers */}
+                <div className="pt-2 flex flex-wrap gap-2">
+                  <a
+                    href="https://www.justdial.com/jdmart/Wardha/Shree-Sai-Enterprises-Opposite-Matoshree-SabhagruhPipri-/9999P7152-7152-231230084013-U6K2_BZDET/catalogue"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#ff7a00]/15 hover:bg-[#ff7a00]/25 text-[#ff9436] border border-[#ff7a00]/40 text-[11px] font-bold transition shadow-xs cursor-pointer group"
+                    title="Shree Sai Enterprises Justdial Official Verified Profile"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#ff7a00] group-hover:scale-125 transition"></span>
+                    <span>Justdial Verified</span>
+                    <ExternalLink className="w-3 h-3 text-[#ff9436]" />
+                  </a>
+                  <a
+                    href="https://share.google/pRPd28v4DoL3a5Ocr"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer"
+                    title="Google Business Profile & Maps"
+                  >
+                    <span>📍 Google Business / Maps</span>
+                    <ExternalLink className="w-3 h-3 text-blue-300" />
+                  </a>
+                  <a
+                    href="https://www.instagram.com/shreesaienterprisess"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 border border-pink-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer group"
+                    title="Shree Sai Enterprises Official Instagram"
+                  >
+                    <Instagram className="w-3.5 h-3.5 text-pink-400 group-hover:scale-110 transition" />
+                    <span>Instagram</span>
+                    <ExternalLink className="w-3 h-3 text-pink-400" />
+                  </a>
+                  <a
+                    href="https://www.facebook.com/profile.php?id=61554340030893"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer group"
+                    title="Shree Sai Enterprises Official Facebook Page"
+                  >
+                    <Facebook className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition" />
+                    <span>Facebook</span>
+                    <ExternalLink className="w-3 h-3 text-blue-400" />
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -2710,13 +2759,44 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
           {/* Bottom Copyright */}
           <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
             <p>© {new Date().getFullYear()} Shri Sai Enterprises, Wardha. All rights reserved.</p>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-4">
               <p className="flex items-center gap-1">
                 <span>Official Website:</span>
                 <a href="https://shrisaient.in" className="text-amber-400 font-bold hover:underline">
                   https://shrisaient.in
                 </a>
               </p>
+              <div className="flex items-center gap-3">
+                <a
+                  href="https://www.instagram.com/shreesaienterprisess"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-pink-400 hover:text-pink-300 font-bold transition"
+                  title="Follow us on Instagram"
+                >
+                  <Instagram className="w-3.5 h-3.5" />
+                  <span>Instagram</span>
+                </a>
+                <a
+                  href="https://www.facebook.com/profile.php?id=61554340030893"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold transition"
+                  title="Follow us on Facebook"
+                >
+                  <Facebook className="w-3.5 h-3.5" />
+                  <span>Facebook</span>
+                </a>
+                <a
+                  href="https://www.justdial.com/jdmart/Wardha/Shree-Sai-Enterprises-Opposite-Matoshree-SabhagruhPipri-/9999P7152-7152-231230084013-U6K2_BZDET/catalogue"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[#ff8533] hover:text-[#ff9436] font-bold transition"
+                  title="Justdial Catalogue"
+                >
+                  <span>Justdial</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>

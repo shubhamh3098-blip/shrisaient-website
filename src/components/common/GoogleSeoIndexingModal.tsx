@@ -13,6 +13,8 @@ import {
   Star,
   Clock,
   Navigation,
+  Instagram,
+  Facebook,
   X
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -44,7 +46,10 @@ export const GoogleSeoIndexingModal: React.FC<GoogleSeoIndexingModalProps> = ({
     address: 'Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001 (Maharashtra)',
     marathiAddress: 'मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा - ४४२००१',
     timing: 'सकाळी ९:३० ते रात्री ९:३० (आठवड्याचे सर्व दिवस चालू)',
-    googleMapsUrl: 'https://maps.google.com/?q=Shri+Sai+Enterprises+Matoshree+Sabhagruh+Arvi+Road+Wardha',
+    googleMapsUrl: 'https://share.google/pRPd28v4DoL3a5Ocr',
+    justdialUrl: 'https://www.justdial.com/jdmart/Wardha/Shree-Sai-Enterprises-Opposite-Matoshree-SabhagruhPipri-/9999P7152-7152-231230084013-U6K2_BZDET/catalogue',
+    instagramUrl: 'https://www.instagram.com/shreesaienterprisess',
+    facebookUrl: 'https://www.facebook.com/profile.php?id=61554340030893',
     websiteUrl: 'https://shrisaient.in',
   };
 
@@ -55,7 +60,11 @@ export const GoogleSeoIndexingModal: React.FC<GoogleSeoIndexingModalProps> = ({
 ⏰ वेळ: ${businessInfo.timing}
 🌟 उत्पादने: स्मार्ट TV, फ्रिज, वॉशिंग मशीन, सागवान सोफा, बेड, कपाटे
 🎁 योजना: ३० महिन्यांची साप्ताहिक बचत योजना (Weekly Lucky Draw Scheme)
-🌐 वेबसाइट: ${businessInfo.websiteUrl}`;
+🌐 अधिकृत वेबसाइट: ${businessInfo.websiteUrl}
+📍 Google Business Profile: ${businessInfo.googleMapsUrl}
+🟠 Justdial अधिकृत कॅटलॉग: ${businessInfo.justdialUrl}
+📸 Instagram प्रोफाइल: ${businessInfo.instagramUrl}
+📘 Facebook पेज: ${businessInfo.facebookUrl}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
@@ -240,26 +249,26 @@ export const GoogleSeoIndexingModal: React.FC<GoogleSeoIndexingModalProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Store Address Card */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-2">
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-rose-500" /> अधिकृत पत्ता (Official Address)
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" /> अधिकृत पत्ता
                   </span>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(businessInfo.marathiAddress, 'address')}
-                    className="text-[11px] text-blue-500 hover:underline flex items-center gap-1"
+                    className="text-[11px] text-blue-500 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Copy className="w-3 h-3" />
                     {copiedType === 'address' ? 'कॉपी झाले!' : 'पत्ता कॉपी'}
                   </button>
                 </div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
                   {businessInfo.marathiAddress}
                 </p>
-                <p className="text-xs text-slate-500 font-mono">
+                <p className="text-[11px] text-slate-500 font-mono">
                   {businessInfo.address}
                 </p>
                 <div className="pt-1 flex items-center gap-2">
@@ -269,49 +278,125 @@ export const GoogleSeoIndexingModal: React.FC<GoogleSeoIndexingModalProps> = ({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
                   >
-                    <Navigation className="w-3 h-3" /> Google Maps वर उघडा
+                    <Navigation className="w-3 h-3" /> Google Business & Maps
+                  </a>
+                </div>
+              </div>
+
+              {/* Justdial Official Profile Card */}
+              <div className="p-3.5 rounded-xl border border-[#ff7a00]/30 bg-white dark:bg-slate-900/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#ff7a00] flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#ff7a00]"></span> Justdial Listing
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(businessInfo.justdialUrl, 'justdial')}
+                    className="text-[11px] text-[#ff7a00] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copiedType === 'justdial' ? 'कॉपी झाले!' : 'लिंक कॉपी'}
+                  </button>
+                </div>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  Shree Sai Enterprises
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Opp. Matoshree Sabhagruh, Pipri, Wardha
+                </p>
+                <div className="pt-1 flex items-center gap-2">
+                  <a
+                    href={businessInfo.justdialUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#ff7a00] hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Justdial कॅटलॉग
+                  </a>
+                </div>
+              </div>
+
+              {/* Official Social Profiles Card (Instagram & Facebook) */}
+              <div className="p-3.5 rounded-xl border border-pink-500/30 bg-white dark:bg-slate-900/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-pink-500 flex items-center gap-1">
+                    <Instagram className="w-3.5 h-3.5 text-pink-500" /> सोशल मीडिया पेजेस
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(`Instagram: ${businessInfo.instagramUrl}\nFacebook: ${businessInfo.facebookUrl}`, 'social')}
+                    className="text-[11px] text-pink-500 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copiedType === 'social' ? 'कॉपी झाले!' : 'लिंक्स कॉपी'}
+                  </button>
+                </div>
+                <div className="space-y-1.5 text-xs pt-0.5">
+                  <a
+                    href={businessInfo.instagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 font-bold transition"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                      <span>Instagram</span>
+                    </span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <a
+                    href={businessInfo.facebookUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold transition"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Facebook className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Facebook</span>
+                    </span>
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               </div>
 
               {/* Phone Numbers Card */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-2">
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-emerald-500" /> संपर्क क्रमांक (Contact Numbers)
+                    <Phone className="w-3.5 h-3.5 text-emerald-500" /> संपर्क क्रमांक
                   </span>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(businessInfo.phones.join(', '), 'phones')}
-                    className="text-[11px] text-blue-500 hover:underline flex items-center gap-1"
+                    className="text-[11px] text-blue-500 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Copy className="w-3 h-3" />
                     {copiedType === 'phones' ? 'कॉपी झाले!' : 'नंबर कॉपी'}
                   </button>
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">मुख्य संपर्क / चौकशी:</span>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 text-[11px]">मुख्य चौकशी:</span>
                     <a href="tel:8600122978" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
-                      +91 86001 22978
+                      8600122978
                     </a>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">बिलिंग व हप्ता वसुली:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 text-[11px]">हप्ता वसुली:</span>
                     <a href="tel:9175537365" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
-                      +91 91755 37365
+                      9175537365
                     </a>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">डिलिव्हरी व ग्राहक सेवा:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 text-[11px]">डिलिव्हरी:</span>
                     <a href="tel:8766486915" className="font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
-                      +91 87664 86915
+                      8766486915
                     </a>
                   </div>
                 </div>
 
-                <div className="pt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                <div className="pt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500">
                   <Clock className="w-3 h-3" /> {businessInfo.timing}
                 </div>
               </div>

@@ -126,7 +126,7 @@ export const DEFAULT_LANDING_CONFIG: LandingPageConfig = {
     whatsappNumber: '918766486915',
     addressHindi: 'Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001',
     landmark: 'Near Shivaji Chowk, Arvi Road',
-    googleMapLink: 'https://maps.google.com/?q=Wardha+Maharashtra',
+    googleMapLink: 'https://share.google/pRPd28v4DoL3a5Ocr',
     timings: 'Open Daily: 9:30 AM – 9:30 PM (All 7 Days)',
   },
   schemeBanner: {

@@ -16,7 +16,6 @@ import {
   HelpCircle,
   BadgeCheck,
   X,
-  Sparkles,
   ShieldAlert
 } from 'lucide-react';
 import { AdminUser, StoreData } from '../../types';
@@ -40,39 +39,21 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'recovery' | 'approvals'>('login');
 
-  // Form Fields - Login
+  // Form Fields - Login (strictly empty by default for high security)
   const [identifier, setIdentifier] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('sai_erp_remembered_id') || 'admin';
+      return localStorage.getItem('sai_erp_remembered_id') || '';
     }
-    return 'admin';
+    return '';
   });
-  const [secret, setSecret] = useState('1079');
+  const [secret, setSecret] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Rate Limiting / Lockout Countdown State
   const [lockoutState, setLockoutState] = useState(() => SecurityService.getLockoutState());
-
-  // 1-Tap Quick Owner/Admin Login
-  const handleQuickOwnerLogin = () => {
-    setIdentifier('admin');
-    setSecret('1079');
-    setLoginError('');
-    setIsSubmitting(true);
-    setTimeout(() => {
-      const res = SecurityService.authenticateUser('admin', '1079');
-      setIsSubmitting(false);
-      if (res.success && res.user) {
-        onLoginSuccess(res.user);
-        onClose();
-      } else {
-        setLoginError(res.error || 'लॉगिन अयशस्वी!');
-      }
-    }, 150);
-  };
 
   // Form Fields - Staff Sign Up
   const [signupName, setSignupName] = useState('');
@@ -392,23 +373,15 @@ export const SecureErpLoginModal: React.FC<SecureErpLoginModalProps> = ({
         {/* Tab 1: Secure Login */}
         {activeTab === 'login' && (
           <div className="p-5 sm:p-6 space-y-4">
-            {/* 1-Click Instant Owner Login Button */}
-            <button
-              type="button"
-              onClick={handleQuickOwnerLogin}
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm transition shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/40 active:scale-98"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>⚡ १-क्लिक ॲडमिन थेट लॉगिन (Instant ERP Access)</span>
-            </button>
-
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-slate-800 w-full"></div>
-              <span className="bg-slate-900 px-3 text-[11px] text-slate-500 font-bold uppercase tracking-wider shrink-0">
-                किंवा युझरनेम/पासवर्डने लॉगिन करा
-              </span>
-              <div className="border-t border-slate-800 w-full"></div>
+            {/* Strict Access Security Notice */}
+            <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs text-slate-300 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 font-black">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div className="text-[12px] leading-tight">
+                <p className="font-bold text-white">केवळ अधिकृत व्यवस्थापक / मालक लॉगिन (Protected)</p>
+                <p className="text-slate-400 text-[11px] mt-0.5">विना-पासवर्ड कोणालाही प्रवेश नाही. तुमचा युझरनेम आणि पासवर्ड अचूक टाका.</p>
+              </div>
             </div>
 
             {/* Brute-force Lockout Alert */}
