@@ -1,20 +1,44 @@
 {
   "name": "श्री साई एंटरप्रायजेस - एजंट वसुली व व्यापारी हिशोब",
-  "short_name": "Shri Sai ERP",
+  "short_name": "श्री साई ERP",
   "description": "श्री साई एंटरप्रायजेस वर्धा - ३०-महिने साप्ताहिक योजना वसुली, ग्राहक खातेवही आणि काउंटर बिलिंग ॲप",
   "start_url": "/",
   "id": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#090d1f",
-  "theme_color": "#090d1f",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "lang": "mr",
   "icons": [
     {
-      "src": "/shri-sai-logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/shri-sai-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/favicon.svg",
