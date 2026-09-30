@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   CheckCircle2,
@@ -25,7 +25,11 @@ import { NotificationService } from '../../services/notificationService';
 import { useTheme } from '../../context/ThemeContext';
 import { extractCardNumber, resolveCardScheme } from '../../utils/schemeUtils';
 import { getLivePassbookUrl, getWhatsAppGroupDisplay } from '../../utils/passbookUtils';
-import { shareThermalReceiptOnWhatsApp } from '../../services/receiptImageService';
+import {
+  shareThermalReceiptOnWhatsApp,
+  printThermalReceiptViaIframe,
+} from '../../services/receiptImageService';
+import { WeeklyDepositReceiptModal } from './WeeklyDepositReceiptModal';
 
 interface WeeklyCardCollectionModalProps {
   isOpen: boolean;
@@ -86,6 +90,10 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
   const [receiptNo, setReceiptNo] = useState<string>('');
   const [collectionSuccess, setCollectionSuccess] = useState<CardTransaction | null>(null);
 
+  // Dedicated 58mm / 80mm Print & WhatsApp PNG Photo Modal Viewer
+  const [viewReceiptTx, setViewReceiptTx] = useState<CardTransaction | null>(null);
+  const [viewReceiptFormat, setViewReceiptFormat] = useState<'80mm' | '58mm'>('80mm');
+
   // Multi-tap rapid click protection & idempotency key
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [idempotencyToken, setIdempotencyToken] = useState<string>(() => 'tx-token-' + Date.now());
@@ -103,33 +111,58 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
     return `REC-${rawDigits}-${randCode}`;
   };
 
+  // Track previous member ID to only reset inputs and success state when user actually switches cards
+  const prevMemberIdRef = useRef<string>('');
+
+  // Synchronize initialMember prop when passed from parent
+  useEffect(() => {
+    if (initialMember?.id) {
+      setSelectedMemberId(initialMember.id);
+    }
+  }, [initialMember?.id]);
+
   // Synchronize when currentMember changes
   useEffect(() => {
     if (currentMember) {
-      setSelectedMemberId(currentMember.id);
-      setEditName(currentMember.memberName || '');
-      setEditPhone(currentMember.phone && currentMember.phone !== '0' ? currentMember.phone : '');
-      setEditVillage(currentMember.village || currentMember.address || 'Wardha');
-      setEditSheetNo(currentMember.sheetNo || '');
+      const isCardSwitched = prevMemberIdRef.current !== currentMember.id;
+      prevMemberIdRef.current = currentMember.id;
+
+      if (isCardSwitched) {
+        setSelectedMemberId(currentMember.id);
+        setEditName(currentMember.memberName || '');
+        setEditPhone(currentMember.phone && currentMember.phone !== '0' ? currentMember.phone : '');
+        setEditVillage(currentMember.village || currentMember.address || 'Wardha');
+        setEditSheetNo(currentMember.sheetNo || '');
+        setCollectionSuccess(null);
+      }
       
       // Auto-set to the NEXT UNRECORDED week number to avoid false duplicate blocks
       const nextWeek = getNextAvailableWeek(currentMember, storeData.cardTransactions);
       setWeekNumber(nextWeek);
       setAllowDuplicateOverride(false);
 
-      // Auto-set amount - default to 100 or member's defined amount (100-200)
-      if (currentMember.monthlyAmount && currentMember.monthlyAmount > 0) {
-        setAmount(currentMember.monthlyAmount);
-      } else {
-        setAmount(100);
-      }
+      if (isCardSwitched) {
+        // Auto-set amount - default to 100 or member's defined amount (100-200)
+        if (currentMember.monthlyAmount && currentMember.monthlyAmount > 0) {
+          setAmount(currentMember.monthlyAmount);
+        } else {
+          setAmount(100);
+        }
 
-      // Generate initial receipt number
-      setReceiptNo(generateReceiptNumber(currentMember.cardNo));
-      setIsChangingCard(false);
-      setCollectionSuccess(null);
-      setIdempotencyToken('tx-token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7));
+        // Generate initial receipt number
+        setReceiptNo(generateReceiptNumber(currentMember.cardNo));
+        setIsChangingCard(false);
+        setIdempotencyToken('tx-token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7));
+      }
     }
+  }, [currentMember?.id, storeData.cardTransactions]);
+
+  // Active / latest transaction for this card
+  const latestCardTx = useMemo(() => {
+    if (!currentMember) return null;
+    const memberTxs = storeData.cardTransactions.filter((t) => t.cardMemberId === currentMember.id);
+    if (memberTxs.length === 0) return null;
+    return memberTxs[memberTxs.length - 1];
   }, [currentMember?.id, storeData.cardTransactions]);
 
   // Advance to next member card automatically for zero-friction field collection
@@ -236,7 +269,7 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
   };
 
   // Submit Installment Collection with Rapid Multi-Tap & Double Submit Protection
-  const handleSubmitCollection = (e?: React.FormEvent) => {
+  const handleSubmitCollection = (e?: React.FormEvent, autoAction: 'print80' | 'print58' | 'photo' | 'modal' | 'none' = 'modal') => {
     if (e) e.preventDefault();
     if (!currentMember || isSubmitting) return;
 
@@ -272,6 +305,16 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
       setCollectionSuccess(tx);
       setIdempotencyToken('tx-token-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7));
 
+      // AUTOMATICALLY open the 58mm/80mm Print & HD WhatsApp Photo preview modal!
+      setViewReceiptTx(tx);
+      setViewReceiptFormat(autoAction === 'print58' ? '58mm' : '80mm');
+
+      if (autoAction === 'print80') {
+        handlePrintThermalReceipt(tx, '80mm');
+      } else if (autoAction === 'print58') {
+        handlePrintThermalReceipt(tx, '58mm');
+      }
+
       // Trigger instant notification
       NotificationService.addNotification({
         type: 'installment_collected',
@@ -295,125 +338,21 @@ export const WeeklyCardCollectionModal: React.FC<WeeklyCardCollectionModalProps>
     }
   };
 
-  // 1-Click Thermal POS (80mm & 58mm) Receipt Print
+  // 1-Click Thermal POS (80mm & 58mm) Receipt Print - safe for mobile browsers without popup blocker
   const handlePrintThermalReceipt = (tx: CardTransaction, paperWidth: '80mm' | '58mm' = '80mm') => {
-    const printWindow = window.open('', '_blank', 'width=440,height=700');
-    if (printWindow) {
-      const todayPaid = tx.amount;
-      const prevBal = Math.max(0, (currentMember.totalAmountPaid || 0) - todayPaid);
-      const totalSavings = (currentMember.totalAmountPaid || 0);
-      const targetVal = currentMember.targetAmount || (currentMember.planType === '15000_scheme' ? 15000 : 30000);
-      const remBal = Math.max(0, targetVal - totalSavings);
-      const cardNoDisplay = cardNum;
-      const dateFormatted = new Date(tx.date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-      const timeFormatted = new Date(tx.date).toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-      const waGroupUrl = storeData.settings.whatsappGroupLink || 'https://chat.whatsapp.com/invite/shrisaienterprises';
-      const groupDisplay = getWhatsAppGroupDisplay(storeData.settings);
-      const upiUrl = `upi://pay?pa=8766486915@ybl&pn=Shri%20Sai%20Enterprises&am=${todayPaid}&cu=INR`;
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(upiUrl)}`;
-      const waQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(waGroupUrl)}`;
-
-      const is80 = paperWidth === '80mm';
-      const bodyWidth = is80 ? '74mm' : '54mm';
-      const fontSize = is80 ? '12px' : '11px';
-      const headerSize = is80 ? '16px' : '13px';
-      const bigAmtSize = is80 ? '18px' : '15px';
-
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${is80 ? '80mm' : '58mm'} Thermal Receipt - ${tx.receiptNo}</title>
-          <style>
-            @page { size: ${is80 ? '80mm' : '58mm'} auto; margin: ${is80 ? '2.5mm' : '2mm'}; }
-            body {
-              font-family: 'Courier New', Courier, monospace;
-              width: ${bodyWidth};
-              margin: 0 auto;
-              padding: 4px;
-              color: #000;
-              font-size: ${fontSize};
-              line-height: 1.35;
-              text-align: center;
-            }
-            .bold { font-weight: bold; }
-            .header-title { font-size: ${headerSize}; font-weight: 900; margin-bottom: 2px; }
-            .header-sub { font-size: ${is80 ? '11px' : '9px'}; font-weight: 600; }
-            .divider { border-top: 1px dashed #000; margin: 5px 0; }
-            .divider-double { border-top: 2px double #000; margin: 5px 0; }
-            .row { display: flex; justify-content: space-between; text-align: left; margin: 2.5px 0; font-size: ${is80 ? '11.5px' : '10px'}; }
-            .row-val { font-weight: bold; text-align: right; }
-            .big-amount { font-size: ${bigAmtSize}; font-weight: 900; margin: 4px 0; }
-            .qr-box { margin: 6px auto; width: 110px; height: 110px; }
-            .qr-box img { width: 110px; height: 110px; display: block; margin: 0 auto; }
-            .highlight-box { font-size: ${is80 ? '10.5px' : '8.5px'}; font-weight: bold; border: 1px solid #000; padding: 4px; margin: 4px 0; }
-            .footer { font-size: ${is80 ? '10px' : '8.5px'}; margin-top: 6px; }
-            @media print {
-              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header-title">SHRI SAI ENTERPRISES</div>
-          <div class="header-sub">श्री साई एंटरप्रायझेस (इलेक्ट्रॉनिक्स & फर्निचर शोरूम, वर्धा)</div>
-          <div>मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा</div>
-          <div>मो.: 8600122978 / 9175537365 / 8766486915</div>
-          <div class="divider-double"></div>
-          <div class="bold" style="font-size: ${is80 ? '13px' : '11px'};">साप्ताहिक बचत योजना पावती (${is80 ? '80mm POS' : '58mm POS'})</div>
-          <div class="divider"></div>
-          <div class="row"><span>पावती क्र (Receipt No):</span><span class="row-val">${tx.receiptNo}</span></div>
-          <div class="row"><span>दिनांक (Date & Time):</span><span class="row-val">${dateFormatted} ${timeFormatted}</span></div>
-          <div class="row"><span>कार्ड क्र (Card No):</span><span class="row-val">#${cardNoDisplay} (${currentMember.schemeName || 'योजना १'})</span></div>
-          <div class="row"><span>ग्राहक (Member Name):</span><span class="row-val">${currentMember.memberName}</span></div>
-          <div class="row"><span>गाव / पत्ता (Village):</span><span class="row-val">${currentMember.village || 'Wardha'}</span></div>
-          <div class="row"><span>हप्ता क्र (Week / Installment):</span><span class="row-val">#${tx.weekNumber || tx.monthNumber}</span></div>
-          <div class="divider"></div>
-          <div class="row"><span>१. जुनी रक्कम (मागील जमा):</span><span class="row-val">₹${prevBal.toLocaleString('en-IN')}/-</span></div>
-          <div class="row" style="font-size: ${is80 ? '13px' : '11px'}; font-weight: bold;"><span>२. आज जमा हप्ता (Today Paid):</span><span class="row-val">₹${todayPaid.toLocaleString('en-IN')}/-</span></div>
-          <div class="big-amount">₹${todayPaid.toLocaleString('en-IN')}/-</div>
-          <div class="row"><span>३. आतापर्यंत एकूण जमा:</span><span class="row-val">₹${totalSavings.toLocaleString('en-IN')}/-</span></div>
-          <div class="row"><span>४. कार्ड योजना एकूण उद्दिष्ट:</span><span class="row-val">₹${targetVal.toLocaleString('en-IN')}/-</span></div>
-          <div class="row" style="font-size: ${is80 ? '13px' : '11px'}; font-weight: bold;"><span>५. कार्डमधील चालू शिल्लक बाकी:</span><span class="row-val" style="text-decoration: underline;">₹${remBal.toLocaleString('en-IN')}/-</span></div>
-          <div class="divider"></div>
-          <div class="highlight-box">
-            हिशोब ताळमेळ: एकूण जमा ₹${totalSavings} + शिल्लक ₹${remBal} = एकूण उद्दिष्ट ₹${targetVal} (१००% अचूक)
-          </div>
-          <div class="row"><span>पेमेंट मोड:</span><span class="row-val">${tx.paymentMode || 'Cash'}</span></div>
-          <div class="row"><span>वसुली प्रतिनिधी:</span><span class="row-val">${tx.collectedBy}</span></div>
-          <div class="divider"></div>
-          <div class="bold" style="font-size: ${is80 ? '10.5px' : '9px'};">🎁 लकी ड्रॉ, बंपर योजना व ऑफर्ससाठी ग्रुपला जॉईन व्हा:</div>
-          <div style="font-size: ${is80 ? '9.5px' : '8px'}; word-break: break-all; margin: 2px 0;">${groupDisplay.url}</div>
-          <div class="qr-box">
-            <img src="${qrApiUrl}" alt="Payment / WhatsApp QR" />
-          </div>
-          <div style="font-size: ${is80 ? '9px' : '8px'};">Scan QR for Live Digital Passbook • UPI: 8766486915@ybl</div>
-          <div class="divider-double"></div>
-          <div class="footer">
-            श्री साई एंटरप्रायझेसवर विश्वास ठेवल्याबद्दल मनःपूर्वक धन्यवाद! 🙏<br/>
-            (संगणकीय अधिकृत पावती - सहीची गरज नाही)
-          </div>
-          <script>
-            window.onload = function() {
-              window.focus();
-              setTimeout(function() { window.print(); }, 250);
-            };
-          </script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      return;
+    try {
+      printThermalReceiptViaIframe(tx, currentMember, storeData.settings, paperWidth);
+      NotificationService.success(`${paperWidth} पावती प्रिंट कमांड पाठवली.`);
+    } catch (e) {
+      console.warn('Iframe print failed, falling back to window.print:', e);
+      window.print();
     }
-    window.print();
+  };
+
+  // Open HD Visual 58mm / 80mm Print & WhatsApp PNG Photo Modal
+  const handleOpenReceiptModal = (tx: CardTransaction, format: '80mm' | '58mm' = '80mm') => {
+    setViewReceiptTx(tx);
+    setViewReceiptFormat(format);
   };
 
   // Standard Receipt Print
@@ -528,16 +467,87 @@ ${groupDisplay.displayText}
         {/* Modal Body */}
         <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto overscroll-contain">
 
-          {/* Success Status Indicator */}
+          {/* Success Status Indicator with Direct Print / WhatsApp PNG Buttons */}
           {collectionSuccess && (
-            <div className="p-2.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>₹{collectionSuccess.amount} हप्ता जमा! (खालील प्रिंट व पुढील कार्ड वापरा)</span>
+            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 space-y-2.5 text-xs text-emerald-800 dark:text-emerald-200 font-bold animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span className="font-extrabold text-sm text-emerald-700 dark:text-emerald-300">
+                    ₹{collectionSuccess.amount} हप्ता यशस्वी जमा झाला!
+                  </span>
+                </div>
+                <span className="font-mono text-xs font-black px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-800 dark:text-emerald-200">
+                  #{collectionSuccess.receiptNo}
+                </span>
               </div>
-              <span className="font-mono text-[11px] font-black text-slate-800 dark:text-slate-200">
-                #{collectionSuccess.receiptNo}
-              </span>
+
+              {/* Direct Print & WhatsApp PNG Photo Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleOpenReceiptModal(collectionSuccess, '80mm')}
+                  className="col-span-2 sm:col-span-1 py-2.5 px-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                  title="58mm / 80mm HD पावती फोटो व WhatsApp PNG पहा"
+                >
+                  <Camera className="w-4 h-4 shrink-0 text-amber-300" />
+                  <span>📸 58/80 फोटो पहा</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '80mm')}
+                  className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                  title="80mm Thermal Slip Print (80mm पावती प्रिंट)"
+                >
+                  <Printer className="w-4 h-4 shrink-0" />
+                  <span>80mm प्रिंट</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintThermalReceipt(collectionSuccess, '58mm')}
+                  className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                  title="58mm Mini POS Thermal Slip"
+                >
+                  <Printer className="w-4 h-4 shrink-0" />
+                  <span>58mm थर्मल</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isGeneratingPhoto}
+                  onClick={() => handleShareThermalPhoto(collectionSuccess, '80mm')}
+                  className="py-2.5 px-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                  title="WhatsApp वर पावती फोटो (PNG) थेट पाठवा"
+                >
+                  {isGeneratingPhoto ? (
+                    <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                  ) : (
+                    <Share2 className="w-4 h-4 shrink-0 text-white" />
+                  )}
+                  <span>WhatsApp फोटो</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleWhatsAppShare(collectionSuccess)}
+                  className="col-span-2 sm:col-span-1 py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                  title="Send Marathi WhatsApp Receipt Text"
+                >
+                  <Share2 className="w-4 h-4 shrink-0" />
+                  <span>WhatsApp स्लिप</span>
+                </button>
+              </div>
+
+              {/* One-Tap Advance to Next Card Button */}
+              <button
+                type="button"
+                onClick={handleAdvanceToNextCard}
+                className="w-full mt-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+              >
+                <span>➡️ पुढील कार्ड / पुढचा ग्राहक जमा करा (Next Card)</span>
+              </button>
             </div>
           )}
 
@@ -605,6 +615,60 @@ ${groupDisplay.displayText}
                 </span>
               </div>
             </div>
+
+            {/* Quick Print/Share Bar for Latest Recorded Receipt on this card */}
+            {latestCardTx && !collectionSuccess && (
+              <div className="mt-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>मागील पावती: <strong>#{latestCardTx.receiptNo}</strong> (हप्ता #{latestCardTx.weekNumber || latestCardTx.monthNumber})</span>
+                  </span>
+                  <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">
+                    ₹{latestCardTx.amount}/-
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenReceiptModal(latestCardTx, '80mm')}
+                    className="py-2 px-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow cursor-pointer active:scale-95 touch-manipulation min-h-[38px]"
+                    title="मागील पावतीचा 58mm/80mm PNG फोटो पहा व WhatsApp वर पाठवा"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-amber-300" />
+                    <span>📸 फोटो (58/80)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handlePrintThermalReceipt(latestCardTx, '80mm')}
+                    className="py-2 px-2 rounded-xl bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1 border border-amber-500/30 hover:bg-amber-500/30 cursor-pointer active:scale-95 touch-manipulation min-h-[38px]"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>80mm प्रिंट</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handlePrintThermalReceipt(latestCardTx, '58mm')}
+                    className="py-2 px-2 rounded-xl bg-slate-800 text-amber-300 font-bold text-xs flex items-center justify-center gap-1 border border-slate-700 hover:bg-slate-700 cursor-pointer active:scale-95 touch-manipulation min-h-[38px]"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>58mm मिनी</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleWhatsAppShare(latestCardTx)}
+                    className="py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center gap-1 border border-emerald-500/30 hover:bg-emerald-600/30 cursor-pointer active:scale-95 touch-manipulation min-h-[38px]"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Quick Card Switcher Dropdown */}
             {isChangingCard && (
@@ -950,6 +1014,89 @@ ${groupDisplay.displayText}
             </p>
           </div>
 
+          {/* 7. Instant 58mm / 80mm Print & WhatsApp Photo Option Box (Always Visible) */}
+          <div className={`p-3.5 rounded-2xl border space-y-2.5 ${
+            isDayMode ? 'bg-gradient-to-br from-emerald-50/60 to-amber-50/60 border-emerald-300' : 'bg-slate-900 border-emerald-700/60'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-emerald-500" />
+                <span>पावती प्रिंट व व्हॉट्सॲप फोटो (58mm / 80mm Options)</span>
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                रक्कम: ₹{amount || 100}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-600 dark:text-slate-300">
+              हप्ता जमा करताना थेट प्रिंट हवी असल्यास खालील बटण दाबा:
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmitCollection(undefined, 'print80')}
+                className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                title="हप्ता सेव्ह करा आणि लगेच 80mm पावती प्रिंट करा"
+              >
+                <Printer className="w-4 h-4 shrink-0" />
+                <span>🖨️ जमा व 80mm प्रिंट</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmitCollection(undefined, 'print58')}
+                className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                title="हप्ता सेव्ह करा आणि लगेच 58mm मिनी पावती प्रिंट करा"
+              >
+                <Printer className="w-4 h-4 shrink-0" />
+                <span>🖨️ जमा व 58mm प्रिंट</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleSubmitCollection(undefined, 'photo')}
+                className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                title="हप्ता सेव्ह करा आणि 58/80mm WhatsApp PNG पावती फोटो उघडा"
+              >
+                <Camera className="w-4 h-4 shrink-0 text-amber-300" />
+                <span>📸 जमा व फोटो</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (latestCardTx) {
+                    handleOpenReceiptModal(latestCardTx, '80mm');
+                  } else {
+                    setViewReceiptTx({
+                      id: 'preview-' + Date.now(),
+                      cardMemberId: currentMember.id,
+                      cardNo: currentMember.cardNo,
+                      memberName: currentMember.memberName,
+                      amount: Number(amount) || 100,
+                      date: new Date().toISOString(),
+                      collectedBy: agentName.trim() || defaultAgentName,
+                      receiptNo: receiptNo.trim() || generateReceiptNumber(currentMember.cardNo),
+                      monthNumber: weekNumber,
+                      weekNumber: weekNumber,
+                      paymentMode: paymentMode,
+                    });
+                    setViewReceiptFormat('80mm');
+                  }
+                }}
+                className="py-2.5 px-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-800 dark:text-emerald-300 font-extrabold text-xs flex items-center justify-center gap-1 border border-emerald-500/30 active:scale-95 cursor-pointer touch-manipulation min-h-[44px]"
+                title="पावती प्रिव्ह्यू पहा (Preview Slip)"
+              >
+                <Receipt className="w-4 h-4 shrink-0" />
+                <span>👁️ पावती प्रिव्ह्यू</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Modal Action Footer - Sticky at bottom for mobile view */}
@@ -973,6 +1120,16 @@ ${groupDisplay.displayText}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
+                  onClick={() => handleOpenReceiptModal(collectionSuccess, '80mm')}
+                  className="col-span-2 sm:col-span-1 py-2.5 px-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
+                  title="58mm / 80mm HD पावती फोटो व WhatsApp PNG पहा"
+                >
+                  <Camera className="w-4 h-4 shrink-0 text-amber-300" />
+                  <span>📸 58/80 फोटो पहा</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handlePrintThermalReceipt(collectionSuccess, '80mm')}
                   className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
                   title="80mm Thermal Slip Print (80mm पावती प्रिंट)"
@@ -989,21 +1146,6 @@ ${groupDisplay.displayText}
                 >
                   <Printer className="w-3.5 h-3.5 shrink-0" />
                   <span>58mm थर्मल</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isGeneratingPhoto}
-                  onClick={() => handleShareThermalPhoto(collectionSuccess, '80mm')}
-                  className="py-2.5 px-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-95 touch-manipulation min-h-[44px]"
-                  title="Share 80mm/58mm graphical thermal receipt slip photo directly on WhatsApp"
-                >
-                  {isGeneratingPhoto ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Camera className="w-3.5 h-3.5 shrink-0 text-amber-300" />
-                  )}
-                  <span>📸 पावती फोटो WhatsApp</span>
                 </button>
 
                 <button
@@ -1037,48 +1179,99 @@ ${groupDisplay.displayText}
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 w-full">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer min-h-[44px]"
-              >
-                रद्द करा (Cancel)
-              </button>
+            <div className="w-full space-y-2">
+              {/* Row 1: Direct 80mm / 58mm / Photo Action Buttons right in the footer! */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmitCollection(undefined, 'print80')}
+                  className="flex-1 py-2 px-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1 shadow cursor-pointer active:scale-95 touch-manipulation min-h-[42px]"
+                  title="हप्ता सेव्ह करा आणि लगेच 80mm पावती प्रिंट करा"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span>80mm प्रिंट</span>
+                </button>
 
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={handleSubmitCollection}
-                className={`px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow-md flex items-center gap-2 cursor-pointer transition active:scale-95 touch-manipulation min-h-[44px] ${
-                  isSubmitting
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-75'
-                    : existingEntryForWeek && !allowDuplicateOverride
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/25'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>नोंद होत आहे... (Saving...)</span>
-                  </>
-                ) : existingEntryForWeek && !allowDuplicateOverride ? (
-                  <>
-                    <AlertCircle className="w-4 h-4 text-white" />
-                    <span>तरीही हप्ता जमा करा (Collect ₹{amount})</span>
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="w-4 h-4" />
-                    <span>हप्ता जमा करा (Collect ₹{amount} Now)</span>
-                  </>
-                )}
-              </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmitCollection(undefined, 'print58')}
+                  className="flex-1 py-2 px-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1 border border-slate-700 cursor-pointer active:scale-95 touch-manipulation min-h-[42px]"
+                  title="हप्ता सेव्ह करा आणि लगेच 58mm मिनी प्रिंट करा"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span>58mm थर्मल</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmitCollection(undefined, 'photo')}
+                  className="flex-1 py-2 px-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-extrabold text-[11px] flex items-center justify-center gap-1 shadow cursor-pointer active:scale-95 touch-manipulation min-h-[42px]"
+                  title="हप्ता सेव्ह करा आणि WhatsApp PNG फोटो उघडा"
+                >
+                  <Camera className="w-3.5 h-3.5 shrink-0 text-amber-300" />
+                  <span>WhatsApp फोटो</span>
+                </button>
+              </div>
+
+              {/* Row 2: Cancel and Main Collect Button */}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer min-h-[44px]"
+                >
+                  रद्द करा (Cancel)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmitCollection(undefined, 'modal')}
+                  className={`flex-1 px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition active:scale-95 touch-manipulation min-h-[44px] ${
+                    isSubmitting
+                      ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-75'
+                      : existingEntryForWeek && !allowDuplicateOverride
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/25'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>नोंद होत आहे... (Saving...)</span>
+                    </>
+                  ) : existingEntryForWeek && !allowDuplicateOverride ? (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-white" />
+                      <span>तरीही जमा करा (₹{amount})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Receipt className="w-4 h-4" />
+                      <span>हप्ता जमा करा (Collect ₹{amount})</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* 58mm & 80mm Thermal Receipt Print & HD WhatsApp PNG Photo Modal */}
+      {viewReceiptTx && currentMember && (
+        <WeeklyDepositReceiptModal
+          isOpen={Boolean(viewReceiptTx)}
+          onClose={() => setViewReceiptTx(null)}
+          tx={viewReceiptTx}
+          member={currentMember}
+          settings={storeData.settings}
+          defaultFormat={viewReceiptFormat}
+        />
+      )}
     </div>
   );
 };
