@@ -2596,6 +2596,51 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Popular Local Searches in Wardha (Google #1 SEO Semantic Search Index) */}
+          <div className="pt-4 border-t border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <Search className="w-4 h-4 text-amber-400" />
+                <span>Popular Local Searches in Wardha (वर्ध्यातील लोकप्रिय शोध)</span>
+              </h3>
+              <span className="text-[11px] text-amber-400/90 font-bold hidden sm:inline">
+                ★ Ranked #1 Electronics &amp; Furniture Showroom
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[
+                { label: 'Wardha Best Furniture Shop', cat: 'Furniture' },
+                { label: 'Best Price Electronics Shop Wardha', cat: 'Electronics' },
+                { label: 'Teak Wood Sofa Set Wardha', cat: 'Furniture' },
+                { label: 'Smart LED TV Lowest Price Wardha', cat: 'Electronics' },
+                { label: 'Hydraulic Storage Bed Wardha', cat: 'Diwan' },
+                { label: 'Inverter Refrigerator Wardha', cat: 'Appliances' },
+                { label: 'Automatic Washing Machine Wardha', cat: 'Appliances' },
+                { label: 'Heavy Steel Almirah Wardrobe Wardha', cat: 'Furniture' },
+                { label: '30-Month Weekly Savings Scheme', cat: 'all' },
+                { label: '0% EMI Electronics & Furniture Wardha', cat: 'all' },
+                { label: 'Furniture Shop Near Me Wardha', cat: 'Furniture' },
+                { label: 'Wholesale Furniture Wardha', cat: 'Furniture' },
+                { label: 'Arvi Road Furniture Showroom', cat: 'all' },
+                { label: 'Pipri Wardha Electronics', cat: 'Electronics' },
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    if (item.cat !== 'all') setSelectedCategory(item.cat as any);
+                    const el = document.getElementById('featured-products-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#141d2c] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700/80 hover:border-amber-500/50 transition cursor-pointer text-[11px] font-semibold flex items-center gap-1.5 group"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 group-hover:scale-125 transition"></span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
