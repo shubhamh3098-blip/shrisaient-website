@@ -1924,7 +1924,7 @@ export const LandingPageEditorView: React.FC<LandingPageEditorViewProps> = ({
                     {[
                       { label: 'Smart 4K TV', url: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80' },
                       { label: 'Teak Sofa', url: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80' },
-                      { label: 'Diwan Cot', url: 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=800&auto=format&fit=crop&q=80' },
+                      { label: 'Diwan Cot', url: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80' },
                       { label: 'Refrigerator', url: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=800&auto=format&fit=crop&q=80' },
                       { label: 'Steel Almirah', url: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=800&auto=format&fit=crop&q=80' },
                       { label: 'Washing Machine', url: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=800&auto=format&fit=crop&q=80' },

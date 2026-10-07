@@ -20,7 +20,7 @@ export const GENUINE_PRODUCT_IMAGES: Record<string, string> = {
   // Solid Teak / Sheesham Wood King Bed
   'stk-4': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
   'bed': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
-  'king-bed': 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=800&auto=format&fit=crop&q=80',
+  'king-bed': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
 
   // Luxury Teak / Fabric Recliner Sofa Set
   'stk-5': 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80',
@@ -40,7 +40,7 @@ export const GENUINE_PRODUCT_IMAGES: Record<string, string> = {
   'microwave': 'https://images.unsplash.com/photo-1585659722983-3a675dabf23d?w=800&auto=format&fit=crop&q=80',
 
   // Teakwood Diwan Cot & Beds
-  'diwan': 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=800&auto=format&fit=crop&q=80',
+  'diwan': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
   'cot': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
 
   // Steel Almirah & Wardrobe Cupboard

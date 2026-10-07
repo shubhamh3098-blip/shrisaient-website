@@ -22,7 +22,8 @@ import {
   Smartphone,
   RefreshCw,
   TrendingUp,
-  ShieldCheck
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 import { NavTab } from '../Sidebar';
 import { useTheme } from '../../context/ThemeContext';
@@ -40,6 +41,7 @@ interface TopHubNavBarProps {
   onOpenMobileAgentTerminal?: () => void;
   onOpenFrontAddProductModal?: () => void;
   onOpenSeoModal?: () => void;
+  onOpenAdminCredentialsModal?: () => void;
   isSimpleView?: boolean;
   onToggleSimpleView?: () => void;
   isLiveSynced?: boolean;
@@ -59,6 +61,7 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
   onOpenMobileAgentTerminal,
   onOpenFrontAddProductModal,
   onOpenSeoModal,
+  onOpenAdminCredentialsModal,
   isSimpleView = true,
   onToggleSimpleView,
   isLiveSynced = true,
@@ -340,6 +343,23 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
             </button>
           )}
 
+          {/* Admin Credentials & PIN Change Button */}
+          {onOpenAdminCredentialsModal && (
+            <button
+              type="button"
+              onClick={() => handleAction(onOpenAdminCredentialsModal)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap shadow-xs ${
+                isDayMode
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border-amber-500/40'
+              }`}
+              title="ॲडमिन लॉगिन युझरनेम, पासवर्ड आणि पिन बदला"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] sm:text-xs">पिन बदला</span>
+            </button>
+          )}
+
           {/* Return to Dashboard (On desktop/tablet when outside dashboard) */}
           {currentTab !== 'dashboard' && (
             <button
@@ -477,6 +497,20 @@ export const TopHubNavBar: React.FC<TopHubNavBarProps> = ({
               <ShieldCheck className="w-3 h-3 text-teal-400" />
               <span>सिस्टीम शील्ड</span>
             </button>
+
+            {onOpenAdminCredentialsModal && (
+              <button
+                type="button"
+                onClick={() => handleAction(onOpenAdminCredentialsModal)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition cursor-pointer shrink-0 ${
+                  isDayMode ? 'bg-amber-50 text-amber-900 border-amber-300' : 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+                }`}
+                title="ॲडमिन लॉगिन व पासवर्ड व्यवस्थापन"
+              >
+                <KeyRound className="w-3 h-3 text-amber-400" />
+                <span>पिन व पासवर्ड बदला</span>
+              </button>
+            )}
 
             {onOpenSeoModal && (
               <button

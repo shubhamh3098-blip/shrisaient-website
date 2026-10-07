@@ -285,13 +285,15 @@ export class SecurityService {
       trimmedId === 'owner' ||
       trimmedId === (storeData.settings.phone || '').replace(/[^0-9]/g, '');
 
+    const isDefaultUnchanged =
+      secSettings.masterPasswordHash === this.hash('Admin@1079') ||
+      secSettings.masterPinHash === this.hash('1079');
+
     const isMasterPassword =
       secretHash === secSettings.masterPasswordHash ||
       secretHash === secSettings.masterPinHash ||
-      // Safe bootstrap check for default initial password
-      trimmedSecret === 'Admin@1079' ||
-      trimmedSecret === '1079' ||
-      trimmedSecret === '1234';
+      // Safe bootstrap check for default initial password only if password was never customized
+      (isDefaultUnchanged && (trimmedSecret === 'Admin@1079' || trimmedSecret === '1079' || trimmedSecret === '1234'));
 
     if (isMasterUsername && isMasterPassword) {
       this.resetLockout();
@@ -442,19 +444,20 @@ export class SecurityService {
   }
 
   /**
-   * Master Admin Password Change
+   * Master Admin Password & PIN Change
    */
   public static changeMasterPassword(currentSecret: string, newPasswordOrPin: string, isPinOnly = false): { success: boolean; error?: string } {
-    const auth = this.authenticateUser('admin', currentSecret);
+    const sec = this.getSecuritySettings();
+    const auth = this.authenticateUser(sec.masterUsername || 'admin', currentSecret);
     if (!auth.success) {
-      return { success: false, error: 'सध्याचा चालू पासवर्ड चुकीचा आहे. बदल नाकारला.' };
+      return { success: false, error: 'सध्याचा चालू पासवर्ड किंवा पिन चुकीचा आहे. बदल नाकारला.' };
     }
 
     if (!newPasswordOrPin || newPasswordOrPin.length < 4) {
-      return { success: false, error: 'नवीन पासवर्ड किमान ४ ते ६ अक्षरांचा असणे आवश्यक आहे.' };
+      return { success: false, error: 'नवीन पासवर्ड किमान ४ ते ६ अक्षरांचा किंवा अंकांचा असणे आवश्यक आहे.' };
     }
 
-    const hashed = this.hash(newPasswordOrPin);
+    const hashed = this.hash(newPasswordOrPin.trim());
     if (isPinOnly) {
       this.updateSecuritySettings({ masterPinHash: hashed });
     } else {
@@ -464,12 +467,140 @@ export class SecurityService {
       });
     }
 
+    // Also sync admin user in storeData.adminUsers
+    const store = StorageService.loadData();
+    if (store.adminUsers && store.adminUsers.length > 0) {
+      const admin = store.adminUsers.find(u => u.role === 'Admin' || u.id === 'usr-1');
+      if (admin) {
+        admin.pin = newPasswordOrPin.trim();
+        (admin as any).passwordHash = hashed;
+        StorageService.saveData(store, true);
+      }
+    }
+
     this.logSecurityAudit({
-      username: 'admin',
+      username: sec.masterUsername || 'admin',
       role: 'Admin',
       eventType: 'PASSWORD_CHANGED',
       ipOrDevice: navigator.userAgent,
-      details: 'सुपर ॲडमिन मास्टर पासवर्ड यशस्वीरीत्या बदलण्यात आला.',
+      details: 'सुपर ॲडमिन मास्टर पासवर्ड / पिन यशस्वीरीत्या बदलण्यात आला.',
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Update Admin Login Username, Display Name, and Password / PIN in 1 Unified Action
+   */
+  public static updateAdminCredentials(params: {
+    currentSecret?: string;
+    newUsername?: string;
+    newDisplayName?: string;
+    newPasswordOrPin?: string;
+    bypassCurrentSecret?: boolean;
+  }): { success: boolean; error?: string } {
+    const storeData = StorageService.loadData();
+    const secSettings = this.getSecuritySettings(storeData);
+
+    // Verify current secret if not bypassed
+    if (!params.bypassCurrentSecret && params.currentSecret) {
+      const auth = this.authenticateUser(secSettings.masterUsername || 'admin', params.currentSecret);
+      if (!auth.success) {
+        return { success: false, error: 'सध्याचा चालू पासवर्ड किंवा पिन चुकीचा आहे. बदल नाकारला.' };
+      }
+    }
+
+    const cleanUsername = params.newUsername ? params.newUsername.trim().toLowerCase() : secSettings.masterUsername;
+    if (cleanUsername.length < 3) {
+      return { success: false, error: 'लॉगिन युझरनेम किमान ३ अक्षरांचे असावे (उदा. admin, shubham).' };
+    }
+
+    let hashedSecret: string | null = null;
+    if (params.newPasswordOrPin) {
+      if (params.newPasswordOrPin.trim().length < 4) {
+        return { success: false, error: 'नवीन पासवर्ड किंवा पिन किमान ४ अक्षरांचा / अंकांचा असावा.' };
+      }
+      hashedSecret = this.hash(params.newPasswordOrPin.trim());
+    }
+
+    // 1. Update Security Settings
+    const newSecSettings: Partial<SecuritySettings> = {
+      masterUsername: cleanUsername,
+    };
+    if (hashedSecret) {
+      newSecSettings.masterPasswordHash = hashedSecret;
+      newSecSettings.masterPinHash = hashedSecret;
+    }
+    this.updateSecuritySettings(newSecSettings);
+
+    // 2. Update matching admin user in storeData.adminUsers
+    const updatedStoreData = StorageService.loadData();
+    if (!updatedStoreData.adminUsers) {
+      updatedStoreData.adminUsers = [];
+    }
+
+    let adminUser = updatedStoreData.adminUsers.find(
+      (u) => u.role === 'Admin' || u.id === 'usr-1' || u.id === 'usr-owner' || u.username === secSettings.masterUsername
+    );
+
+    if (adminUser) {
+      adminUser.username = cleanUsername;
+      if (params.newDisplayName) adminUser.displayName = params.newDisplayName.trim();
+      if (params.newPasswordOrPin) {
+        adminUser.pin = params.newPasswordOrPin.trim();
+        (adminUser as any).passwordHash = hashedSecret;
+      }
+    } else {
+      updatedStoreData.adminUsers.unshift({
+        id: 'usr-1',
+        username: cleanUsername,
+        displayName: params.newDisplayName?.trim() || updatedStoreData.settings.ownerName || 'Store Owner / Admin',
+        role: 'Admin',
+        pin: params.newPasswordOrPin ? params.newPasswordOrPin.trim() : '1234',
+        status: 'active',
+      });
+    }
+
+    if (params.newDisplayName) {
+      updatedStoreData.settings.ownerName = params.newDisplayName.trim();
+    }
+
+    // Save and push to cloud
+    StorageService.saveData(updatedStoreData, true);
+
+    this.logSecurityAudit({
+      username: cleanUsername,
+      role: 'Admin',
+      eventType: 'SECURITY_SETTINGS_UPDATED',
+      ipOrDevice: navigator.userAgent,
+      details: `ॲडमिन क्रेडेन्शियल्स यशस्वीरीत्या अपडेट करण्यात आले (लॉगिन नाव: ${cleanUsername}, पासवर्ड: ${params.newPasswordOrPin ? 'बदलला' : 'अपरिवर्तित'}).`,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Admin can update any staff user's PIN or credentials
+   */
+  public static updateUserPinByAdmin(userId: string, newPin: string): { success: boolean; error?: string } {
+    if (!newPin || newPin.trim().length < 4) {
+      return { success: false, error: 'पिन किमान ४ अंकांचा असावा.' };
+    }
+    const storeData = StorageService.loadData();
+    if (!storeData.adminUsers) return { success: false, error: 'वापरकर्ता आढळला नाही.' };
+    const user = storeData.adminUsers.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'वापरकर्ता आढळला नाही.' };
+
+    user.pin = newPin.trim();
+    (user as any).passwordHash = this.hash(newPin.trim());
+    StorageService.saveData(storeData, true);
+
+    this.logSecurityAudit({
+      username: 'admin',
+      role: 'Admin',
+      eventType: 'SECURITY_SETTINGS_UPDATED',
+      ipOrDevice: navigator.userAgent,
+      details: `वापरकर्ता "${user.displayName}" (${user.role}) चा पिन ॲडमिनने बदलला.`,
     });
 
     return { success: true };

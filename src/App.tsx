@@ -80,6 +80,7 @@ import { LandingPageEditorView } from './components/showroom/LandingPageEditorVi
 import { AppleHubSegmentBar } from './components/common/AppleHubSegmentBar';
 import { GoogleSeoIndexingModal } from './components/common/GoogleSeoIndexingModal';
 import { MobileAgentFieldTerminal } from './components/agent/MobileAgentFieldTerminal';
+import { AdminCredentialsModal } from './components/auth/AdminCredentialsModal';
 
 function AppContent() {
   const { isDayMode } = useTheme();
@@ -111,6 +112,7 @@ function AppContent() {
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
   const [isWeeklyCollectionModalOpen, setIsWeeklyCollectionModalOpen] = useState(false);
   const [isDailyBackupModalOpen, setIsDailyBackupModalOpen] = useState(false);
+  const [isAdminCredentialsModalOpen, setIsAdminCredentialsModalOpen] = useState(false);
   // Public Landing Page & Admin Authentication Lock with Auto-Lock protection
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -304,6 +306,7 @@ function AppContent() {
         onOpenFinanceModal={() => setIsFinanceModalOpen(true)}
         onOpenCustomerShowroom={() => setIsCustomerShowroomOpen(true)}
         onOpenSeoModal={() => setIsGoogleSeoModalOpen(true)}
+        onOpenAdminCredentialsModal={() => setIsAdminCredentialsModalOpen(true)}
         isSimpleView={isSimpleView}
         onToggleSimpleView={handleToggleSimpleView}
         isLiveSynced={isLiveSynced}
@@ -528,6 +531,7 @@ function AppContent() {
                   <SettingsView
                     storeData={storeData}
                     onRefreshData={handleRefreshData}
+                    onOpenAdminCredentialsModal={() => setIsAdminCredentialsModalOpen(true)}
                   />
                 )}
 
@@ -950,6 +954,17 @@ function AppContent() {
           onClose={() => setIsDailyBackupModalOpen(false)}
           storeData={storeData}
           onRefreshData={handleRefreshData}
+        />
+      )}
+
+      {/* Admin Login Username & Password / PIN Manager Modal */}
+      {isAdminCredentialsModalOpen && (
+        <AdminCredentialsModal
+          isOpen={isAdminCredentialsModalOpen}
+          onClose={() => setIsAdminCredentialsModalOpen(false)}
+          storeData={storeData}
+          onRefreshData={handleRefreshData}
+          currentUser={activeUser}
         />
       )}
 

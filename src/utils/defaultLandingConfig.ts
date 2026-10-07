@@ -41,7 +41,7 @@ export const DEFAULT_HERO_SLIDES: LandingHeroSlide[] = [
     titleLead: 'Solid Teak Sofas, Diwans &',
     titleHighlight: 'Heavy Steel Almirahs',
     subtitle: 'Crafted from 100% genuine seasoned Chandrapur teakwood without middlemen. Lifetime wood durability guarantee and free home delivery across Wardha district.',
-    imageUrl: 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=1600&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1600&auto=format&fit=crop&q=80',
     primaryBtnText: 'View Furniture Collection',
     primaryBtnTarget: 'catalog',
     secondaryBtnText: 'Contact Showroom on WhatsApp',
@@ -223,7 +223,7 @@ export const SAMPLE_SHOWROOM_PRODUCTS: Omit<StockItem, 'id' | 'updatedAt'>[] = [
     unit: 'Pcs',
     warrantyMonths: 36,
     description: 'Solid heavy commercial ply & teak border structure with spacious hydraulic storage for blankets and mattresses.',
-    imageUrl: 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=800&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
     isFeaturedOnLanding: true,
     landingBadge: 'Hot Deal',
     schemeWeeklyAmount: 100,
@@ -320,7 +320,12 @@ export function getActiveLandingConfig(config?: LandingPageConfig): LandingPageC
       ...DEFAULT_LANDING_CONFIG.announcement,
       ...(config.announcement || {}),
     },
-    heroSlides: config.heroSlides && config.heroSlides.length > 0 ? config.heroSlides : DEFAULT_HERO_SLIDES,
+    heroSlides: (config.heroSlides && config.heroSlides.length > 0 ? config.heroSlides : DEFAULT_HERO_SLIDES).map((s) => {
+      if (s.imageUrl && s.imageUrl.includes('1540518614846-7ede433c4ef0')) {
+        return { ...s, imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1600&auto=format&fit=crop&q=80' };
+      }
+      return s;
+    }),
     offers: config.offers && config.offers.length > 0 ? config.offers : DEFAULT_OFFERS,
     contactInfo: {
       ...DEFAULT_LANDING_CONFIG.contactInfo,

@@ -206,7 +206,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
       id: 'Diwan',
       label: 'Wooden Diwans',
       sub: '4x6 & 5x6 Storage Box Cots',
-      image: 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=300&auto=format&fit=crop&q=80',
+      image: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=400&auto=format&fit=crop&q=80',
       badge: 'Heavy Sagwan',
     },
     {
@@ -865,6 +865,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&auto=format&fit=crop&q=80';
+                    }}
                   />
                 </div>
                 <div className="text-center">
@@ -958,6 +961,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                       className="w-full h-full object-cover object-center transform scale-105 transition-transform duration-7000 ease-out"
                       referrerPolicy="no-referrer"
                       loading={idx === 0 ? 'eager' : 'lazy'}
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1600&auto=format&fit=crop&q=80';
+                      }}
                     />
                     {/* Thematic Deep Color Gradient Overlay */}
                     <div className={`absolute inset-0 bg-gradient-to-r ${slide.themeGradient}`} />
@@ -1500,6 +1506,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
+                    }}
                   />
 
                   {/* Brand Tag Top Left */}
@@ -2859,6 +2868,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 alt={quickViewProduct.name}
                 className="max-h-72 w-full object-contain"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
+                }}
               />
               <span className="absolute top-4 left-4 px-2.5 py-0.5 rounded bg-[#131921] text-[#febd69] text-xs font-black uppercase border border-slate-700">
                 {quickViewProduct.brand}

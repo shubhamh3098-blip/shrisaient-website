@@ -130,6 +130,32 @@ export class StorageService {
           }
         }
 
+        // Sanitize broken/404 image URLs in stock items and landing config
+        const BROKEN_IMG_ID = '1540518614846-7ede433c4ef0';
+        const VALID_BED_IMG = 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80';
+        const VALID_BED_HERO = 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1600&auto=format&fit=crop&q=80';
+        
+        let hasFixedImgs = false;
+        if (parsed.stock && Array.isArray(parsed.stock)) {
+          parsed.stock.forEach((item: any) => {
+            if (item.imageUrl && item.imageUrl.includes(BROKEN_IMG_ID)) {
+              item.imageUrl = VALID_BED_IMG;
+              hasFixedImgs = true;
+            }
+          });
+        }
+        if (parsed.landingPageConfig?.heroSlides) {
+          parsed.landingPageConfig.heroSlides.forEach((s: any) => {
+            if (s.imageUrl && s.imageUrl.includes(BROKEN_IMG_ID)) {
+              s.imageUrl = VALID_BED_HERO;
+              hasFixedImgs = true;
+            }
+          });
+        }
+        if (hasFixedImgs) {
+          this.saveData(parsed, false);
+        }
+
         // Automatic deduplication: clean up duplicate customers, cards, and receipts
         const deduped = StorageService.deduplicateStoreData(parsed);
         if (
@@ -586,9 +612,15 @@ export class StorageService {
       if (serverData) {
         notifyListeners(serverData);
       } else {
-        // If server had no data yet, push our current local state to initialize it
+        // Only push local state if local actually HAS real records (never overwrite with empty initial boot!)
         const current = this.loadData();
-        this.pushToServer(current);
+        const hasRecords =
+          (current.customers?.length || 0) > 0 ||
+          (current.cardMembers?.length || 0) > 0 ||
+          (current.transactions?.length || 0) > 0;
+        if (hasRecords) {
+          this.pushToServer(current);
+        }
       }
     });
 

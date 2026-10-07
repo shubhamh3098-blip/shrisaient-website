@@ -40,9 +40,14 @@ import { SecurityService } from '../../services/securityService';
 interface SettingsViewProps {
   storeData: StoreData;
   onRefreshData: () => void;
+  onOpenAdminCredentialsModal?: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ storeData, onRefreshData }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({
+  storeData,
+  onRefreshData,
+  onOpenAdminCredentialsModal,
+}) => {
   const [settings, setSettings] = useState<StoreSettings>(storeData.settings);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -63,7 +68,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeData, onRefresh
   const [userActionMessage, setUserActionMessage] = useState<string | null>(null);
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
 
+  // Individual user PIN editing
+  const [editingUserPinId, setEditingUserPinId] = useState<string | null>(null);
+  const [editingUserPinVal, setEditingUserPinVal] = useState<string>('');
+
   // Production Security States
+  const [adminUsernameInput, setAdminUsernameInput] = useState<string>(() => {
+    return SecurityService.getSecuritySettings(storeData).masterUsername || 'admin';
+  });
   const [currentMasterPassword, setCurrentMasterPassword] = useState('');
   const [newMasterPassword, setNewMasterPassword] = useState('');
   const [confirmMasterPassword, setConfirmMasterPassword] = useState('');
@@ -164,28 +176,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeData, onRefresh
     e.preventDefault();
     setMasterPassFeedback(null);
 
-    if (!currentMasterPassword) {
-      setMasterPassFeedback({ type: 'error', message: 'कृपया चालू पासवर्ड प्रविष्ट करा.' });
-      return;
-    }
-    if (newMasterPassword.length < 4) {
-      setMasterPassFeedback({ type: 'error', message: 'नवीन पासवर्ड किमान ४ अक्षरांचा किंवा अंकांचा असावा.' });
-      return;
-    }
-    if (newMasterPassword !== confirmMasterPassword) {
-      setMasterPassFeedback({ type: 'error', message: 'नवीन पासवर्ड आणि पुष्टीकरण जुळत नाहीत.' });
+    const cleanUsername = adminUsernameInput.trim().toLowerCase();
+    if (cleanUsername.length < 3) {
+      setMasterPassFeedback({ type: 'error', message: 'लॉगिन युझरनेम किमान ३ अक्षरांचे असावे (उदा. admin, shubham).' });
       return;
     }
 
-    const res = SecurityService.changeMasterPassword(currentMasterPassword, newMasterPassword);
+    if (newMasterPassword) {
+      if (newMasterPassword.length < 4) {
+        setMasterPassFeedback({ type: 'error', message: 'नवीन पासवर्ड किंवा पिन किमान ४ अक्षरांचा किंवा अंकांचा असावा.' });
+        return;
+      }
+      if (newMasterPassword !== confirmMasterPassword) {
+        setMasterPassFeedback({ type: 'error', message: 'नवीन पासवर्ड आणि पुष्टीकरण जुळत नाहीत.' });
+        return;
+      }
+      if (!currentMasterPassword) {
+        setMasterPassFeedback({ type: 'error', message: 'कृपया सध्याचा चालू पासवर्ड किंवा पिन प्रविष्ट करा.' });
+        return;
+      }
+    }
+
+    const res = SecurityService.updateAdminCredentials({
+      currentSecret: currentMasterPassword ? currentMasterPassword.trim() : undefined,
+      newUsername: cleanUsername,
+      newPasswordOrPin: newMasterPassword ? newMasterPassword.trim() : undefined,
+      bypassCurrentSecret: !newMasterPassword,
+    });
+
     if (res.success) {
-      setMasterPassFeedback({ type: 'success', message: 'मास्टर पासवर्ड यशस्वीरित्या बदलला आणि एनक्रिप्ट केला!' });
+      setMasterPassFeedback({
+        type: 'success',
+        message: `🎉 ॲडमिन क्रेडेन्शियल्स यशस्वीरित्या सेव्ह झाले! (लॉगिन नाव: ${cleanUsername}${newMasterPassword ? ', नवीन पासवर्ड लागू झाला' : ''})`,
+      });
       setCurrentMasterPassword('');
       setNewMasterPassword('');
       setConfirmMasterPassword('');
       onRefreshData();
     } else {
-      setMasterPassFeedback({ type: 'error', message: res.error || 'पासवर्ड बदल अयशस्वी.' });
+      setMasterPassFeedback({ type: 'error', message: res.error || 'बदल अयशस्वी. कृपया सध्याचा पिन तपासा.' });
+    }
+  };
+
+  const handleSaveStaffPin = (userId: string) => {
+    if (!editingUserPinVal || editingUserPinVal.trim().length < 4) {
+      setUserActionMessage('पिन किमान ४ अंकांचा असावा.');
+      return;
+    }
+    const res = SecurityService.updateUserPinByAdmin(userId, editingUserPinVal.trim());
+    if (res.success) {
+      setUserActionMessage('कर्मचाऱ्याचा पिन यशस्वीरीत्या बदलण्यात आला!');
+      setEditingUserPinId(null);
+      setEditingUserPinVal('');
+      onRefreshData();
+      setTimeout(() => setUserActionMessage(null), 3000);
+    } else {
+      setUserActionMessage(res.error || 'पिन बदल अयशस्वी.');
     }
   };
 
@@ -683,44 +729,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeData, onRefresh
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {(storeData.adminUsers || []).map((u) => {
                     const isRevealed = !!revealedPins[u.id];
+                    const isEditingPin = editingUserPinId === u.id;
+
                     return (
                       <div
                         key={u.id}
-                        className="p-2.5 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-between text-xs"
+                        className="p-2.5 rounded-lg bg-slate-800 border border-slate-700 flex flex-col justify-between gap-2 text-xs"
                       >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                u.status === 'active' ? 'bg-emerald-400' : 'bg-amber-400'
-                              }`}
-                            />
-                            <strong className="text-white">{u.displayName}</strong>
-                            <span className="text-[10px] text-amber-400">({u.role})</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  u.status === 'active' ? 'bg-emerald-400' : 'bg-amber-400'
+                                }`}
+                              />
+                              <strong className="text-white">{u.displayName}</strong>
+                              <span className="text-[10px] text-amber-400 font-bold">({u.role})</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                              <span>युझर: <strong className="text-slate-300">{u.username}</strong></span>
+                              <span>•</span>
+                              <span>पिन: {isRevealed ? u.pin : '••••'}</span>
+                              <button
+                                type="button"
+                                onClick={() => togglePinReveal(u.id)}
+                                className="text-slate-500 hover:text-amber-400 transition cursor-pointer p-0.5"
+                                title={isRevealed ? "पिन लपवा" : "पिन पहा"}
+                              >
+                                {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                            <span>पिन: {isRevealed ? u.pin : '••••'}</span>
+
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => togglePinReveal(u.id)}
-                              className="text-slate-500 hover:text-amber-400 transition cursor-pointer p-0.5"
-                              title={isRevealed ? "पिन लपवा" : "पिन पहा"}
+                              onClick={() => {
+                                setEditingUserPinId(isEditingPin ? null : u.id);
+                                setEditingUserPinVal(u.pin || '');
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-amber-300 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                              title="पिन बदला"
                             >
-                              {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              <KeyRound className="w-2.5 h-2.5" />
+                              <span>पिन बदला</span>
                             </button>
-                            {u.phone && <span>• {u.phone}</span>}
+                            {u.id !== 'admin-owner' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUser(u.id)}
+                                className="p-1 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                                title="खाते हटवा"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        {u.id !== 'admin-owner' && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="p-1 text-slate-400 hover:text-rose-400 transition cursor-pointer"
-                            title="खाते हटवा"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        {/* Inline PIN edit form */}
+                        {isEditingPin && (
+                          <div className="pt-2 border-t border-slate-700/80 flex items-center gap-1.5 animate-in fade-in">
+                            <input
+                              type="password"
+                              maxLength={8}
+                              value={editingUserPinVal}
+                              onChange={(e) => setEditingUserPinVal(e.target.value)}
+                              placeholder="नवीन पिन"
+                              className="w-24 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white font-mono text-center text-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveStaffPin(u.id)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition cursor-pointer"
+                            >
+                              सेव्ह
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingUserPinId(null);
+                                setEditingUserPinVal('');
+                              }}
+                              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs transition cursor-pointer"
+                            >
+                              रद्द
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -813,44 +909,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeData, onRefresh
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 {/* Master Password Change Box */}
-                <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 space-y-2.5">
-                  <div className="flex items-center gap-1.5 text-white font-bold">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                    <span>मास्टर पासवर्ड / पिन बदला (Change Master Password)</span>
+                <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-white font-bold">
+                      <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                      <span>मास्टर ॲडमिन लॉगिन व पासवर्ड बदला</span>
+                    </div>
+                    {onOpenAdminCredentialsModal && (
+                      <button
+                        type="button"
+                        onClick={onOpenAdminCredentialsModal}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>सविस्तर मॅनेजर उघडा</span>
+                      </button>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    वेबसाईट ऑनलाईन जाताना स्टोअर मालकाचा मास्टर पासवर्ड कूटबद्ध (SHA-256) ठेवला जातो.
+                    ॲडमिन लॉगिन नाव आणि पासवर्ड थेट येथून बदला. नवीन माहिती लगेच सर्व फोनवर लागू होते.
                   </p>
-                  <form onSubmit={handleChangeMasterPassword} className="space-y-2">
-                    <input
-                      type="password"
-                      placeholder="सध्याचा मास्टर पासवर्ड किंवा पिन (Current)"
-                      value={currentMasterPassword}
-                      onChange={(e) => setCurrentMasterPassword(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500"
-                    />
+                  <form onSubmit={handleChangeMasterPassword} className="space-y-2.5">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        लॉगिन युझरनेम (Username):
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="लॉगिन युझरनेम (उदा. admin, shubham)"
+                        value={adminUsernameInput}
+                        onChange={(e) => setAdminUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono placeholder-slate-500 text-xs focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        सध्याचा चालू पासवर्ड किंवा पिन (Current):
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="सध्याचा पासवर्ड / पिन"
+                        value={currentMasterPassword}
+                        onChange={(e) => setCurrentMasterPassword(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 text-xs focus:border-amber-400 focus:outline-none font-mono"
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="password"
-                        placeholder="नवीन पासवर्ड (New)"
-                        value={newMasterPassword}
-                        onChange={(e) => setNewMasterPassword(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500"
-                      />
-                      <input
-                        type="password"
-                        placeholder="पुष्टी करा (Confirm)"
-                        value={confirmMasterPassword}
-                        onChange={(e) => setConfirmMasterPassword(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500"
-                      />
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                          नवीन पासवर्ड / पिन (New):
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="नवीन पासवर्ड"
+                          value={newMasterPassword}
+                          onChange={(e) => setNewMasterPassword(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 text-xs focus:border-amber-400 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                          पुष्टी करा (Confirm):
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="पुन्हा टाईप करा"
+                          value={confirmMasterPassword}
+                          onChange={(e) => setConfirmMasterPassword(e.target.value)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 text-xs focus:border-amber-400 focus:outline-none font-mono"
+                        />
+                      </div>
                     </div>
                     <button
                       type="submit"
-                      className="w-full py-1.5 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow"
+                      className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow"
                     >
                       <Lock className="w-3.5 h-3.5" />
-                      <span>सुरक्षित पासवर्ड अपडेट करा (Enforce New Key)</span>
+                      <span>क्रेडेन्शियल्स अपडेट करा (Save Changes)</span>
                     </button>
                   </form>
                 </div>

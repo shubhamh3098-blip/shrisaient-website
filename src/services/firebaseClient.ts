@@ -132,24 +132,27 @@ let isPushing = false;
 let pendingPushData: StoreData | null = null;
 let pushDebounceTimer: any = null;
 
-// Initialize quota from localStorage or set initial lockout if recently exceeded
+// Initialize quota from localStorage only if a valid future timestamp exists
 let quotaExceededUntil = 0;
 try {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
     if (stored) {
-      quotaExceededUntil = parseInt(stored, 10) || 0;
+      const parsedTime = parseInt(stored, 10) || 0;
+      if (parsedTime > Date.now()) {
+        quotaExceededUntil = parsedTime;
+      } else {
+        localStorage.removeItem(QUOTA_STORAGE_KEY);
+      }
     }
   }
 } catch {}
 
-// If no stored quota lockout exists but we know from the server environment that quota was just exceeded today, set lockout
-if (quotaExceededUntil <= Date.now()) {
-  // Lockout for 6 hours to prevent hammering Google Cloud when free tier is exhausted
-  quotaExceededUntil = Date.now() + 1000 * 60 * 60 * 6;
+export function resetFirestoreQuotaLockout(): void {
+  quotaExceededUntil = 0;
   try {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(QUOTA_STORAGE_KEY, String(quotaExceededUntil));
+      localStorage.removeItem(QUOTA_STORAGE_KEY);
     }
   } catch {}
 }
@@ -197,6 +200,34 @@ export async function pushStoreDataToFirestore(data: StoreData): Promise<boolean
 
   isPushing = true;
   try {
+    // Guard against empty client overwrite:
+    // If incoming data has 0 records and is not an explicit reset,
+    // check if Firestore already contains records. Never erase cloud data from a fresh client!
+    const incomingCount =
+      (data.customers?.length || 0) +
+      (data.cardMembers?.length || 0) +
+      (data.transactions?.length || 0) +
+      (data.cardTransactions?.length || 0) +
+      (data.billReceipts?.length || 0);
+
+    if (incomingCount === 0 && !data.isExplicitReset) {
+      const metaDocRef = doc(db, 'stores', STORE_ID, 'meta', 'info');
+      const existingSnap = await getDoc(metaDocRef);
+      if (existingSnap.exists()) {
+        const existingMeta = existingSnap.data();
+        const existingChunkSum =
+          (existingMeta.chunkMeta?.customers || 0) +
+          (existingMeta.chunkMeta?.cardMembers || 0) +
+          (existingMeta.chunkMeta?.transactions || 0) +
+          (existingMeta.chunkMeta?.cardTransactions || 0) +
+          (existingMeta.chunkMeta?.billReceipts || 0);
+        if (existingChunkSum > 0) {
+          console.log('[Firebase Firestore] Shielded cloud store data from empty overwrite.');
+          return true;
+        }
+      }
+    }
+
     const updatedAt = data.updatedAt || new Date().toISOString();
 
     const customerChunks = chunkArray(data.customers || []);

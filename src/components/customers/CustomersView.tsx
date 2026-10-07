@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -61,6 +61,11 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVillage, setSelectedVillage] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'due-desc' | 'due-asc' | 'purchase-desc' | 'name-asc'>('due-desc');
+  const [displayLimit, setDisplayLimit] = useState(50);
+
+  useEffect(() => {
+    setDisplayLimit(50);
+  }, [searchQuery, selectedVillage, dueFilter, sortBy]);
 
   // Modals
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
@@ -171,6 +176,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
 
     return result;
   }, [storeData.customers, searchQuery, selectedVillage, dueFilter, sortBy]);
+
+  const displayedCustomers = useMemo(() => {
+    return filteredCustomers.slice(0, displayLimit);
+  }, [filteredCustomers, displayLimit]);
 
   // WhatsApp 1-Click Statement Share from Card
   const handleQuickWhatsApp = (cust: Customer) => {
@@ -560,8 +569,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredCustomers.map((cust) => {
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {displayedCustomers.map((cust) => {
                 const totalPurchased = cust.totalPurchased || 0;
                 const currentBalance = cust.currentBalance || 0;
                 const totalPaid = Math.max(0, totalPurchased - currentBalance);
@@ -684,8 +694,33 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                 );
               })}
             </div>
-          )}
-        </div>
+
+            {filteredCustomers.length > displayedCustomers.length && (
+              <div className="mt-4 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <span className="text-slate-500 font-medium text-center sm:text-left">
+                  दाखवत आहे: <strong className="text-amber-500 font-bold">{displayedCustomers.length}</strong> / एकूण {filteredCustomers.length} ग्राहक (सुपरफास्ट व्ह्यू)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayLimit((prev) => Math.min(prev + 50, filteredCustomers.length))}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition cursor-pointer shadow-xs active:scale-95"
+                  >
+                    + आणखी ५० ग्राहक पहा
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayLimit(filteredCustomers.length)}
+                    className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition cursor-pointer"
+                  >
+                    सर्व ({filteredCustomers.length})
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
       ) : (
         /* TABLE REGISTER VIEW ("सर्व डेटा रजिस्टर") */
         <div className={`rounded-2xl border overflow-hidden shadow-xs ${
@@ -709,7 +744,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredCustomers.map((cust) => (
+                {displayedCustomers.map((cust) => (
                   <tr
                     key={cust.id}
                     className={`transition ${
@@ -777,6 +812,30 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
               </tbody>
             </table>
           </div>
+
+          {filteredCustomers.length > displayedCustomers.length && (
+            <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <span className="text-slate-500 font-medium text-center sm:text-left">
+                दाखवत आहे: <strong className="text-amber-500 font-bold">{displayedCustomers.length}</strong> / एकूण {filteredCustomers.length} ग्राहक (सुपरफास्ट टेबल)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit((prev) => Math.min(prev + 50, filteredCustomers.length))}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition cursor-pointer shadow-xs active:scale-95"
+                >
+                  + आणखी ५० ग्राहक पहा
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(filteredCustomers.length)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition cursor-pointer"
+                >
+                  सर्व ({filteredCustomers.length})
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -159,11 +159,11 @@ Wooden King Size Bed,फर्निचर,32000,24000,3,1`,
       if (category === 'customers') {
         const res = importCustomersTolerant(parsed.headers, parsed.rows, storeData, mode);
         onRefreshData();
-        setImportSuccessMsg(`🎉 अभिनंदन! "${file.name}" मधील सर्व ${res.totalRowsProcessed} नोंदी सिस्टीममध्ये सुरक्षित सेव्ह झाल्या! (नवीन: ${res.added}, अद्ययावत: ${res.updated})`);
+        setImportSuccessMsg(`🎉 अभिनंदन! "${file.name}" मधील सर्व ${res.totalRowsProcessed} नोंदी सुरक्षित सेव्ह झाल्या आणि इतर सर्व फोन/डिव्हाइसवर सिंक झाल्या! (नवीन: ${res.added}, अद्ययावत: ${res.updated})`);
       } else if (category === 'scheme') {
         const res = importSchemeCardsTolerant(parsed.headers, parsed.rows, storeData);
         onRefreshData();
-        setImportSuccessMsg(`🎉 अभिनंदन! "${file.name}" मधील सर्व ${res.totalRowsProcessed} कार्ड नोंदी सुरक्षित सेव्ह झाल्या! (नवीन: ${res.added}, अद्ययावत: ${res.updated})`);
+        setImportSuccessMsg(`🎉 अभिनंदन! "${file.name}" मधील सर्व ${res.totalRowsProcessed} कार्ड नोंदी सुरक्षित सेव्ह झाल्या आणि इतर सर्व फोन/डिव्हाइसवर सिंक झाल्या! (नवीन: ${res.added}, अद्ययावत: ${res.updated})`);
       } else {
         setImportSuccessMsg(`Excel/CSV फाईल मधून ${parsed.rows.length} नोंदी वाचल्या! खालील "आता आयात करा" बटनाने सेव्ह करा.`);
       }
@@ -214,11 +214,11 @@ Wooden King Size Bed,फर्निचर,32000,24000,3,1`,
         const mode = importMode === 'append' ? 'allow' : 'merge';
         const res = importCustomersTolerant(table.headers, table.rows, storeData, mode);
         onRefreshData();
-        setImportSuccessMsg(`🎉 अभिनंदन! एकूण ${res.totalRowsProcessed} पैकी ${res.added} नवीन ग्राहक जोडले आणि ${res.updated} अद्ययावत केले. सर्व नोंदी सेव्ह झाल्या! (Firebase Quota 0% वापरला गेला)`);
+        setImportSuccessMsg(`🎉 अभिनंदन! एकूण ${res.totalRowsProcessed} पैकी ${res.added} नवीन ग्राहक जोडले आणि ${res.updated} अद्ययावत केले. सर्व नोंदी सेव्ह झाल्या आणि क्लाउडवर सर्व फोनसाठी सिंक झाल्या!`);
       } else if (importCategory === 'scheme') {
         const res = importSchemeCardsTolerant(table.headers, table.rows, storeData);
         onRefreshData();
-        setImportSuccessMsg(`🎉 यशस्वी! एकूण ${res.totalRowsProcessed} पैकी ${res.added} कार्ड सभासद जोडले गेले. सर्व नोंदी सुरक्षित सेव्ह झाल्या!`);
+        setImportSuccessMsg(`🎉 यशस्वी! एकूण ${res.totalRowsProcessed} पैकी ${res.added} कार्ड सभासद जोडले गेले. सर्व नोंदी सुरक्षित सेव्ह झाल्या आणि क्लाउडवर सिंक झाल्या!`);
       } else if (importCategory === 'stock') {
         const newItems: StockItem[] = table.rows.map((cols, i) => {
           const name = cols[0] || `Product ${i + 1}`;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   CreditCard,
   Plus,
@@ -180,6 +180,16 @@ export const SchemeManagerView: React.FC<SchemeManagerViewProps> = ({
       return true;
     });
   }, [allEnrichedMembers, activeSchemeTab, statusFilter, searchQuery]);
+
+  const [displayMemberLimit, setDisplayMemberLimit] = useState(50);
+
+  useEffect(() => {
+    setDisplayMemberLimit(50);
+  }, [activeSchemeTab, statusFilter, searchQuery]);
+
+  const displayedMembers = useMemo(() => {
+    return filteredMembers.slice(0, displayMemberLimit);
+  }, [filteredMembers, displayMemberLimit]);
 
   // Statistics for Current Scheme View
   const schemeStats = useMemo(() => {
@@ -792,7 +802,7 @@ ${groupDisplay.displayText}
                 No members found. Please adjust filters or enroll a new member (कोणतेही सभासद सापडले नाहीत).
               </div>
             ) : (
-              filteredMembers.map((member) => {
+              displayedMembers.map((member) => {
                 const isSelected = selectedMember?.id === member.id;
                 const badgeClasses = getSchemeBadgeClasses(member.schemeNo);
                 const progressPct = Math.round(
@@ -905,6 +915,21 @@ ${groupDisplay.displayText}
                   </div>
                 );
               })
+            )}
+
+            {filteredMembers.length > displayedMembers.length && (
+              <div className="p-3 my-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-500 text-[11px]">
+                  दाखवत आहे: <strong className="text-amber-500 font-bold">{displayedMembers.length}</strong> / एकूण {filteredMembers.length} सभासद
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMemberLimit((prev) => Math.min(prev + 50, filteredMembers.length))}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition text-xs cursor-pointer shadow-xs active:scale-95"
+                >
+                  + आणखी ५० सभासद पहा
+                </button>
+              </div>
             )}
           </div>
         </div>

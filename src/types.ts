@@ -661,6 +661,7 @@ export interface StoreData {
   savedPromos?: FestivalPromoCreative[];
   lastBackupDate?: string;
   isDemoWiped?: boolean;
+  isExplicitReset?: boolean;
   securitySettings?: SecuritySettings;
   securityAuditLogs?: SecurityAuditEntry[];
   landingPageConfig?: LandingPageConfig;

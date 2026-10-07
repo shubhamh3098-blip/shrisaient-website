@@ -573,7 +573,7 @@ export const cleanDemoStock: StockItem[] = [
     unit: 'Sets',
     location: 'Floor 2 - Diwan Gallery',
     warrantyMonths: 36,
-    imageUrl: 'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?w=800&auto=format&fit=crop&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80',
     description: 'अस्सल सागवान लाकडी दिवाण कॉट, ४x६ साईझ, बॉक्स स्टोरेज, मजबूत लाकूड पॉलिश',
     updatedAt: '2026-09-18T10:00:00Z',
   },
