@@ -1,0 +1,241 @@
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
+
+// High-contrast, radiant luxury Gold & Royal Navy Medallion SVG for App Icon & Google Favicon
+const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Royal Deep Navy Background with Warm Center Glow -->
+    <radialGradient id="navyGlow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="40%" stop-color="#0f172a"/>
+      <stop offset="85%" stop-color="#090d16"/>
+      <stop offset="100%" stop-color="#05070c"/>
+    </radialGradient>
+
+    <!-- Radiant 24K Polished Gold Gradient for Ring -->
+    <linearGradient id="ringGold" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#fffbe6"/>
+      <stop offset="15%" stop-color="#fde047"/>
+      <stop offset="35%" stop-color="#eab308"/>
+      <stop offset="55%" stop-color="#ca8a04"/>
+      <stop offset="75%" stop-color="#fef08a"/>
+      <stop offset="90%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#854d0e"/>
+    </linearGradient>
+
+    <!-- Brilliant 3D Monogram Gold -->
+    <linearGradient id="monoGold" x1="25%" y1="15%" x2="75%" y2="85%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="20%" stop-color="#fef08a"/>
+      <stop offset="45%" stop-color="#eab308"/>
+      <stop offset="70%" stop-color="#ca8a04"/>
+      <stop offset="85%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#713f12"/>
+    </linearGradient>
+
+    <!-- Feather & Sacred Crest Gradient -->
+    <linearGradient id="featherGrad" x1="0%" y1="100%" x2="60%" y2="0%">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="40%" stop-color="#fde047"/>
+      <stop offset="75%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+
+    <!-- High-Glow Flare -->
+    <radialGradient id="starFlare" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#fef08a"/>
+      <stop offset="70%" stop-color="#eab308" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#eab308" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="goldDrop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.85"/>
+    </filter>
+  </defs>
+
+  <!-- Base Circle Background -->
+  <circle cx="256" cy="256" r="248" fill="url(#navyGlow)" stroke="url(#ringGold)" stroke-width="4"/>
+
+  <!-- Outer Thick Gold 3D Ring -->
+  <circle cx="256" cy="256" r="226" fill="none" stroke="url(#ringGold)" stroke-width="14" filter="url(#goldDrop)"/>
+  <circle cx="256" cy="256" r="217" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="256" cy="256" r="206" fill="none" stroke="url(#ringGold)" stroke-width="3"/>
+
+  <!-- Sacred Feather & Tilak Top Crest -->
+  <g filter="url(#goldDrop)">
+    <!-- Central Feather -->
+    <path d="M246,145 C242,112 248,80 264,52 C276,74 274,108 260,145 C256,134 256,120 258,102 C252,115 250,131 246,145 Z" fill="url(#featherGrad)"/>
+    <path d="M244,124 C236,110 238,94 248,80 C249,92 247,106 244,124 Z" fill="url(#featherGrad)"/>
+    <!-- Sacred Tilak / Bindi -->
+    <ellipse cx="256" cy="154" rx="4" ry="7" fill="#ef4444"/>
+    <ellipse cx="256" cy="154" rx="2" ry="4" fill="#fef08a"/>
+  </g>
+
+  <!-- Central 3D Embossed Monogram 'SS' / 'श्री' -->
+  <g filter="url(#goldDrop)">
+    <!-- First 'S' -->
+    <path d="M200,165 C222,165 235,170 242,176 C245,179 248,181 251,181 C254,181 256,177 257,171 L263,171 C262,185 261,202 261,218 L254,218 C253,204 248,192 239,183 C230,175 218,172 206,172 C194,172 186,177 186,186 C186,194 191,200 200,206 C209,212 223,222 233,229 C244,237 251,246 256,256 C261,266 261,279 261,293 C261,310 252,322 237,327 C222,332 204,332 187,332 C171,332 161,329 154,326 C149,323 146,323 144,325 L142,333 L136,333 C137,325 137,314 137,298 L143,298 C144,313 148,324 157,330 C166,336 179,336 193,336 C202,336 208,333 214,328 C220,323 223,316 223,308 C223,298 219,291 211,284 C203,277 193,270 183,263 C172,255 163,247 157,237 C151,227 151,214 151,201 C151,185 159,175 171,170 C183,165 194,165 200,165 Z" fill="url(#monoGold)"/>
+
+    <!-- Second 'S' Layered -->
+    <path d="M312,165 C334,165 347,170 354,176 C357,179 360,181 363,181 C366,181 368,177 369,171 L375,171 C374,185 373,202 373,218 L366,218 C365,204 360,192 351,183 C342,175 330,172 318,172 C306,172 298,177 298,186 C298,194 303,200 312,206 C321,212 335,222 345,229 C356,237 363,246 368,256 C373,266 373,279 373,293 C373,310 364,322 349,327 C334,332 316,332 299,332 C283,332 273,329 266,326 C261,323 258,323 256,325 L254,333 L248,333 C249,325 249,314 249,298 L255,298 C256,313 260,324 269,330 C278,336 291,336 305,336 C314,336 320,333 326,328 C332,323 335,316 335,308 C335,298 331,291 323,284 C315,277 305,270 295,263 C284,255 275,247 269,237 C263,227 263,214 263,201 C263,185 271,175 283,170 C295,165 306,165 312,165 Z" fill="url(#monoGold)"/>
+  </g>
+
+  <!-- Marathi 'श्री साई' Header Banner -->
+  <g filter="url(#goldDrop)">
+    <text x="256" y="378" font-family="'Cinzel', 'Plus Jakarta Sans', Arial, sans-serif" font-weight="900" font-size="34" fill="url(#ringGold)" text-anchor="middle" letter-spacing="4">श्री साई</text>
+    <text x="256" y="412" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="800" font-size="16" fill="#fef08a" text-anchor="middle" letter-spacing="6">ENTERPRISES</text>
+    <text x="256" y="432" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-weight="700" font-size="11" fill="#cbd5e1" text-anchor="middle" letter-spacing="3">WARDHA • 30M SCHEME</text>
+  </g>
+
+  <!-- Brilliant Sparkling Stars on rim -->
+  <g transform="translate(424, 110)">
+    <circle cx="0" cy="0" r="22" fill="url(#starFlare)"/>
+    <path d="M0,-20 L2,0 L0,20 L-2,0 Z" fill="#ffffff"/>
+    <path d="M-20,0 L0,2 L20,0 L0,-2 Z" fill="#ffffff"/>
+    <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+  </g>
+
+  <g transform="translate(88, 390)">
+    <circle cx="0" cy="0" r="16" fill="url(#starFlare)"/>
+    <path d="M0,-14 L1.5,0 L0,14 L-1.5,0 Z" fill="#ffffff"/>
+    <path d="M-14,0 L0,1.5 L14,0 L0,-1.5 Z" fill="#ffffff"/>
+    <circle cx="0" cy="0" r="2" fill="#ffffff"/>
+  </g>
+</svg>`;
+
+// OpenGraph Card (1200x630) for Google Rich Snippets, WhatsApp Link Previews, Facebook & Twitter
+const ogSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bgOg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="goldHead" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fffbe6"/>
+      <stop offset="30%" stop-color="#fde047"/>
+      <stop offset="70%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bgOg)"/>
+  <rect x="24" y="24" width="1152" height="582" rx="28" fill="none" stroke="#eab308" stroke-width="2" stroke-opacity="0.4"/>
+
+  <!-- Left Side: App Icon Medallion -->
+  <g transform="translate(100, 105)">
+    <!-- Outer Glow Circle -->
+    <circle cx="210" cy="210" r="200" fill="#0f172a" stroke="#eab308" stroke-width="6"/>
+    <circle cx="210" cy="210" r="185" fill="none" stroke="#fde047" stroke-width="2" opacity="0.6"/>
+    <text x="210" y="190" font-family="Arial, sans-serif" font-weight="900" font-size="80" fill="#fde047" text-anchor="middle">SS</text>
+    <text x="210" y="250" font-family="Arial, sans-serif" font-weight="900" font-size="32" fill="#ffffff" text-anchor="middle" letter-spacing="3">श्री साई</text>
+    <text x="210" y="285" font-family="Arial, sans-serif" font-weight="700" font-size="18" fill="#eab308" text-anchor="middle" letter-spacing="4">ENTERPRISES</text>
+  </g>
+
+  <!-- Right Side: Business Title & Info -->
+  <g transform="translate(560, 140)">
+    <!-- Badge -->
+    <rect x="0" y="0" width="310" height="38" rx="19" fill="#eab308" fill-opacity="0.15" stroke="#eab308" stroke-width="1.5"/>
+    <text x="155" y="25" font-family="Arial, sans-serif" font-weight="800" font-size="15" fill="#fde047" text-anchor="middle" letter-spacing="2">⭐ वर्ध्याचे #१ दालन (WARDHA #1)</text>
+
+    <!-- Main Title -->
+    <text x="0" y="100" font-family="Arial, sans-serif" font-weight="900" font-size="52" fill="url(#goldHead)">श्री साई एंटरप्रायझेस</text>
+    <text x="0" y="150" font-family="Arial, sans-serif" font-weight="800" font-size="28" fill="#ffffff">इलेक्ट्रॉनिक्स &amp; टीकवुड फर्निचर शोरूम</text>
+
+    <!-- Scheme Highlight -->
+    <rect x="0" y="180" width="560" height="70" rx="16" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="24" y="222" font-family="Arial, sans-serif" font-weight="800" font-size="20" fill="#34d399">३०-महिने साप्ताहिक बचत योजना (₹१००/₹२००)</text>
+    <text x="24" y="244" font-family="Arial, sans-serif" font-weight="600" font-size="14" fill="#94a3b8">मासिक लकी ड्रॉ बंपर बक्षिसे व हमखास गॅरंटीड साहित्य</text>
+
+    <!-- Contact & Location -->
+    <text x="0" y="295" font-family="Arial, sans-serif" font-weight="700" font-size="18" fill="#fde047">📞 8600122978 / 9175537365</text>
+    <text x="0" y="325" font-family="Arial, sans-serif" font-weight="600" font-size="15" fill="#94a3b8">📍 मातोश्री सभागृह समोर, आर्वी रोड, पंजाब कॉलनी, वर्धा</text>
+  </g>
+</svg>`;
+
+async function main() {
+  const publicDir = path.resolve('public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+
+  const iconBuffer = Buffer.from(iconSvg);
+  const ogBuffer = Buffer.from(ogSvg);
+
+  console.log('Generating PNG icons from high-contrast gold & royal navy master SVG...');
+
+  // 1. icon-512.png
+  await sharp(iconBuffer)
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'icon-512.png'));
+  console.log('✓ icon-512.png created');
+
+  // 2. icon-192.png
+  await sharp(iconBuffer)
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(publicDir, 'icon-192.png'));
+  console.log('✓ icon-192.png created');
+
+  // 3. icon-maskable-512.png
+  await sharp(iconBuffer)
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'icon-maskable-512.png'));
+  console.log('✓ icon-maskable-512.png created');
+
+  // 4. icon-maskable-192.png
+  await sharp(iconBuffer)
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(publicDir, 'icon-maskable-192.png'));
+  console.log('✓ icon-maskable-192.png created');
+
+  // 5. apple-touch-icon.png (180x180)
+  await sharp(iconBuffer)
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  console.log('✓ apple-touch-icon.png created');
+
+  // 6. favicon-32x32.png
+  await sharp(iconBuffer)
+    .resize(32, 32)
+    .png()
+    .toFile(path.join(publicDir, 'favicon-32x32.png'));
+  console.log('✓ favicon-32x32.png created');
+
+  // 7. favicon-16x16.png
+  await sharp(iconBuffer)
+    .resize(16, 16)
+    .png()
+    .toFile(path.join(publicDir, 'favicon-16x16.png'));
+  console.log('✓ favicon-16x16.png created');
+
+  // 8. shri-sai-logo.png
+  await sharp(iconBuffer)
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(publicDir, 'shri-sai-logo.png'));
+  console.log('✓ shri-sai-logo.png created');
+
+  // 9. og-image.png (1200x630) for Google Rich Snippets & WhatsApp
+  await sharp(ogBuffer)
+    .resize(1200, 630)
+    .png()
+    .toFile(path.join(publicDir, 'og-image.png'));
+  console.log('✓ og-image.png created');
+
+  // 10. Save enhanced master SVGs as well
+  fs.writeFileSync(path.join(publicDir, 'shri-sai-logo.svg'), iconSvg, 'utf8');
+  fs.writeFileSync(path.join(publicDir, 'favicon.svg'), iconSvg, 'utf8');
+  console.log('✓ shri-sai-logo.svg and favicon.svg updated with high-contrast luxury gold medallion');
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

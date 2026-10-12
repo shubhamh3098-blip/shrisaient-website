@@ -28,11 +28,97 @@ if (!fs.existsSync(DATA_DIR)) {
 
 let serverStoreData: any = null;
 
+function deduplicateServerData(data: any): any {
+  if (!data) return data;
+
+  const getCustomerKey = (c: any) => {
+    const cleanPhone = (c.phone || '').replace(/\D/g, '');
+    const cleanName = (c.name || '').trim().toLowerCase();
+    const cleanVillage = (c.village || c.city || c.address || '').trim().toLowerCase();
+    if (cleanPhone.length >= 10) {
+      return 'p:' + cleanPhone.slice(-10);
+    }
+    return 'nv:' + cleanName + '|' + cleanVillage;
+  };
+
+  const custMap = new Map();
+  for (const c of (data.customers || [])) {
+    const key = getCustomerKey(c);
+    if (!custMap.has(key)) {
+      custMap.set(key, c);
+    } else {
+      const existing = custMap.get(key);
+      const cBal = c.currentBalance || 0;
+      const exBal = existing.currentBalance || 0;
+      const cPurch = c.totalPurchased || c.totalPurchase || 0;
+      const exPurch = existing.totalPurchased || existing.totalPurchase || 0;
+      if (cBal > exBal || (cBal === exBal && cPurch >= exPurch)) {
+        custMap.set(key, { ...existing, ...c });
+      } else {
+        custMap.set(key, { ...c, ...existing });
+      }
+    }
+  }
+
+  const cardMap = new Map();
+  for (const m of (data.cardMembers || [])) {
+    const key = (m.cardNo || m.id).trim().toLowerCase();
+    if (!cardMap.has(key)) {
+      cardMap.set(key, m);
+    } else {
+      const existing = cardMap.get(key);
+      const mMonths = m.totalPaidMonths || m.paidMonthsCount || 0;
+      const exMonths = existing.totalPaidMonths || existing.paidMonthsCount || 0;
+      const mPaid = m.totalAmountPaid || m.totalPaid || 0;
+      const exPaid = existing.totalAmountPaid || existing.totalPaid || 0;
+      if (mMonths > exMonths || (mMonths === exMonths && mPaid >= exPaid)) {
+        cardMap.set(key, { ...existing, ...m });
+      } else {
+        cardMap.set(key, { ...m, ...existing });
+      }
+    }
+  }
+
+  const ctxMap = new Map();
+  for (const t of (data.cardTransactions || [])) {
+    const key = (t.receiptNo || (t.cardNo + '_' + (t.weekNumber || t.monthNumber))).trim().toLowerCase();
+    if (!ctxMap.has(key)) {
+      ctxMap.set(key, t);
+    }
+  }
+
+  const txMap = new Map();
+  for (const t of (data.transactions || [])) {
+    const key = (t.invoiceNo || t.id).trim().toLowerCase();
+    if (!txMap.has(key)) {
+      txMap.set(key, t);
+    }
+  }
+
+  const billMap = new Map();
+  for (const b of (data.billReceipts || [])) {
+    const key = String(b.receiptNo || b.id).trim().toLowerCase();
+    if (!billMap.has(key)) {
+      billMap.set(key, b);
+    }
+  }
+
+  return {
+    ...data,
+    customers: Array.from(custMap.values()),
+    cardMembers: Array.from(cardMap.values()),
+    cardTransactions: Array.from(ctxMap.values()),
+    transactions: Array.from(txMap.values()),
+    billReceipts: Array.from(billMap.values()),
+  };
+}
+
 // Load persisted data on server boot
 try {
   if (fs.existsSync(DATA_FILE)) {
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    serverStoreData = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    serverStoreData = deduplicateServerData(parsed);
     console.log(`[Realtime Sync] Loaded existing store data from ${DATA_FILE}`);
   }
 } catch (err) {
@@ -102,23 +188,24 @@ app.post("/api/sync", (req, res) => {
     });
   }
 
-  // Stamp updated timestamp
-  data.updatedAt = new Date().toISOString();
-  serverStoreData = data;
+  // Deduplicate and stamp updated timestamp
+  const cleanData = deduplicateServerData(data);
+  cleanData.updatedAt = new Date().toISOString();
+  serverStoreData = cleanData;
 
   // Persist to disk synchronously so it survives restarts
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+    fs.writeFileSync(DATA_FILE, JSON.stringify(cleanData, null, 2), "utf-8");
   } catch (err) {
     console.error("[Realtime Sync] Error saving store data to file:", err);
   }
 
   // Broadcast in real-time to all connected mobile agents and desktops
-  broadcastSyncUpdate(data, sourceDeviceId);
+  broadcastSyncUpdate(cleanData, sourceDeviceId);
 
   res.json({
     success: true,
-    version: data.updatedAt,
+    version: cleanData.updatedAt,
     connectedDevices: sseClients.size,
   });
 });

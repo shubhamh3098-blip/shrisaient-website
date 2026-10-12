@@ -1,100 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <!-- Luminous Royal Sapphire & Vibrant Navy Disc (High brightness, NO pitch black) -->
-    <radialGradient id="vibrantNavy" cx="50%" cy="46%" r="54%">
-      <stop offset="0%" stop-color="#2563eb"/>
-      <stop offset="30%" stop-color="#1d4ed8"/>
-      <stop offset="65%" stop-color="#1e3a8a"/>
-      <stop offset="90%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#090d16"/>
-    </radialGradient>
-
-    <!-- Warm Golden Aura Flare in the center -->
-    <radialGradient id="goldHalo" cx="50%" cy="48%" r="45%">
-      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.85"/>
-      <stop offset="35%" stop-color="#f59e0b" stop-opacity="0.5"/>
-      <stop offset="70%" stop-color="#d97706" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#b45309" stop-opacity="0"/>
-    </radialGradient>
-
-    <!-- Radiant 24K Polished Gold Rim Gradient -->
-    <linearGradient id="pureGoldRim" x1="10%" y1="10%" x2="90%" y2="90%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="15%" stop-color="#fef08a"/>
-      <stop offset="35%" stop-color="#fbbf24"/>
-      <stop offset="55%" stop-color="#d97706"/>
-      <stop offset="75%" stop-color="#fef08a"/>
-      <stop offset="90%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#b45309"/>
-    </linearGradient>
-
-    <!-- Ultra-Luminous 3D Gold for Central Emblem -->
-    <linearGradient id="emblemGold3D" x1="15%" y1="10%" x2="85%" y2="90%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="20%" stop-color="#fffbeb"/>
-      <stop offset="38%" stop-color="#fde047"/>
-      <stop offset="60%" stop-color="#f59e0b"/>
-      <stop offset="80%" stop-color="#d97706"/>
-      <stop offset="92%" stop-color="#fef08a"/>
-      <stop offset="100%" stop-color="#92400e"/>
-    </linearGradient>
-
-    <!-- Sparkling Star Flare -->
-    <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="40%" stop-color="#fef08a"/>
-      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- Outer Thick 24K Gold Rim (Width 30px = stays brilliant even at 16x16px!) -->
-  <circle cx="256" cy="256" r="238" fill="url(#vibrantNavy)" stroke="url(#pureGoldRim)" stroke-width="28"/>
-
-  <!-- Inner Polished Gold Ring -->
-  <circle cx="256" cy="256" r="218" fill="none" stroke="#fef08a" stroke-width="5" opacity="0.95"/>
-  <circle cx="256" cy="256" r="208" fill="none" stroke="url(#pureGoldRim)" stroke-width="3" opacity="0.8"/>
-
-  <!-- Warm Golden Center Burst -->
-  <circle cx="256" cy="256" r="185" fill="url(#goldHalo)"/>
-
-  <!-- Sacred Feather & Tilak Crest at top -->
-  <g>
-    <!-- Sacred Tilak / Bindi -->
-    <ellipse cx="256" cy="98" rx="8" ry="16" fill="#ef4444"/>
-    <ellipse cx="256" cy="98" rx="4" ry="9" fill="#ffffff"/>
-    <circle cx="256" cy="122" r="5" fill="#fde047"/>
-  </g>
-
-  <!-- Massive Bold 3D Golden 'श्री' (Shri) Symbol (Fills 75% of canvas for Google Search visibility) -->
-  <g>
-    <!-- Shirorekha (Top Horizontal Bar) with 3D Bevel -->
-    <path d="M124,142 L388,142 C396,142 402,148 402,156 L402,176 C402,184 396,190 388,190 L124,190 C116,190 110,184 110,176 L110,156 C110,148 116,142 124,142 Z" fill="url(#emblemGold3D)"/>
-    <path d="M128,146 L384,146 C388,146 392,150 392,154 L392,162 L120,162 L120,154 C120,150 124,146 128,146 Z" fill="#ffffff" opacity="0.8"/>
-
-    <!-- Left Loop of Sha (श) -->
-    <path d="M192,190 C158,190 132,216 132,250 C132,280 156,304 186,306 C158,334 134,370 116,412 C112,422 118,432 128,434 L160,438 C168,439 174,435 178,428 C198,388 222,352 250,324 L250,422 C250,430 256,436 264,436 L292,436 C300,436 306,430 306,422 L306,190 L260,190 L260,294 C238,282 224,268 222,252 C220,238 228,228 240,224 L240,190 C220,190 204,190 192,190 Z M188,222 C198,222 206,230 206,240 C206,250 198,258 186,258 C176,258 168,250 168,240 C168,230 176,222 188,222 Z" fill="url(#emblemGold3D)"/>
-
-    <!-- Slanted Crossstroke (R-kar) -->
-    <path d="M176,330 L226,380 C232,386 240,386 246,380 L264,362 C270,356 270,348 264,342 L212,292 Z" fill="url(#emblemGold3D)"/>
-
-    <!-- Right Matra (Grand Sweeping Arch of Dirgha Ee) -->
-    <path d="M344,190 L382,190 C390,190 396,196 396,204 L396,422 C396,430 390,436 382,436 L344,436 C336,436 330,430 330,422 L330,204 C330,196 336,190 344,190 Z" fill="url(#emblemGold3D)"/>
-    <path d="M364,142 C364,68 266,68 256,126 C254,136 262,144 274,144 L294,144 C304,144 310,136 312,126 C318,104 354,104 354,142 Z" fill="url(#emblemGold3D)"/>
-    <!-- Specular Highlight Curve on Ee-kar -->
-    <path d="M358,138 C358,80 280,80 270,126" fill="none" stroke="#ffffff" stroke-width="5" opacity="0.85"/>
-  </g>
-
-  <!-- 4 Radiant Specular Starbursts on the rim -->
-  <g transform="translate(436, 120)">
-    <circle cx="0" cy="0" r="26" fill="url(#starGlow)"/>
-    <path d="M0,-24 L3,0 L0,24 L-3,0 Z" fill="#ffffff"/>
-    <path d="M-24,0 L0,3 L24,0 L0,-3 Z" fill="#ffffff"/>
-    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
-  </g>
-  <g transform="translate(76, 380)">
-    <circle cx="0" cy="0" r="18" fill="url(#starGlow)"/>
-    <path d="M0,-16 L2,0 L0,16 L-2,0 Z" fill="#ffffff"/>
-    <path d="M-16,0 L0,2 L16,0 L0,-2 Z" fill="#ffffff"/>
-    <circle cx="0" cy="0" r="3" fill="#ffffff"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="44" fill="#0f172a" stroke="#f59e0b" stroke-width="8"/>
+  <text x="100" y="116" 
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="74" 
+        font-weight="900" 
+        letter-spacing="2" 
+        fill="#ffffff" 
+        text-anchor="middle">SSE</text>
+  <rect x="44" y="146" width="112" height="6" rx="3" fill="#f59e0b"/>
 </svg>
