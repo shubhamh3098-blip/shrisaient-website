@@ -42,23 +42,14 @@ import {
   HelpCircle,
   ArrowUp,
   SlidersHorizontal,
-  UserPlus,
-  UserCheck,
-  Key,
-  Shield,
-  User,
-  Users,
-  AlertCircle,
   BadgeCheck,
-  Copy,
-  ExternalLink,
   Navigation,
   BookOpen,
   Instagram,
   Facebook,
+  ExternalLink,
 } from 'lucide-react';
 import { StoreData, StockItem, CardMember, AdminUser } from '../../types';
-import { StorageService } from '../../services/storageService';
 import { NotificationService } from '../../services/notificationService';
 import { SaiLogo, SaiLogoEmblem } from '../common/SaiLogo';
 import { FinanceEmiModal } from '../common/FinanceEmiModal';
@@ -94,9 +85,12 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'rating'>('featured');
-  
+
   // Dynamic Landing Page Config (Admin editable from ERP)
-  const landingConfig = useMemo(() => getActiveLandingConfig(storeData.landingPageConfig), [storeData.landingPageConfig]);
+  const landingConfig = useMemo(
+    () => getActiveLandingConfig(storeData.landingPageConfig),
+    [storeData.landingPageConfig]
+  );
 
   // Hero Carousel State
   const [activeSlide, setActiveSlide] = useState(0);
@@ -108,7 +102,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  
+
   // On-Page Passbook Portal State
   const [onPageCardQuery, setOnPageCardQuery] = useState('');
   const [onPageMember, setOnPageMember] = useState<CardMember | null>(null);
@@ -135,7 +129,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     price: 44990,
   });
 
-  // Auto rotate hero slides every 5 seconds
+  // Auto rotate hero slides every 5.5 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % 3);
@@ -172,63 +166,56 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
   }, [storeData.cardMembers]);
 
   const categories = [
-    { id: 'All', label: 'All Categories', icon: Store },
+    { id: 'All', label: 'All Showroom Collections', icon: Store },
     { id: 'Electronics', label: 'Smart 4K TVs', icon: Tv },
-    { id: 'Furniture', label: 'Teakwood Sofas', icon: Sofa },
-    { id: 'Diwan', label: 'Storage Diwan & Beds', icon: Layers },
-    { id: 'Appliances', label: 'Refrigerators & Coolers', icon: Wind },
+    { id: 'Furniture', label: 'Royal Teakwood Sofas', icon: Sofa },
+    { id: 'Diwan', label: 'Storage Diwans & Beds', icon: Layers },
+    { id: 'Appliances', label: 'Refrigerators & AC', icon: Wind },
   ];
 
-  // Quick Category Strip with Genuine Photographic Thumbnails (Amazon Style)
+  // Curated Showroom Showcase Thumbnails
   const quickCategories = [
     {
       id: 'Electronics',
-      label: 'Smart 4K TVs',
-      sub: '32" to 65" UHD HDR',
-      image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=300&auto=format&fit=crop&q=80',
-      badge: 'Up to 38% OFF',
-    },
-    {
-      id: 'Appliances',
-      label: 'Refrigerators',
-      sub: 'Inverter Single & Double Door',
-      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=300&auto=format&fit=crop&q=80',
-      badge: 'Energy Star 5★',
+      label: 'Smart 4K LED TVs',
+      sub: 'Sony, Samsung, LG (32"–65")',
+      image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=400&auto=format&fit=crop&q=80',
+      badge: 'Brand Warranty',
     },
     {
       id: 'Furniture',
       label: 'Royal Teak Sofas',
-      sub: 'Pure Teak 3+1+1 Sets',
-      image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&auto=format&fit=crop&q=80',
-      badge: 'Direct Factory Rate',
+      sub: 'Pure Teakwood 3+1+1 Sets',
+      image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&auto=format&fit=crop&q=80',
+      badge: 'Factory Direct',
     },
     {
       id: 'Diwan',
-      label: 'Wooden Diwans',
-      sub: '4x6 & 5x6 Storage Box Cots',
+      label: 'Storage Box Diwans',
+      sub: 'Hydraulic Storage & Sagwan Cots',
       image: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=400&auto=format&fit=crop&q=80',
-      badge: 'Heavy Sagwan',
+      badge: 'Heavy Wood',
     },
     {
       id: 'Appliances',
-      label: 'Inverter AC & Coolers',
-      sub: 'Split ACs & Heavy Coolers',
-      image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&auto=format&fit=crop&q=80',
-      badge: 'Summer Special',
+      label: 'Refrigerators & AC',
+      sub: 'Single & Double Door Inverters',
+      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=400&auto=format&fit=crop&q=80',
+      badge: '5-Star Inverter',
     },
     {
       id: 'Furniture',
-      label: 'Steel Wardrobes',
-      sub: 'Godrej Style Almirah',
-      image: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=300&auto=format&fit=crop&q=80',
-      badge: 'Heavy Gauge Steel',
+      label: 'Steel Almirahs',
+      sub: 'Heavy Gauge Wardrobes',
+      image: 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=400&auto=format&fit=crop&q=80',
+      badge: 'Godrej Style',
     },
     {
       id: 'Scheme',
       label: '30-Month Scheme',
-      sub: 'Weekly ₹100 - ₹200 Card',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300&auto=format&fit=crop&q=80',
-      badge: 'Monthly Lucky Draw',
+      sub: 'Weekly ₹100 / ₹200 Passbook',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400&auto=format&fit=crop&q=80',
+      badge: 'Weekly Lucky Draw',
     },
   ];
 
@@ -240,33 +227,58 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     const expanded = new Set<string>(tokens);
 
     tokens.forEach((t) => {
-      // TVs
       if (t.includes('tv') || t.includes('टीव्ही') || t.includes('led') || t.includes('स्मार्ट')) {
-        ['tv', 'television', 'led', 'smart', '4k', 'uhd', 'oled', 'sony', 'lg', 'samsung'].forEach(w => expanded.add(w));
+        ['tv', 'television', 'led', 'smart', '4k', 'uhd', 'oled', 'sony', 'lg', 'samsung'].forEach((w) =>
+          expanded.add(w)
+        );
       }
-      // Sofa / Furniture
       if (t.includes('sofa') || t.includes('सोफा') || t.includes('सागवान') || t.includes('teak')) {
-        ['sofa', 'furniture', 'teak', 'cushion', 'recliner', 'wooden', 'सागवान'].forEach(w => expanded.add(w));
+        ['sofa', 'furniture', 'teak', 'cushion', 'recliner', 'wooden', 'सागवान'].forEach((w) =>
+          expanded.add(w)
+        );
       }
-      // Diwan / Bed
-      if (t.includes('diwan') || t.includes('दिवाण') || t.includes('bed') || t.includes('कॉट') || t.includes('गादी')) {
-        ['diwan', 'bed', 'box', 'storage', 'mattress', 'दिवाण'].forEach(w => expanded.add(w));
+      if (
+        t.includes('diwan') ||
+        t.includes('दिवाण') ||
+        t.includes('bed') ||
+        t.includes('कॉट') ||
+        t.includes('गादी')
+      ) {
+        ['diwan', 'bed', 'box', 'storage', 'mattress', 'दिवाण'].forEach((w) => expanded.add(w));
       }
-      // Refrigerator / Fridge
-      if (t.includes('fridge') || t.includes('फ्रिज') || t.includes('फ्रीज') || t.includes('रेफ्रिजरेटर')) {
-        ['fridge', 'refrigerator', 'whirlpool', 'godrej', 'lg', 'samsung', 'फ्रिज'].forEach(w => expanded.add(w));
+      if (
+        t.includes('fridge') ||
+        t.includes('फ्रिज') ||
+        t.includes('फ्रीज') ||
+        t.includes('रेफ्रिजरेटर')
+      ) {
+        ['fridge', 'refrigerator', 'whirlpool', 'godrej', 'lg', 'samsung', 'फ्रिज'].forEach((w) =>
+          expanded.add(w)
+        );
       }
-      // Cooler / AC
       if (t.includes('cooler') || t.includes('कूलर') || t.includes('ac') || t.includes('एसी')) {
-        ['cooler', 'ac', 'air', 'voltas', 'symphony', 'kenstar', 'कूलर'].forEach(w => expanded.add(w));
+        ['cooler', 'ac', 'air', 'voltas', 'symphony', 'kenstar', 'कूलर'].forEach((w) =>
+          expanded.add(w)
+        );
       }
-      // Almirah / Cupboard
-      if (t.includes('कपाट') || t.includes('अलमारी') || t.includes('wardrobe') || t.includes('cupboard') || t.includes('almari')) {
-        ['wardrobe', 'cupboard', 'almirah', 'almari', 'steel', 'कपाट'].forEach(w => expanded.add(w));
+      if (
+        t.includes('कपाट') ||
+        t.includes('अलमारी') ||
+        t.includes('wardrobe') ||
+        t.includes('cupboard') ||
+        t.includes('almari')
+      ) {
+        ['wardrobe', 'cupboard', 'almirah', 'almari', 'steel', 'कपाट'].forEach((w) =>
+          expanded.add(w)
+        );
       }
-      // Washing Machine
-      if (t.includes('वॉशिंग') || t.includes('washing') || t.includes('मशिन') || t.includes('machine')) {
-        ['washing', 'machine', 'washer'].forEach(w => expanded.add(w));
+      if (
+        t.includes('वॉशिंग') ||
+        t.includes('washing') ||
+        t.includes('मशिन') ||
+        t.includes('machine')
+      ) {
+        ['washing', 'machine', 'washer'].forEach((w) => expanded.add(w));
       }
     });
 
@@ -286,37 +298,55 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     const rawQ = searchQuery.trim().toLowerCase();
     const tokens = getSearchTokens(rawQ);
 
-    return storeData.stock.filter((item) => {
-      // Respect admin visibility toggle from Landing Page Editor
-      if (item.hideOnLanding) return false;
+    return storeData.stock
+      .filter((item) => {
+        if (item.hideOnLanding) return false;
 
-      const itemText = `${item.name} ${item.brand} ${item.model || ''} ${item.category || ''} ${item.code || ''} ${item.description || ''}`.toLowerCase();
+        const itemText = `${item.name} ${item.brand} ${item.model || ''} ${item.category || ''} ${
+          item.code || ''
+        } ${item.description || ''}`.toLowerCase();
 
-      let matchesSearch = true;
-      if (rawQ) {
-        matchesSearch = tokens.some((tok) => itemText.includes(tok)) || itemText.includes(rawQ);
-      }
-
-      let matchesCat = true;
-      // If user typed a specific search query, don't rigidly constrain by existing category tab
-      if (selectedCategory !== 'All' && !rawQ) {
-        if (selectedCategory === 'Electronics') {
-          matchesCat = item.category === 'Electronics' || itemText.includes('tv') || itemText.includes('led');
-        } else if (selectedCategory === 'Furniture') {
-          matchesCat = item.category === 'Furniture' || itemText.includes('sofa') || itemText.includes('almari') || itemText.includes('कपाट');
-        } else if (selectedCategory === 'Diwan') {
-          matchesCat = itemText.includes('diwan') || itemText.includes('दिवाण') || itemText.includes('bed') || itemText.includes('कॉट');
-        } else if (selectedCategory === 'Appliances') {
-          matchesCat = item.category === 'Home Appliances' || item.category === 'Kitchen Appliances' || itemText.includes('refrigerator') || itemText.includes('cooler') || itemText.includes('washing') || itemText.includes('ac') || itemText.includes('फ्रिज');
+        let matchesSearch = true;
+        if (rawQ) {
+          matchesSearch = tokens.some((tok) => itemText.includes(tok)) || itemText.includes(rawQ);
         }
-      }
 
-      return matchesSearch && matchesCat;
-    }).sort((a, b) => {
-      if (sortBy === 'price-asc') return a.salePrice - b.salePrice;
-      if (sortBy === 'price-desc') return b.salePrice - a.salePrice;
-      return 0;
-    });
+        let matchesCat = true;
+        if (selectedCategory !== 'All' && !rawQ) {
+          if (selectedCategory === 'Electronics') {
+            matchesCat =
+              item.category === 'Electronics' || itemText.includes('tv') || itemText.includes('led');
+          } else if (selectedCategory === 'Furniture') {
+            matchesCat =
+              item.category === 'Furniture' ||
+              itemText.includes('sofa') ||
+              itemText.includes('almari') ||
+              itemText.includes('कपाट');
+          } else if (selectedCategory === 'Diwan') {
+            matchesCat =
+              itemText.includes('diwan') ||
+              itemText.includes('दिवाण') ||
+              itemText.includes('bed') ||
+              itemText.includes('कॉट');
+          } else if (selectedCategory === 'Appliances') {
+            matchesCat =
+              item.category === 'Home Appliances' ||
+              item.category === 'Kitchen Appliances' ||
+              itemText.includes('refrigerator') ||
+              itemText.includes('cooler') ||
+              itemText.includes('washing') ||
+              itemText.includes('ac') ||
+              itemText.includes('फ्रिज');
+          }
+        }
+
+        return matchesSearch && matchesCat;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price-asc') return a.salePrice - b.salePrice;
+        if (sortBy === 'price-desc') return b.salePrice - a.salePrice;
+        return 0;
+      });
   }, [storeData.stock, searchQuery, selectedCategory, sortBy]);
 
   // Cart operations
@@ -376,25 +406,25 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
       },
     });
 
-    let msg = `*SHRI SAI ENTERPRISES, WARDHA*\n`;
-    msg += `(Electronics, Home Appliances & Teakwood Furniture Showroom)\n`;
-    msg += `📍 Address: ${landingConfig.contactInfo.addressHindi || 'Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha 442001'}\n`;
-    msg += `📞 Contacts: ${landingConfig.contactInfo.helpline1 || '8766486915'} | ${landingConfig.contactInfo.helpline2 || '8600122978'} | ${landingConfig.contactInfo.helpline3 || '9175537365'}\n`;
+    let msg = `*Shree Sai Enterprises (SHRI SAI ENTERPRISES, WARDHA)*\n`;
+    msg += `(Electronics, Home Appliances & Solid Teakwood Furniture Showroom)\n`;
+    msg += `📍 Address: ${landingConfig.contactInfo.address || 'Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001'}\n`;
+    msg += `📞 Helpline: ${landingConfig.contactInfo.helpline1 || '8766486915'} | ${landingConfig.contactInfo.helpline2 || '8600122978'} | ${landingConfig.contactInfo.helpline3 || '9175537365'}\n`;
     msg += `--------------------------------\n`;
     if (customerName.trim()) msg += `👤 Customer: *${customerName.trim()}*\n`;
-    if (customerPhone.trim()) msg += `📞 WhatsApp: ${customerPhone.trim()}\n`;
-    if (customerAddress.trim()) msg += `📍 Delivery Address: ${customerAddress.trim()}\n`;
+    if (customerPhone.trim()) msg += `📞 Phone: ${customerPhone.trim()}\n`;
+    if (customerAddress.trim()) msg += `📍 Address: ${customerAddress.trim()}\n`;
     msg += `Date: ${new Date().toLocaleDateString('en-IN')}\n`;
     msg += `--------------------------------\n`;
     cart.forEach((item, index) => {
       msg += `${index + 1}. *${item.stock.name}* (${item.stock.brand})\n`;
-      msg += `   Qty: ${item.qty} | Price: ₹${item.stock.salePrice.toLocaleString('en-IN')} = ₹${(item.stock.salePrice * item.qty).toLocaleString('en-IN')}\n`;
+      msg += `   Qty: ${item.qty} | Rate: ₹${item.stock.salePrice.toLocaleString('en-IN')} = ₹${(item.stock.salePrice * item.qty).toLocaleString('en-IN')}\n`;
     });
     msg += `--------------------------------\n`;
     msg += `💰 *Total Amount: ₹${cartTotalAmount.toLocaleString('en-IN')} (All Taxes Included)*\n`;
-    msg += `🚚 Delivery: FREE Express Delivery (Wardha & Nearby 50 KM)\n`;
+    msg += `🚚 Delivery: Free Doorstep Delivery (Wardha & 50 km Radius)\n`;
     msg += `--------------------------------\n`;
-    msg += `Please confirm this order. Thank you!`;
+    msg += `Please confirm my order and share delivery schedule. Thank you!`;
 
     const encoded = encodeURIComponent(msg);
     window.open(`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encoded}`, '_blank');
@@ -407,9 +437,12 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     );
     const txTotal = memberPayments.reduce((acc, t) => acc + t.amount, 0);
     const totalPaid = txTotal + (member.totalAmountPaid || member.totalPaid || 0);
-    // Weekly installment is ₹100 or ₹200 as per showroom rules
-    const weeklyAmt = (member.monthlyAmount && member.monthlyAmount <= 500) ? member.monthlyAmount : 100;
-    const paidWeeks = memberPayments.length > 0 ? memberPayments.length : Math.max(1, Math.floor(totalPaid / weeklyAmt));
+    const weeklyAmt =
+      member.monthlyAmount && member.monthlyAmount <= 500 ? member.monthlyAmount : 100;
+    const paidWeeks =
+      memberPayments.length > 0
+        ? memberPayments.length
+        : Math.max(1, Math.floor(totalPaid / weeklyAmt));
     const totalWeeks = member.durationMonths ? member.durationMonths * 4 : 120;
     const totalTarget = weeklyAmt * totalWeeks;
     const remainingWeeks = Math.max(0, totalWeeks - paidWeeks);
@@ -430,7 +463,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     setOnPageError('');
     const q = onPageCardQuery.trim().toLowerCase();
     if (!q) {
-      setOnPageError('Please enter a Card Number (e.g. 1001, 1050) or 10-digit mobile number.');
+      setOnPageError('Please enter your Card Number (e.g. 1001) or 10-digit mobile number.');
       return;
     }
 
@@ -446,7 +479,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
       setOnPageError('');
     } else {
       setOnPageMember(null);
-      setOnPageError(`No passbook record found for Card or Mobile "${onPageCardQuery}". Please verify and try again.`);
+      setOnPageError(`No passbook record found for Card/Mobile "${onPageCardQuery}".`);
     }
   };
 
@@ -456,7 +489,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
     setPassbookError('');
     const q = passbookCardQuery.trim().toLowerCase();
     if (!q) {
-      setPassbookError('Please enter a Card Number or Mobile Number.');
+      setPassbookError('Please enter a Card Number or mobile number.');
       return;
     }
 
@@ -472,11 +505,11 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
       setPassbookError('');
     } else {
       setSearchedMember(null);
-      setPassbookError('No member card found for this number. Please check and try again.');
+      setPassbookError('No member card found for this number.');
     }
   };
 
-  // Current Admin & Staff Users (active and pending)
+  // Current Admin & Staff Users
   const currentAdminUsers: AdminUser[] = useMemo(() => {
     if (storeData.adminUsers && storeData.adminUsers.length > 0) {
       return storeData.adminUsers;
@@ -487,23 +520,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         username: 'admin',
         displayName: 'Store Owner / Admin',
         role: 'Admin',
-        pin: '1079',
-        status: 'active',
-      },
-      {
-        id: 'usr-2',
-        username: 'cashier',
-        displayName: 'Rahul Joshi (Cashier)',
-        role: 'Cashier',
-        pin: '0000',
-        status: 'active',
-      },
-      {
-        id: 'usr-3',
-        username: 'manager',
-        displayName: 'Mahesh Sharma (Showroom Manager)',
-        role: 'Manager',
-        pin: '5555',
+        pin: '1234',
         status: 'active',
       },
     ];
@@ -518,18 +535,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans bg-[#0f1111] text-[#f3f4f6] selection:bg-[#f3a847] selection:text-black">
+    <div className="min-h-screen flex flex-col font-sans bg-[#080d16] text-[#f1f5f9] selection:bg-amber-500 selection:text-slate-950">
       
-      {/* 0. SLEEK & ELEGANT TOP CUSTOMER ANNOUNCEMENT & CONTACT STRIP */}
+      {/* 0. ELEGANT LUXURY TOP ANNOUNCEMENT & CONTACT RIBBON */}
       {landingConfig.enableAnnouncementBar !== false && (
-        <div className="bg-[#0b1019] border-b border-amber-500/20 text-slate-300 text-xs py-1.5 px-3 sm:px-5">
-          <div className="max-w-[1500px] mx-auto flex items-center justify-between gap-3">
-            {/* Left: Store Greeting / Announcement */}
+        <div className="bg-[#05080e] border-b border-amber-500/20 text-slate-300 text-xs py-2 px-3 sm:px-6">
+          <div className="max-w-[1520px] mx-auto flex items-center justify-between gap-4">
+            
+            {/* Left: Store Greeting / Trust Badge */}
             <div className="flex items-center gap-2 overflow-hidden truncate">
               {landingConfig.announcement?.enabled ? (
                 <>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase shrink-0 shadow-xs">
-                    {landingConfig.announcement.badge || 'OFFER'}
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase shrink-0 shadow-xs">
+                    {landingConfig.announcement.badge || 'SPECIAL DEAL'}
                   </span>
                   <span className="truncate text-white font-medium text-xs">
                     {landingConfig.announcement.text}
@@ -541,87 +559,99 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   )}
                 </>
               ) : (
-                <span className="text-slate-300 font-medium text-xs truncate">
-                  🚩 <strong className="text-amber-400">Shri Sai Enterprises, Wardha</strong> • 30-Month Savings Scheme & Festive Special Offers
-                </span>
+                <div className="flex items-center gap-2 text-xs truncate">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-black tracking-wider uppercase shrink-0">
+                    Wardha Flagship Showroom
+                  </span>
+                  <span className="text-slate-200 font-medium truncate">
+                    Shree Sai Enterprises • 30-Month Lucky Draw Savings Scheme, Solid Teakwood Furniture & Branded Electronics
+                  </span>
+                </div>
               )}
             </div>
 
-            {/* Right: Clean Helpline & WhatsApp Link */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 text-xs">
+            {/* Right: Direct Helpline, Timings & Quick Contacts */}
+            <div className="flex items-center gap-4 shrink-0 text-xs font-semibold">
+              <div className="hidden xl:flex items-center gap-1.5 text-slate-400">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Open Daily: 9:30 AM – 9:30 PM</span>
+              </div>
+
               <a
                 href={`tel:${landingConfig.contactInfo.helpline1 || '8766486915'}`}
-                className="hidden sm:flex items-center gap-1 text-slate-300 hover:text-white transition"
-                title="Call Showroom"
+                className="hidden sm:inline-flex items-center gap-1.5 text-amber-300 hover:text-amber-200 transition"
+                title="Call Showroom Directly"
               >
-                <Phone className="w-3 h-3 text-amber-400" />
-                <span className="font-mono">{landingConfig.contactInfo.helpline1 || '8766486915'}</span>
+                <Phone className="w-3.5 h-3.5 text-amber-400" />
+                <span>{landingConfig.contactInfo.helpline1 || '8766486915'}</span>
               </a>
 
-              <span className="hidden sm:inline text-slate-600">|</span>
-
               <a
-                href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=Hello%20Shri%20Sai%20Enterprises,%20Wardha.%20I%20am%20calling%20regarding%20furniture%20and%20electronics.`}
+                href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                  'Hello Shree Sai Enterprises (Wardha), I would like information regarding furniture, electronics, and the 30-Month Weekly Savings Scheme.'
+                )}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-bold text-xs transition"
-                title="Connect Directly via WhatsApp"
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs transition"
+                title="Connect via WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                <span>WhatsApp</span>
+                <span>WhatsApp Inquiry</span>
               </a>
             </div>
           </div>
         </div>
       )}
 
-      {/* 1. AMAZON SIGNATURE DARK HEADER (#131921) */}
-      <header className="sticky top-0 z-40 bg-[#131921] text-white shadow-xl border-b border-[#232f3e]">
-        <div className="max-w-[1500px] mx-auto px-3 sm:px-5 py-2 flex items-center justify-between gap-2 sm:gap-5">
+      {/* 1. DISTINCTIVE ROYAL SHOWROOM MAIN HEADER */}
+      <header className="sticky top-0 z-40 bg-[#090e18]/95 backdrop-blur-md text-white shadow-xl border-b border-amber-500/20">
+        <div className="max-w-[1520px] mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-3 sm:gap-6">
           
-          {/* Brand Logo & Amazon Prime Style Smile Tag */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <SaiLogo size="md" glow={true} />
-            <div className="cursor-pointer" onClick={() => setSelectedCategory('All')}>
-              <div className="flex items-baseline gap-1">
+          {/* Brand Logo & Royal Identity (High Contrast, Bold & Ultra Visible!) */}
+          <div
+            className="flex items-center gap-3 sm:gap-4 shrink-0 cursor-pointer group"
+            onClick={() => setSelectedCategory('All')}
+          >
+            <SaiLogo size="lg" glow={true} />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-base sm:text-2xl font-black tracking-tight text-white font-sans">
-                  SHREE SAI
+                  SHREE SAI ENTERPRISES
                 </span>
-                <span className="text-xs sm:text-sm font-bold text-[#febd69] tracking-tight">
-                  .in
-                </span>
-                <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black uppercase bg-[#febd69] text-[#131921] ml-1 shadow-sm">
-                  prime <Check className="w-2.5 h-2.5 stroke-[3]" />
+                <span className="text-[10px] sm:text-xs font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  Wardha Showroom
                 </span>
               </div>
-              <p className="text-[10px] text-slate-300 hidden sm:flex items-center gap-1 -mt-0.5">
-                <span className="text-amber-400 font-bold">Arvi Road Showroom</span>
-                <span className="text-slate-500">•</span>
-                <span className="text-slate-400">Electronics & Teak Furniture</span>
+              <p className="text-[10px] sm:text-xs text-slate-300 flex items-center gap-1.5 mt-0.5 font-sans">
+                <span className="text-amber-400 font-semibold">Shree Sai Enterprises</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400 hidden sm:inline">Electronics & Solid Teak Furniture Showroom (Arvi Road)</span>
               </p>
             </div>
           </div>
 
-          {/* Amazon Deliver Location Badge */}
+          {/* Showroom Physical Location Pin */}
           <div
             onClick={() => {
               const el = document.getElementById('google-business-section');
               if (el) el.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white cursor-pointer text-xs text-left"
+            className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-amber-500/40 cursor-pointer text-xs text-left transition"
             title="Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha 442001"
           >
-            <MapPin className="w-4 h-4 text-[#febd69] shrink-0" />
+            <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
             <div className="leading-tight">
-              <span className="text-[10px] text-slate-400 block">Showroom Location</span>
-              <span className="font-bold text-white block">Arvi Rd, Punjab Colony, Wardha</span>
+              <span className="text-[10px] text-slate-400 block">Showroom Address</span>
+              <span className="font-bold text-slate-200 block truncate max-w-[180px]">
+                Opp. Matoshree Sabhagruh, Arvi Road, Wardha
+              </span>
             </div>
           </div>
 
-          {/* Amazon Big Search Bar */}
+          {/* Sleek Showroom Search Bar */}
           <form
             onSubmit={handleSearchSubmit}
-            className="flex-1 max-w-3xl hidden md:flex items-center rounded-md overflow-hidden bg-white focus-within:ring-2 focus-within:ring-[#f90] shadow-inner"
+            className="flex-1 max-w-2xl hidden md:flex items-center rounded-xl overflow-hidden bg-[#111827] border border-slate-700/80 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 shadow-inner transition"
           >
             <select
               value={selectedCategory}
@@ -630,26 +660,27 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 const el = document.getElementById('products-catalog-section');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="bg-[#e6e6e6] text-[#0f1111] text-xs px-3 py-2.5 border-r border-slate-300 outline-none cursor-pointer font-medium hover:bg-slate-300 transition"
+              className="bg-[#1a2333] text-slate-200 text-xs px-3.5 py-2.5 border-r border-slate-700 outline-none cursor-pointer font-semibold hover:bg-slate-800 transition"
             >
-              <option value="All">All Categories</option>
+              <option value="All">All Departments</option>
               <option value="Electronics">Smart 4K TVs</option>
-              <option value="Furniture">Teak Sofas</option>
-              <option value="Diwan">Diwan Beds</option>
+              <option value="Furniture">Teakwood Sofas</option>
+              <option value="Diwan">Storage Diwans & Beds</option>
               <option value="Appliances">Refrigerators & AC</option>
             </select>
+
             <input
               type="text"
-              placeholder="Search Shri Sai: Smart TV, Teak Sofa, Diwan Bed, Inverter Fridge, Split AC..."
+              placeholder="Search Smart 4K TVs, Teak Sofas, Diwans, Refrigerators, 30-Month Scheme..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-3 py-2 text-sm text-[#0f1111] outline-none placeholder:text-slate-500 font-medium"
+              className="flex-1 px-3.5 py-2 text-xs text-slate-100 outline-none placeholder:text-slate-500 font-medium bg-transparent"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="px-2 text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
+                className="px-2 text-slate-400 hover:text-slate-200 text-xs font-bold cursor-pointer"
                 title="Clear Search"
               >
                 ✕
@@ -657,14 +688,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             )}
             <button
               type="submit"
-              className="bg-[#febd69] hover:bg-[#f3a847] text-[#131921] px-5 py-2.5 transition flex items-center justify-center cursor-pointer active:scale-95"
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-4 py-2.5 transition flex items-center justify-center cursor-pointer font-bold shrink-0"
               title="Search Products"
             >
-              <Search className="w-5 h-5 stroke-[2.5]" />
+              <Search className="w-4 h-4 stroke-[2.5]" />
             </button>
           </form>
 
-          {/* Amazon Right Nav Actions */}
+          {/* Right Showroom Actions */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             
             {/* Passbook / Customer Account Link */}
@@ -674,64 +705,53 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
                 else setIsOpenPassbookModal(true);
               }}
-              className="px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white text-left cursor-pointer transition text-xs flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-left cursor-pointer transition text-xs flex items-center gap-2"
+              title="30-Month Weekly Savings Scheme Passbook"
             >
-              <CreditCard className="w-5 h-5 text-[#febd69]" />
+              <CreditCard className="w-4 h-4 text-amber-400" />
               <div className="hidden sm:block leading-tight">
-                <span className="text-[10px] text-slate-300 block">Customer Portal</span>
-                <span className="font-bold text-white block">View Passbook</span>
+                <span className="text-[10px] text-amber-400/80 block">30-Month Scheme</span>
+                <span className="font-bold text-amber-200 block">Check Passbook</span>
               </div>
             </button>
 
-            {/* Lucky Draw 30-Month Scheme Link */}
-            <button
-              onClick={() => {
-                const el = document.getElementById('passbook-portal-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white text-left cursor-pointer text-xs"
-            >
-              <Gift className="w-5 h-5 text-[#ffa41c]" />
-              <div className="leading-tight">
-                <span className="text-[10px] text-slate-300 block">30-Mo Scheme</span>
-                <span className="font-bold text-amber-300 block">Lucky Draw Status</span>
-              </div>
-            </button>
-
-            {/* Amazon Shopping Cart */}
+            {/* Showroom Order / Cart Drawer */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative px-2.5 py-1.5 rounded hover:outline hover:outline-1 hover:outline-white text-white font-bold text-xs flex items-center gap-1 cursor-pointer transition"
+              className="relative px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 cursor-pointer transition"
+              title="View Cart / Quote"
             >
               <div className="relative">
-                <ShoppingCart className="w-7 h-7 text-white" />
-                <span className="absolute -top-1 left-3.5 px-1.5 py-0.2 rounded-full bg-[#f08804] text-[#131921] text-[11px] font-black leading-none">
-                  {cartItemCount}
-                </span>
+                <ShoppingCart className="w-4 h-4 text-amber-400" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black leading-none">
+                    {cartItemCount}
+                  </span>
+                )}
               </div>
-              <span className="hidden sm:inline font-bold mt-2">Cart</span>
+              <span className="hidden sm:inline">Cart / Quote</span>
             </button>
 
-            {/* Admin ERP Login Protected */}
+            {/* Admin & Staff ERP Protected Login */}
             {isAdminLoggedIn ? (
               <button
                 onClick={() => (onReturnToERP ? onReturnToERP() : onEnterAdminERP())}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow cursor-pointer shrink-0 whitespace-nowrap"
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md cursor-pointer shrink-0"
               >
                 <Store className="w-3.5 h-3.5 shrink-0" />
-                <span>Admin ERP</span>
+                <span>ERP Dashboard</span>
               </button>
             ) : (
               <button
                 onClick={() => setIsAdminPinModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer relative shrink-0 whitespace-nowrap"
-                title="ERP Login / Sign Up (Staff & Admin Portal)"
+                className="px-3 py-1.5 rounded-xl border border-slate-700 hover:border-amber-400/60 bg-slate-900/80 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer relative shrink-0"
+                title="ERP Login (Staff & Admin Portal)"
               >
-                <Lock className="w-3.5 h-3.5 text-[#febd69] shrink-0" />
-                <span className="hidden sm:inline">ERP Login / Sign Up</span>
+                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="hidden sm:inline">Staff ERP Login</span>
                 <span className="sm:hidden">Login</span>
                 {pendingUsers.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse">
                     {pendingUsers.length}
                   </span>
                 )}
@@ -741,30 +761,30 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         </div>
 
         {/* Mobile Search Bar Row */}
-        <div className="md:hidden px-3 pb-2 pt-0.5">
+        <div className="md:hidden px-3 pb-2.5 pt-0.5">
           <form
             onSubmit={handleSearchSubmit}
-            className="flex items-center bg-white rounded-md overflow-hidden shadow-inner focus-within:ring-2 focus-within:ring-[#f90]"
+            className="flex items-center bg-[#111827] rounded-xl overflow-hidden border border-slate-700 focus-within:border-amber-400 shadow-inner"
           >
             <input
               type="text"
-              placeholder="Search Smart TV, Teak Sofa, Diwan, Scheme..."
+              placeholder="Search Smart TVs, Teak Sofas, Diwans, Scheme..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-3 py-2 text-xs text-[#0f1111] outline-none font-medium"
+              className="flex-1 px-3 py-2 text-xs text-white outline-none font-medium bg-transparent"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="px-2 text-slate-400 hover:text-slate-700 text-xs font-bold"
+                className="px-2 text-slate-400 text-xs font-bold"
               >
                 ✕
               </button>
             )}
             <button
               type="submit"
-              className="bg-[#febd69] active:bg-[#f3a847] text-[#131921] px-3.5 py-2 cursor-pointer"
+              className="bg-amber-500 text-slate-950 px-3.5 py-2 cursor-pointer font-bold"
               title="Search"
             >
               <Search className="w-4 h-4 stroke-[2.5]" />
@@ -772,52 +792,62 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
           </form>
         </div>
 
-        {/* 2. AMAZON SUB-NAVBAR (#232f3e) */}
-        <div className="bg-[#232f3e] text-white px-3 sm:px-5 py-1.5 text-xs font-medium flex items-center gap-4 overflow-x-auto no-scrollbar border-t border-slate-800">
+        {/* 2. REFINED SHOWROOM COLLECTIONS NAVIGATION BAR */}
+        <div className="bg-[#0b101a] text-slate-300 px-3 sm:px-6 py-2 text-xs font-medium flex items-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar border-t border-slate-800/80">
           <button
             onClick={() => setSelectedCategory('All')}
-            className={`flex items-center gap-1 px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap cursor-pointer ${
-              selectedCategory === 'All' ? 'text-[#febd69] font-bold' : ''
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg whitespace-nowrap cursor-pointer transition ${
+              selectedCategory === 'All'
+                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                : 'hover:text-white hover:bg-slate-800/50'
             }`}
           >
-            <Menu className="w-4 h-4" />
-            <span>All Products</span>
+            <Store className="w-3.5 h-3.5 text-amber-400" />
+            <span>All Showroom Stock</span>
           </button>
 
           <button
             onClick={() => setSelectedCategory('Electronics')}
-            className={`px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap cursor-pointer ${
-              selectedCategory === 'Electronics' ? 'text-[#febd69] font-bold' : ''
+            className={`px-3 py-1 rounded-lg whitespace-nowrap cursor-pointer transition ${
+              selectedCategory === 'Electronics'
+                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                : 'hover:text-white hover:bg-slate-800/50'
             }`}
           >
-            Smart 4K TVs
+            Smart 4K TVs (Sony, Samsung, LG)
           </button>
 
           <button
             onClick={() => setSelectedCategory('Furniture')}
-            className={`px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap cursor-pointer ${
-              selectedCategory === 'Furniture' ? 'text-[#febd69] font-bold' : ''
+            className={`px-3 py-1 rounded-lg whitespace-nowrap cursor-pointer transition ${
+              selectedCategory === 'Furniture'
+                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                : 'hover:text-white hover:bg-slate-800/50'
             }`}
           >
-            Royal Teakwood Sofas
+            Solid Teakwood Sofas
           </button>
 
           <button
             onClick={() => setSelectedCategory('Diwan')}
-            className={`px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap cursor-pointer ${
-              selectedCategory === 'Diwan' ? 'text-[#febd69] font-bold' : ''
+            className={`px-3 py-1 rounded-lg whitespace-nowrap cursor-pointer transition ${
+              selectedCategory === 'Diwan'
+                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                : 'hover:text-white hover:bg-slate-800/50'
             }`}
           >
-            Storage Diwan & Box Beds
+            Storage Box Diwans & Beds
           </button>
 
           <button
             onClick={() => setSelectedCategory('Appliances')}
-            className={`px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap cursor-pointer ${
-              selectedCategory === 'Appliances' ? 'text-[#febd69] font-bold' : ''
+            className={`px-3 py-1 rounded-lg whitespace-nowrap cursor-pointer transition ${
+              selectedCategory === 'Appliances'
+                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                : 'hover:text-white hover:bg-slate-800/50'
             }`}
           >
-            Refrigerators & AC
+            Inverter Refrigerators, Washers & AC
           </button>
 
           <button
@@ -825,17 +855,17 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               const el = document.getElementById('passbook-portal-section');
               if (el) el.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="px-2 py-1 rounded hover:outline hover:outline-1 hover:outline-white whitespace-nowrap text-[#febd69] font-bold flex items-center gap-1 cursor-pointer ml-auto"
+            className="px-3 py-1 rounded-lg whitespace-nowrap text-amber-300 font-bold flex items-center gap-1.5 cursor-pointer ml-auto bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>30-Month Weekly Savings Scheme (₹100 - ₹200/wk)</span>
+            <span>30-Month Weekly Savings Scheme (₹100–₹200/Week)</span>
           </button>
         </div>
       </header>
 
-      {/* 3. AMAZON CATEGORY THUMBNAILS RIBBON WITH GENUINE PHOTOS */}
-      <div className="bg-[#1a222d] border-b border-[#2a3648] py-3.5 px-3 sm:px-5">
-        <div className="max-w-[1500px] mx-auto flex items-center justify-between sm:justify-start gap-4 sm:gap-7 overflow-x-auto no-scrollbar">
+      {/* 3. SHOWROOM FEATURED CATEGORY THUMBNAILS RIBBON */}
+      <div className="bg-[#0b101a]/60 border-b border-slate-800/80 py-4 px-3 sm:px-6">
+        <div className="max-w-[1520px] mx-auto flex items-center justify-between sm:justify-start gap-3 sm:gap-6 overflow-x-auto no-scrollbar">
           {quickCategories.map((c) => {
             const isSelected = selectedCategory === c.id;
             return (
@@ -850,33 +880,38 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     setSelectedCategory(c.id);
                   }
                 }}
-                className={`flex flex-col items-center gap-1.5 shrink-0 group transition cursor-pointer p-1 rounded-xl ${
+                className={`flex flex-col items-center gap-2 shrink-0 group transition cursor-pointer p-1.5 rounded-2xl ${
                   isSelected ? 'scale-105' : 'hover:scale-105'
                 }`}
               >
-                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 transition-all p-0.5 bg-[#121820] shadow-md ${
-                  isSelected
-                    ? 'border-[#ff9900] ring-2 ring-[#ff9900]/50 shadow-[#ff9900]/20'
-                    : 'border-[#2d3b4e] group-hover:border-[#ff9900]'
-                }`}>
+                <div
+                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border-2 transition-all p-0.5 bg-[#0f172a] shadow-lg ${
+                    isSelected
+                      ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-amber-500/20'
+                      : 'border-slate-700 group-hover:border-amber-400'
+                  }`}
+                >
                   <img
                     src={c.image}
                     alt={c.label}
-                    className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-full object-cover rounded-xl group-hover:scale-110 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                     loading="lazy"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&auto=format&fit=crop&q=80';
+                      e.currentTarget.src =
+                        'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300&auto=format&fit=crop&q=80';
                     }}
                   />
                 </div>
                 <div className="text-center">
-                  <span className={`text-[11px] sm:text-xs font-bold block whitespace-nowrap leading-tight text-slate-200 ${
-                    isSelected ? 'text-[#ff9900]' : 'group-hover:text-[#ff9900]'
-                  }`}>
+                  <span
+                    className={`text-[11px] sm:text-xs font-bold block whitespace-nowrap leading-tight text-slate-200 ${
+                      isSelected ? 'text-amber-300' : 'group-hover:text-amber-300'
+                    }`}
+                  >
                     {c.label}
                   </span>
-                  <span className="text-[9px] text-[#febd69] font-medium block leading-tight">
+                  <span className="text-[9px] text-amber-400 font-medium block leading-tight">
                     {c.badge}
                   </span>
                 </div>
@@ -886,65 +921,77 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         </div>
       </div>
 
-      {/* 4. CINEMATIC FULL-IMAGE HERO BANNER (MINIMALIST WITH THEME COLOR OVERLAYS) */}
+      {/* 4. EDITORIAL CINEMATIC HERO BANNER FOR WARDHA SHOWROOM */}
       {landingConfig.showHeroSection !== false && (() => {
-        const heroSlides = (landingConfig.heroSlides && landingConfig.heroSlides.filter(s => s.active).length > 0)
-          ? landingConfig.heroSlides.filter(s => s.active).map((s, idx) => {
-              const isPurple = s.themeColor === 'purple' || idx === 1;
-              const isEmerald = s.themeColor === 'emerald' || idx === 2;
-              return {
-                id: s.id,
-                tag: s.tag,
-                tagIcon: isPurple ? Gift : isEmerald ? Award : Sparkles,
-                titleLead: s.titleLead,
-                titleHighlight: s.titleHighlight,
-                description: s.subtitle,
-                bgImage: s.imageUrl,
-                themeGradient: isPurple
-                  ? 'from-[#140a02]/95 via-[#221205]/85 sm:via-[#221205]/75 to-[#221205]/30'
-                  : isEmerald
-                  ? 'from-[#130803]/95 via-[#1e0e06]/85 sm:via-[#1e0e06]/75 to-[#1e0e06]/30'
-                  : 'from-[#050b14]/95 via-[#0b1526]/85 sm:via-[#0b1526]/75 to-[#0b1526]/30',
-                accentColor: isPurple ? '#f59e0b' : isEmerald ? '#fbbf24' : '#febd69',
-                ctaPrimary: s.primaryBtnText,
-                ctaAction: () => {
-                  if (s.primaryBtnTarget === 'scheme' || s.primaryBtnTarget === 'passbook') {
-                    const el = document.getElementById('passbook-portal-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  } else if (s.primaryBtnTarget === 'whatsapp') {
-                    window.open(`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=Hello%20Shri%20Sai%20Enterprises,%20Wardha`, '_blank');
-                  } else {
-                    const el = document.getElementById('products-catalog-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }
-                },
-                ctaSecondary: s.secondaryBtnText,
-                ctaSecondaryAction: () => {
-                  if (s.secondaryBtnTarget === 'catalog') {
-                    const el = document.getElementById('products-catalog-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  } else if (s.secondaryBtnTarget === 'whatsapp') {
-                    window.open(`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=Hello%20Shri%20Sai%20Enterprises,%20Wardha`, '_blank');
-                  } else {
-                    const el = document.getElementById('passbook-portal-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }
-                },
-                highlights: [s.cardMetric, s.cardMetric2, '100% Brand Warranty'],
-                cardBadge: s.cardBadge,
-                cardTitle: s.titleLead,
-                cardSubtitle: s.titleHighlight,
-                cardMetric: s.cardMetric,
-                cardMetric2: s.cardMetric2,
-              };
-            })
-          : [];
+        const heroSlides =
+          landingConfig.heroSlides && landingConfig.heroSlides.filter((s) => s.active).length > 0
+            ? landingConfig.heroSlides
+                .filter((s) => s.active)
+                .map((s, idx) => {
+                  return {
+                    id: s.id,
+                    tag: s.tag,
+                    tagIcon: idx === 1 ? Gift : idx === 2 ? Award : Sparkles,
+                    titleLead: s.titleLead,
+                    titleHighlight: s.titleHighlight,
+                    description: s.subtitle,
+                    bgImage: s.imageUrl,
+                    themeGradient:
+                      idx === 1
+                        ? 'from-[#120803]/95 via-[#1c0d05]/85 sm:via-[#1c0d05]/75 to-[#1c0d05]/20'
+                        : idx === 2
+                        ? 'from-[#08121f]/95 via-[#0e1c30]/85 sm:via-[#0e1c30]/75 to-[#0e1c30]/20'
+                        : 'from-[#080d16]/95 via-[#101726]/85 sm:via-[#101726]/75 to-[#101726]/20',
+                    accentColor: '#f59e0b',
+                    ctaPrimary: s.primaryBtnText,
+                    ctaAction: () => {
+                      if (s.primaryBtnTarget === 'scheme' || s.primaryBtnTarget === 'passbook') {
+                        const el = document.getElementById('passbook-portal-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      } else if (s.primaryBtnTarget === 'whatsapp') {
+                        window.open(
+                          `https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                            'Hello Shree Sai Enterprises (Wardha), I would like to inquire about your products.'
+                          )}`,
+                          '_blank'
+                        );
+                      } else {
+                        const el = document.getElementById('products-catalog-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    },
+                    ctaSecondary: s.secondaryBtnText,
+                    ctaSecondaryAction: () => {
+                      if (s.secondaryBtnTarget === 'catalog') {
+                        const el = document.getElementById('products-catalog-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      } else if (s.secondaryBtnTarget === 'whatsapp') {
+                        window.open(
+                          `https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                            'Hello Shree Sai Enterprises (Wardha), I would like to request a quotation.'
+                          )}`,
+                          '_blank'
+                        );
+                      } else {
+                        const el = document.getElementById('passbook-portal-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    },
+                    highlights: [s.cardMetric, s.cardMetric2, '100% Authorized Warranty'],
+                    cardBadge: s.cardBadge,
+                    cardTitle: s.titleLead,
+                    cardSubtitle: s.titleHighlight,
+                    cardMetric: s.cardMetric,
+                    cardMetric2: s.cardMetric2,
+                  };
+                })
+            : [];
 
         const currentSlide = heroSlides[activeSlide] || heroSlides[0];
 
         return (
-          <div className="max-w-[1500px] mx-auto px-3 sm:px-5 pt-3 pb-2 w-full">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800/80 min-h-[440px] sm:min-h-[480px] lg:min-h-[510px] flex items-center bg-[#070b12]">
+          <div className="max-w-[1520px] mx-auto px-3 sm:px-6 pt-4 pb-2 w-full">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 min-h-[440px] sm:min-h-[480px] lg:min-h-[510px] flex items-center bg-[#070b12]">
               {/* Full-bleed background image layers with crossfade */}
               {heroSlides.map((slide, idx) => {
                 const isActive = activeSlide === idx;
@@ -962,15 +1009,13 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                       referrerPolicy="no-referrer"
                       loading={idx === 0 ? 'eager' : 'lazy'}
                       onError={(e) => {
-                        e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1600&auto=format&fit=crop&q=80';
+                        e.currentTarget.src =
+                          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1600&auto=format&fit=crop&q=80';
                       }}
                     />
-                    {/* Thematic Deep Color Gradient Overlay */}
                     <div className={`absolute inset-0 bg-gradient-to-r ${slide.themeGradient}`} />
-                    {/* Bottom fade blending seamlessly into page */}
-                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0f1111] via-[#0f1111]/70 to-transparent" />
-                    {/* Subtle top shade for header contrast */}
-                    <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#0f1111]/60 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#080d16] via-[#080d16]/70 to-transparent" />
+                    <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#080d16]/60 to-transparent" />
                   </div>
                 );
               })}
@@ -978,27 +1023,24 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               {/* Foreground Content for Current Slide */}
               <div className="relative z-10 w-full px-6 sm:px-10 lg:px-14 py-8 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                 {/* Left Content */}
-                <div className="max-w-2xl space-y-3.5">
+                <div className="max-w-2xl space-y-4">
                   {/* Badge Pill */}
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/15 text-white text-xs font-semibold shadow-lg">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/70 backdrop-blur-md border border-amber-500/30 text-amber-300 text-xs font-bold shadow-lg">
                     {React.createElement(currentSlide.tagIcon, {
                       className: 'w-3.5 h-3.5 text-amber-400',
                     })}
                     <span className="tracking-wide">{currentSlide.tag}</span>
                   </div>
 
-                  {/* Minimalist Bold Headline */}
-                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-md font-sans">
+                  {/* Headline */}
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-md font-serif">
                     {currentSlide.titleLead}{' '}
-                    <span
-                      style={{ color: currentSlide.accentColor }}
-                      className="drop-shadow underline decoration-amber-500/40 decoration-wavy underline-offset-8"
-                    >
+                    <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
                       {currentSlide.titleHighlight}
                     </span>
                   </h1>
 
-                  {/* Subtitle / Value Proposition */}
+                  {/* Description */}
                   <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-xl drop-shadow font-medium">
                     {currentSlide.description}
                   </p>
@@ -1007,7 +1049,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   <div className="flex flex-wrap items-center gap-3 pt-2 text-xs sm:text-sm">
                     <button
                       onClick={currentSlide.ctaAction}
-                      className="px-6 py-3 rounded-full bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black transition flex items-center gap-2 shadow-xl hover:shadow-[#ffd814]/20 active:scale-95 cursor-pointer border border-[#fcd200]"
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black transition flex items-center gap-2 shadow-xl shadow-amber-500/20 active:scale-95 cursor-pointer"
                     >
                       <span>{currentSlide.ctaPrimary}</span>
                       <ArrowRight className="w-4 h-4" />
@@ -1015,31 +1057,33 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
                     <button
                       onClick={currentSlide.ctaSecondaryAction}
-                      className="px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md transition flex items-center gap-2 border border-white/25 active:scale-95 cursor-pointer shadow-md"
+                      className="px-5 py-3 rounded-xl bg-slate-900/60 hover:bg-slate-800 text-white font-bold backdrop-blur-md transition flex items-center gap-2 border border-slate-700 active:scale-95 cursor-pointer shadow-md"
                     >
                       <span>{currentSlide.ctaSecondary}</span>
                     </button>
 
                     <a
-                      href="https://wa.me/917822859073?text=Hello%20Shri%20Sai%20Enterprises,%20I%20am%20interested%20in%20your%20products%20and%20savings%20scheme."
+                      href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                        'Hello Shree Sai Enterprises, I would like information regarding products and the 30-Month Savings Scheme.'
+                      )}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-4 py-3 rounded-full bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold backdrop-blur-md transition flex items-center gap-1.5 border border-emerald-400/40 active:scale-95 shadow-md"
+                      className="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1.5 active:scale-95 shadow-md"
                       title="WhatsApp Enquiry"
                     >
                       <MessageCircle className="w-4 h-4" />
-                      <span className="hidden sm:inline">WhatsApp</span>
+                      <span className="hidden sm:inline">WhatsApp Connect</span>
                     </a>
                   </div>
 
-                  {/* Minimalist Feature Badges */}
+                  {/* Trust Highlights */}
                   <div className="flex flex-wrap items-center gap-2 pt-2">
                     {currentSlide.highlights.map((h, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/10 text-[11px] text-slate-200 font-medium"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/60 backdrop-blur-md border border-slate-800 text-[11px] text-slate-200 font-medium"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                         {h}
                       </span>
                     ))}
@@ -1048,55 +1092,57 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
                 {/* Right Side Minimal Glass Preview Card (Desktop) */}
                 <div className="hidden lg:block w-80 shrink-0">
-                  <div className="p-5 rounded-2xl bg-black/45 backdrop-blur-xl border border-white/15 text-white shadow-2xl space-y-3.5 transition-all">
+                  <div className="p-5 rounded-2xl bg-slate-900/70 backdrop-blur-xl border border-amber-500/20 text-white shadow-2xl space-y-3.5 transition-all">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-[#febd69] tracking-wider px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
+                      <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
                         {currentSlide.cardBadge}
                       </span>
                       <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5" /> 100% Guaranteed
+                        <ShieldCheck className="w-3.5 h-3.5" /> 100% Genuine Quality
                       </span>
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="text-base font-black text-white leading-snug">
+                      <h4 className="text-base font-black text-white leading-snug font-serif">
                         {currentSlide.cardTitle}
                       </h4>
-                      <p className="text-[11px] text-slate-300">
-                        {currentSlide.cardSubtitle}
-                      </p>
+                      <p className="text-[11px] text-slate-300">{currentSlide.cardSubtitle}</p>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1 text-xs">
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>Weekly Installment / EMI</span>
-                        <strong className="text-amber-400 font-mono text-sm">{currentSlide.cardMetric}</strong>
+                        <span>Weekly Installment Option</span>
+                        <strong className="text-amber-300 font-mono text-sm">
+                          {currentSlide.cardMetric}
+                        </strong>
                       </div>
                       <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                        <span>Delivery</span>
+                        <span>Free Doorstep Delivery</span>
                         <span className="text-emerald-300 font-semibold">{currentSlide.cardMetric2}</span>
                       </div>
                     </div>
 
                     <button
                       onClick={currentSlide.ctaAction}
-                      className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 border border-white/20 cursor-pointer"
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 text-xs font-bold transition flex items-center justify-center gap-1.5 border border-amber-500/40 cursor-pointer"
                     >
-                      <span>View Product Details</span>
+                      <span>Explore Collection</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Minimalist Progress Indicators */}
+              {/* Progress Indicators */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
                 {heroSlides.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
                     className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                      activeSlide === idx ? 'bg-[#ff9900] w-9 shadow-lg shadow-amber-500/50' : 'bg-white/35 w-2 hover:bg-white/70'
+                      activeSlide === idx
+                        ? 'bg-amber-400 w-9 shadow-lg shadow-amber-500/50'
+                        : 'bg-white/30 w-2 hover:bg-white/60'
                     }`}
                     title={`Slide ${idx + 1}`}
                   />
@@ -1105,15 +1151,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
               {/* Next / Prev Controls */}
               <button
-                onClick={() => setActiveSlide((prev) => (prev === 0 ? heroSlides.length - 1 : prev - 1))}
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-black/40 hover:bg-black/80 backdrop-blur-md text-white transition cursor-pointer border border-white/10 hover:scale-105"
+                onClick={() =>
+                  setActiveSlide((prev) => (prev === 0 ? heroSlides.length - 1 : prev - 1))
+                }
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-slate-950/60 hover:bg-slate-950/90 backdrop-blur-md text-white transition cursor-pointer border border-slate-700 hover:scale-105"
                 title="Previous Slide"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setActiveSlide((prev) => (prev === heroSlides.length - 1 ? 0 : prev + 1))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-black/40 hover:bg-black/80 backdrop-blur-md text-white transition cursor-pointer border border-white/10 hover:scale-105"
+                onClick={() =>
+                  setActiveSlide((prev) => (prev === heroSlides.length - 1 ? 0 : prev + 1))
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-slate-950/60 hover:bg-slate-950/90 backdrop-blur-md text-white transition cursor-pointer border border-slate-700 hover:scale-105"
                 title="Next Slide"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -1123,247 +1173,174 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         );
       })()}
 
-      {/* 4.2 PROMINENT LIVE OFFERS & MEGA DEALS SECTION (ADMIN MANAGED FROM ERP) */}
-      {landingConfig.enableOffersSection !== false && landingConfig.offers && landingConfig.offers.filter(o => o.active).length > 0 && (
-        <section id="offers-deals-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-3 w-full">
-          <div className="rounded-3xl bg-gradient-to-r from-[#161208] via-[#241a0b] to-[#141007] border-2 border-amber-500/50 p-4 sm:p-6 shadow-2xl relative overflow-hidden">
-            {/* Background ambient glow */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-amber-500/30">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/30">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white animate-pulse">
-                      HOT DEALS
-                    </span>
-                    <h2 className="text-base sm:text-xl font-black text-white tracking-tight">
-                      Today's Mega Offers & Festive Discounts
-                    </h2>
+      {/* 4.2 PROMINENT LIVE OFFERS & FESTIVE SHOWROOM DEALS */}
+      {landingConfig.enableOffersSection !== false &&
+        landingConfig.offers &&
+        landingConfig.offers.filter((o) => o.active).length > 0 && (
+          <section id="offers-deals-section" className="max-w-[1520px] mx-auto px-3 sm:px-6 py-3 w-full">
+            <div className="rounded-3xl bg-gradient-to-r from-[#141b27] via-[#1a2333] to-[#141b27] border-2 border-amber-500/40 p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-amber-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/30">
+                    <Sparkles className="w-5 h-5" />
                   </div>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Limited Period Special Discounts • Claim Your Offer in One Click via WhatsApp
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-amber-400 font-bold">
-                  {landingConfig.offers.filter(o => o.active).length} Active Offers Available
-                </span>
-              </div>
-            </div>
-
-            {/* Offers Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-4">
-              {landingConfig.offers.filter(o => o.active).map((offer) => (
-                <div
-                  key={offer.id}
-                  className="rounded-2xl bg-[#0e141e]/90 border border-amber-500/40 hover:border-amber-400 p-3.5 flex flex-col justify-between space-y-3 transition-all duration-200 hover:shadow-xl hover:shadow-amber-500/10 group"
-                >
-                  <div className="space-y-2.5">
-                    {offer.imageUrl && (
-                      <div className="h-32 rounded-xl overflow-hidden bg-black/60 relative">
-                        <img
-                          src={offer.imageUrl}
-                          alt={offer.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white shadow">
-                          {offer.badge}
-                        </span>
-                        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded text-[10px] font-bold bg-black/80 text-amber-300">
-                          {offer.category}
-                        </span>
-                      </div>
-                    )}
-
-                    {!offer.imageUrl && (
-                      <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white shadow">
-                          {offer.badge}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                          {offer.category}
-                        </span>
-                      </div>
-                    )}
-
-                    <h3 className="font-black text-sm text-white group-hover:text-amber-400 transition-colors line-clamp-2 leading-snug">
-                      {offer.title}
-                    </h3>
-
-                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
-                      {offer.subtitle}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white">
+                        Showroom Specials
+                      </span>
+                      <h2 className="text-base sm:text-xl font-black text-white tracking-tight font-serif">
+                        Exclusive Showroom Deals & Festive Offers
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Limited-Time Offers • Book Directly via WhatsApp with 1 Click
                     </p>
                   </div>
+                </div>
 
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-black text-emerald-400">
-                        {offer.discount}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {offer.validTill}
-                      </span>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-amber-300 font-bold">
+                    {landingConfig.offers.filter((o) => o.active).length} Active Offers Available
+                  </span>
+                </div>
+              </div>
 
-                    <a
-                      href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
-                        offer.whatsappMessage || `Hello, I would like to inquire about the "${offer.title}" offer.`
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
+              {/* Offers Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+                {landingConfig.offers
+                  .filter((o) => o.active)
+                  .map((offer) => (
+                    <div
+                      key={offer.id}
+                      className="rounded-2xl bg-[#0b1019]/90 border border-slate-700/80 hover:border-amber-400 p-4 flex flex-col justify-between space-y-3 transition-all duration-200 hover:shadow-xl hover:shadow-amber-500/10 group"
                     >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      <span>Claim Offer (WhatsApp)</span>
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+                      <div className="space-y-2.5">
+                        {offer.imageUrl && (
+                          <div className="h-32 rounded-xl overflow-hidden bg-black/60 relative">
+                            <img
+                              src={offer.imageUrl}
+                              alt={offer.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white shadow">
+                              {offer.badge}
+                            </span>
+                            <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded text-[10px] font-bold bg-black/80 text-amber-300">
+                              {offer.category}
+                            </span>
+                          </div>
+                        )}
 
-      {/* 4.5 PROMINENT FRONT STORE CONTACT & ADDRESS BANNER (OPTIONAL - ADMIN CONTROLLED) */}
-      {landingConfig.showAddressBanner === true && (
-        <div className="max-w-[1500px] mx-auto px-3 sm:px-5 py-2.5 w-full">
-          <div className="rounded-2xl bg-gradient-to-r from-[#111927] via-[#19273c] to-[#111927] border-2 border-amber-500/40 p-4 sm:p-5 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-4">
-            {/* Address Details */}
-            <div className="flex items-start sm:items-center gap-3.5">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden shrink-0 shadow-[0_0_20px_rgba(245,158,11,0.4)] border-2 border-amber-400/60 bg-[#070a12] p-0.5">
-                <SaiLogoEmblem />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500 text-black">
-                    Official Showroom Address
-                  </span>
-                  <span className="text-xs text-emerald-400 font-bold">
-                    {landingConfig.contactInfo.timings || 'Open Daily 9:30 AM – 9:30 PM (All 7 Days)'}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-white mt-1">
-                  {landingConfig.contactInfo.addressHindi || 'Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001'}
-                </h3>
-                <p className="text-xs text-slate-300">
-                  {landingConfig.contactInfo.landmark ? `${landingConfig.contactInfo.landmark}, Wardha (Maharashtra)` : 'Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha 442001 (Maharashtra)'}
-                </p>
-              </div>
-            </div>
+                        {!offer.imageUrl && (
+                          <div className="flex items-center justify-between">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-600 text-white shadow">
+                              {offer.badge}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              {offer.category}
+                            </span>
+                          </div>
+                        )}
 
-            {/* 3 Prominent Numbers and Quick Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                <a
-                  href={`tel:${landingConfig.contactInfo.helpline1 || '8766486915'}`}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-black text-xs transition flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer border border-emerald-400/40"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{landingConfig.contactInfo.helpline1 || '8766486915'}</span>
-                </a>
+                        <h3 className="font-bold text-sm text-white group-hover:text-amber-300 transition-colors line-clamp-2 leading-snug font-serif">
+                          {offer.title}
+                        </h3>
 
-                <a
-                  href={`tel:${landingConfig.contactInfo.helpline2 || '8600122978'}`}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-black text-xs transition flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer border border-amber-300"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{landingConfig.contactInfo.helpline2 || '8600122978'}</span>
-                </a>
+                        <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                          {offer.subtitle}
+                        </p>
+                      </div>
 
-                <a
-                  href={`tel:${landingConfig.contactInfo.helpline3 || '9175537365'}`}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono font-black text-xs transition flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer border border-blue-400/40"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{landingConfig.contactInfo.helpline3 || '9175537365'}</span>
-                </a>
-              </div>
+                      <div className="space-y-2 pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-black text-emerald-400">{offer.discount}</span>
+                          <span className="text-[11px] text-slate-400">{offer.validTill}</span>
+                        </div>
 
-              <div className="flex items-center gap-2">
-                <a
-                  href={landingConfig.contactInfo.googleMapLink || 'https://www.google.com/maps/search/?api=1&query=Shri+Sai+Enterprises+Matoshree+Sabhagruh+Arvi+Road+Punjab+Colony+Wardha+442001'}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3.5 py-2 rounded-xl bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black text-xs transition flex items-center gap-1.5 shadow active:scale-95 cursor-pointer"
-                >
-                  <Navigation className="w-3.5 h-3.5" />
-                  <span>Google Maps Directions</span>
-                </a>
-
-                <a
-                  href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=Hello%20Shri%20Sai%20Enterprises,%20Wardha.%20I%20am%20calling%20regarding%20furniture%20and%20electronics.`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition active:scale-95 cursor-pointer"
-                  title="WhatsApp Us"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                </a>
+                        <a
+                          href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                            offer.whatsappMessage ||
+                              `Hello, I would like more details about "${offer.title}".`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>Claim Offer (WhatsApp)</span>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
 
-      {/* 5. AMAZON VALUE PROPOSITION STRIP */}
-      <div className="max-w-[1500px] mx-auto px-3 sm:px-5 py-2 w-full">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 rounded-xl bg-[#171f2a] border border-[#273549] text-xs">
-          <div className="flex items-center gap-2.5">
-            <Truck className="w-5 h-5 text-[#febd69] shrink-0" />
+      {/* 5. SHOWROOM TRUST & VALUE PROPOSITION STRIP */}
+      <div className="max-w-[1520px] mx-auto px-3 sm:px-6 py-2.5 w-full">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-[#0f1726] border border-slate-800 text-xs shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Truck className="w-5 h-5 text-amber-400" />
+            </div>
             <div>
-              <span className="font-bold block text-white">FREE Express Delivery</span>
-              <span className="text-[10px] text-slate-400">Wardha & 50km Surroundings</span>
+              <span className="font-bold block text-white text-xs">Free Express Delivery</span>
+              <span className="text-[10px] text-slate-400">Wardha City & 50 km Radius</span>
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+            </div>
             <div>
-              <span className="font-bold block text-white">100% Genuine Brand Bill</span>
-              <span className="text-[10px] text-slate-400">Authorized Manufacturer Warranty</span>
+              <span className="font-bold block text-white text-xs">100% Authentic GST Invoice</span>
+              <span className="text-[10px] text-slate-400">Official Brand Warranty</span>
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <CreditCard className="w-5 h-5 text-[#f08804] shrink-0" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5 text-amber-400" />
+            </div>
             <div>
-              <span className="font-bold block text-white">₹100 - ₹200 Weekly Savings</span>
-              <span className="text-[10px] text-slate-400">30-Month Passbook Scheme</span>
+              <span className="font-bold block text-white text-xs">Weekly Savings from ₹100</span>
+              <span className="text-[10px] text-slate-400">30-Month Lucky Draw Scheme</span>
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
-            <Calculator className="w-5 h-5 text-purple-400 shrink-0" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+              <Calculator className="w-5 h-5 text-purple-400" />
+            </div>
             <div>
-              <span className="font-bold block text-white">0% No Cost EMI</span>
-              <span className="text-[10px] text-slate-400">Bajaj & TVS Finance In-Store</span>
+              <span className="font-bold block text-white text-xs">0% Interest Easy EMI</span>
+              <span className="text-[10px] text-slate-400">Bajaj & TVS Finance Available</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 6. MAIN CATALOG: AMAZON DARK THEME PRODUCT GRID */}
-      <main id="products-catalog-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-4 flex-1 w-full space-y-6 scroll-mt-20">
-        
-        {/* Active Search Results Indicator Banner */}
+      {/* 6. MAIN CATALOG: BOUTIQUE SHOWROOM PRODUCT GRID */}
+      <main
+        id="products-catalog-section"
+        className="max-w-[1520px] mx-auto px-3 sm:px-6 py-5 flex-1 w-full space-y-6 scroll-mt-20"
+      >
+        {/* Search Results Banner */}
         {searchQuery.trim() && (
-          <div className="bg-[#172436] border border-[#f90]/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-[#febd69] text-black">
+          <div className="bg-[#10192a] border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-lg">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold">
                 <Search className="w-4 h-4" />
               </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[#febd69] font-extrabold text-sm">Search Results:</span>
+                  <span className="text-amber-400 font-extrabold text-sm">Search Results:</span>
                   <span className="font-black text-white text-base">"{searchQuery}"</span>
                 </div>
                 <div className="text-slate-300 text-[11px]">
-                  {filteredProducts.length > 0 
-                    ? `Found ${filteredProducts.length} matching products.`
-                    : `No exact product found with this name or model.`}
+                  {filteredProducts.length > 0
+                    ? `${filteredProducts.length} products found.`
+                    : `No products found matching this name.`}
                 </div>
               </div>
             </div>
@@ -1374,7 +1351,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 setSearchQuery('');
                 setSelectedCategory('All');
               }}
-              className="px-4 py-2 rounded-xl bg-[#232f3e] hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs flex items-center gap-1.5 transition border border-slate-600 cursor-pointer shadow-sm active:scale-95 self-stretch sm:self-auto justify-center"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs flex items-center gap-1.5 transition border border-slate-700 cursor-pointer shadow-sm active:scale-95"
             >
               <span>Show All Products</span>
               <span>✕</span>
@@ -1383,7 +1360,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         )}
 
         {/* Category Tabs & Sorting Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-[#273549]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 no-scrollbar">
             {categories.map((c) => {
               const IconComp = c.icon;
@@ -1392,10 +1369,10 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <button
                   key={c.id}
                   onClick={() => setSelectedCategory(c.id)}
-                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 border ${
                     isSelected
-                      ? 'bg-[#febd69] text-[#131921] border-[#f3a847] shadow'
-                      : 'bg-[#1a2432] text-slate-300 border-[#2d3a4d] hover:border-slate-500'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 border-amber-400 shadow-md shadow-amber-500/10'
+                      : 'bg-[#101726] text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
                   }`}
                 >
                   <IconComp className="w-3.5 h-3.5" />
@@ -1407,14 +1384,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
           <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto text-xs text-slate-400">
             <span>{filteredProducts.length} Products Available</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
               <select
                 value={sortBy}
                 onChange={(e: any) => setSortBy(e.target.value)}
-                className="bg-[#17202d] text-white text-xs px-2.5 py-1.5 rounded border border-slate-700 outline-none cursor-pointer"
+                className="bg-[#101726] text-slate-200 text-xs px-3 py-1.5 rounded-xl border border-slate-700 outline-none cursor-pointer"
               >
-                <option value="featured">Featured (Top Recommended)</option>
+                <option value="featured">Featured / Best Sellers</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
               </select>
@@ -1422,18 +1399,16 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
           </div>
         </div>
 
-        {/* Zero Results Feedback with Fast Tag Suggestions */}
+        {/* Zero Results Feedback */}
         {storeData.stock.length === 0 ? (
-          <div className="py-20 px-4 text-center rounded-3xl bg-[#171f2a] border border-slate-800 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#232f3e] text-[#febd69] flex items-center justify-center mx-auto text-3xl">
+          <div className="py-20 px-4 text-center rounded-3xl bg-[#0f1726] border border-slate-800 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center mx-auto text-3xl">
               🏪
             </div>
             <div className="space-y-2 max-w-md mx-auto">
-              <h3 className="text-lg font-bold text-white">
-                Showroom Ready for New Stock
-              </h3>
+              <h3 className="text-lg font-bold text-white font-serif">Showroom Ready for New Stock</h3>
               <p className="text-xs text-slate-400">
-                Ready for your genuine store products. Click below to login to the ERP portal and add your products or import from Excel.
+                Login to the ERP Portal to add new inventory or import from Excel/CSV.
               </p>
             </div>
             <div className="pt-2">
@@ -1442,892 +1417,381 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 onClick={() => setIsAdminPinModalOpen(true)}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-lg transition cursor-pointer"
               >
-                🔐 ERP Portal Login (+ Add New Products)
+                🔐 ERP Portal Login (+ Add Stock)
               </button>
             </div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="py-16 px-4 text-center rounded-3xl bg-[#171f2a] border border-slate-800 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#232f3e] text-[#febd69] flex items-center justify-center mx-auto text-2xl">
+          <div className="py-16 px-4 text-center rounded-3xl bg-[#0f1726] border border-slate-800 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center mx-auto text-2xl">
               🔍
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-white">
-                No products found for "{searchQuery}"
-              </h3>
+              <h3 className="text-base font-bold text-white">"{searchQuery}" No products found for</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Please check your spelling or choose from popular suggestions below:
+                Please check the spelling or choose from our showroom categories:
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              {['Smart TV', 'Teakwood Sofa', 'Diwan Bed', 'Single Door Refrigerator', 'Air Cooler', 'Godrej Cupboard'].map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSearchQuery(tag)}
-                  className="px-3 py-1.5 rounded-full bg-[#232f3e] hover:bg-[#febd69] hover:text-[#131921] text-slate-300 text-xs font-semibold border border-slate-700 transition cursor-pointer"
-                >
-                  + {tag}
-                </button>
-              ))}
+            <div className="flex flex-wrap justify-center gap-2 pt-2">
               <button
-                type="button"
                 onClick={() => {
                   setSearchQuery('');
-                  setSelectedCategory('All');
+                  setSelectedCategory('Electronics');
                 }}
-                className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-amber-300 hover:bg-slate-700"
               >
-                Reset All Products
+                Smart 4K TVs
+              </button>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('Furniture');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-amber-300 hover:bg-slate-700"
+              >
+                Teakwood Sofas
+              </button>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('Diwan');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold text-amber-300 hover:bg-slate-700"
+              >
+                Diwan Beds
               </button>
             </div>
           </div>
         ) : (
-          /* Amazon Dark Theme Product Grid with Genuine Images */
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-          {filteredProducts.map((prod: StockItem) => {
-            const genuineImg = getGenuineProductImage(prod);
-            const discountPct = Math.round(((prod.mrp - prod.salePrice) / prod.mrp) * 100);
-            const isBestSeller = prod.salePrice > 30000 || prod.category === 'Electronics';
+          /* High-End Showroom Product Cards Grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {filteredProducts.map((prod) => {
+              const genuineImg = getGenuineProductImage(prod);
+              const discountPct =
+                prod.mrp && prod.mrp > prod.salePrice
+                  ? Math.round(((prod.mrp - prod.salePrice) / prod.mrp) * 100)
+                  : 0;
+              const savingsAmt = prod.mrp ? Math.max(0, prod.mrp - prod.salePrice) : 0;
+              const isBestSeller =
+                prod.isFeaturedOnLanding ||
+                (prod.landingBadge && prod.landingBadge.toLowerCase().includes('best'));
 
-            return (
-              <div
-                key={prod.id}
-                className="rounded-xl border border-[#273549] bg-[#171f2a] hover:border-[#ff9900] hover:shadow-2xl hover:shadow-black/70 transition-all duration-200 flex flex-col justify-between overflow-hidden group relative"
-              >
-                {/* Genuine Photographic Image Frame */}
+              return (
                 <div
-                  onClick={() => setQuickViewProduct(prod)}
-                  className="relative h-56 sm:h-64 bg-[#111721] p-3 flex items-center justify-center cursor-pointer overflow-hidden border-b border-[#243041]"
+                  key={prod.id}
+                  className="rounded-2xl overflow-hidden bg-[#0d1424] border border-slate-800 hover:border-amber-400/60 transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/10 flex flex-col justify-between group"
                 >
-                  <img
-                    src={genuineImg}
-                    alt={prod.name}
-                    className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
-                    }}
-                  />
-
-                  {/* Brand Tag Top Left */}
-                  <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#131921]/90 text-[#febd69] border border-slate-700">
-                    {prod.brand}
-                  </span>
-
-                  {/* Deal / Prime Badges */}
-                  <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1">
-                    {prod.landingBadge ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#cc0c39] text-white shadow">
-                        {prod.landingBadge}
-                      </span>
-                    ) : discountPct > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#cc0c39] text-white shadow">
-                        {discountPct}% OFF
-                      </span>
-                    ) : null}
-                    <span className="text-[#00a8e1] font-black text-[11px] flex items-center gap-0.5 bg-[#131921]/90 px-1.5 py-0.2 rounded border border-slate-800">
-                      prime <Check className="w-2.5 h-2.5 stroke-[3]" />
-                    </span>
-                  </div>
-
-                  {/* Quick View Button on Hover */}
-                  <div className="absolute inset-x-3 bottom-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setQuickViewProduct(prod);
+                  {/* Image Container with Brand & Tags */}
+                  <div
+                    onClick={() => setQuickViewProduct(prod)}
+                    className="relative h-60 bg-[#070b14] p-4 flex items-center justify-center cursor-pointer overflow-hidden border-b border-slate-800/80"
+                  >
+                    <img
+                      src={genuineImg}
+                      alt={prod.name}
+                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
                       }}
-                      className="w-full py-1.5 bg-[#232f3e]/90 hover:bg-[#232f3e] text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 shadow border border-slate-600"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-[#febd69]" />
-                      <span>Quick View</span>
-                    </button>
-                  </div>
-                </div>
+                    />
 
-                {/* Card Content & Amazon Pricing */}
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                  <div>
-                    {/* Amazon's Choice Tag */}
-                    {isBestSeller && (
-                      <div className="inline-flex items-center gap-1 bg-[#232f3e] text-white text-[10px] px-2 py-0.5 rounded mb-1.5 border-l-2 border-[#e77600]">
-                        <span className="text-[#e77600] font-black">Amazon's</span>
-                        <span className="font-bold">Choice</span>
-                      </div>
-                    )}
+                    {/* Brand Tag Top Left */}
+                    <span className="absolute top-3 left-3 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-900/90 text-amber-300 border border-amber-500/30">
+                      {prod.brand}
+                    </span>
 
-                    {/* Product Title */}
-                    <h3
-                      onClick={() => setQuickViewProduct(prod)}
-                      className="font-bold text-sm text-slate-100 group-hover:text-[#ff9900] line-clamp-2 leading-snug cursor-pointer transition-colors"
-                      title={prod.name}
-                    >
-                      {prod.name}
-                    </h3>
-
-                    {/* Amazon Rating Stars */}
-                    <div className="flex items-center gap-1.5 mt-1 text-xs">
-                      <div className="flex text-[#ffa41c]">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-3 h-3 fill-current" />
-                        ))}
-                      </div>
-                      <span className="text-slate-400 text-[11px] font-medium">
-                        4.8 (1,240+)
-                      </span>
-                    </div>
-
-                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
-                      {prod.description || '100% authentic brand showroom warranty, GST invoice, and free express delivery.'}
-                    </p>
-                  </div>
-
-                  {/* Pricing Box */}
-                  <div className="space-y-2.5 pt-2 border-t border-[#273549]">
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        {discountPct > 0 && (
-                          <span className="text-sm font-bold text-[#cc0c39]">
-                            -{discountPct}%
-                          </span>
-                        )}
-                        <span className="text-2xl font-black text-white tabular-nums tracking-tight">
-                          ₹{prod.salePrice.toLocaleString('en-IN')}
+                    {/* Deal Badges Top Right */}
+                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                      {prod.landingBadge ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white shadow">
+                          {prod.landingBadge}
                         </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                        <span>M.R.P.:</span>
-                        <span className="line-through">₹{prod.mrp.toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-
-                    {/* 30-Month Scheme & EMI Badge */}
-                    <div className="p-2 rounded-lg bg-[#111721] border border-slate-800 space-y-0.5">
-                      <div className="flex items-center justify-between text-[11px] text-amber-300 font-bold">
-                        <span>30-Mo Savings Scheme:</span>
-                        <span className="text-[#febd69]">
-                          {prod.schemeWeeklyAmount ? `₹${prod.schemeWeeklyAmount} / wk` : '₹100 - ₹200 / wk'}
+                      ) : discountPct > 0 ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white shadow">
+                          {discountPct}% OFF
                         </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 block">
-                        No Cost EMI from ₹{Math.round(prod.salePrice / 10).toLocaleString('en-IN')}/mo
-                      </span>
+                      ) : null}
                     </div>
 
-                    {/* Fast Delivery Promise */}
-                    <div className="text-[11px] text-slate-300 flex items-center gap-1">
-                      <span className="text-emerald-400 font-bold">FREE Delivery</span>
-                      <span>Tomorrow by 11 AM • Wardha</span>
-                    </div>
-
-                    {/* Action Buttons (Amazon Style: Add to Cart & Buy Now/WhatsApp) */}
-                    <div className="space-y-2 pt-1">
+                    {/* Quick View Button on Hover */}
+                    <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => addToCart(prod)}
-                        className="w-full py-2 px-3 bg-[#ffd814] hover:bg-[#f7ca00] active:scale-95 text-[#0f1111] font-bold rounded-full text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm border border-[#fcd200]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickViewProduct(prod);
+                        }}
+                        className="w-full py-1.5 bg-slate-900/95 hover:bg-slate-900 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow border border-slate-700"
                       >
-                        <ShoppingCart className="w-3.5 h-3.5" />
-                        <span>Add to Cart</span>
+                        <Eye className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Quick View</span>
                       </button>
+                    </div>
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                  {/* Card Content & Pricing */}
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                    <div>
+                      {isBestSeller && (
+                        <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 mb-1.5 font-bold">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span>Showroom Best Seller</span>
+                        </div>
+                      )}
+
+                      <h3
+                        onClick={() => setQuickViewProduct(prod)}
+                        className="font-bold text-sm text-slate-100 group-hover:text-amber-300 line-clamp-2 leading-snug cursor-pointer transition-colors font-serif"
+                        title={prod.name}
+                      >
+                        {prod.name}
+                      </h3>
+
+                      {/* Verified Rating */}
+                      <div className="flex items-center gap-1.5 mt-1 text-xs">
+                        <div className="flex text-amber-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-3 h-3 fill-current" />
+                          ))}
+                        </div>
+                        <span className="text-slate-400 text-[11px] font-medium">
+                          4.8★ (Customer Favorite)
+                        </span>
+                      </div>
+
+                      <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                        {prod.description ||
+                          '100% Authorized Brand Warranty, GST Invoice & Free Doorstep Delivery.'}
+                      </p>
+                    </div>
+
+                    {/* Pricing Box */}
+                    <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                      <div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-black text-white tabular-nums tracking-tight">
+                            ₹{prod.salePrice.toLocaleString('en-IN')}
+                          </span>
+                          {prod.mrp && prod.mrp > prod.salePrice && (
+                            <span className="text-xs text-slate-400 line-through">
+                              ₹{prod.mrp.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </div>
+
+                        {savingsAmt > 0 && (
+                          <div className="text-[11px] text-emerald-400 font-bold">
+                            Instant Savings: ₹{savingsAmt.toLocaleString('en-IN')}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 30-Month Weekly Scheme Card Calculation */}
+                      <div className="p-2 rounded-xl bg-[#090f1a] border border-slate-800 space-y-0.5">
+                        <div className="flex items-center justify-between text-[11px] text-amber-300 font-bold">
+                          <span>30-Month Scheme:</span>
+                          <span className="text-amber-200">
+                            {prod.schemeWeeklyAmount
+                              ? `₹${prod.schemeWeeklyAmount} / week`
+                              : '₹100 - ₹200 / week'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">
+                          0% Down Payment EMI Available
+                        </span>
+                      </div>
+
+                      {/* Free Delivery Promise */}
+                      <div className="text-[11px] text-slate-300 flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400 font-bold">Free Delivery</span>
+                        <span>• Wardha City & 50 km</span>
+                      </div>
+
+                      {/* Action Buttons: Add to Cart & WhatsApp Direct Order */}
+                      <div className="space-y-2 pt-1">
+                        <button
+                          onClick={() => addToCart(prod)}
+                          className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>Add to Cart</span>
+                        </button>
+
                         <a
-                          href={`https://wa.me/918766486915?text=${encodeURIComponent(
-                            `Hello Shri Sai Enterprises (Wardha), I would like to purchase:\nProduct: ${prod.name} (${prod.brand})\nPrice: ₹${prod.salePrice.toLocaleString('en-IN')}\nPlease share delivery and order confirmation details.`
+                          href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                            `Hello Shree Sai Enterprises (Wardha), I would like to purchase this product:\nProduct: ${prod.name} (${prod.brand})\nPrice: ₹${prod.salePrice.toLocaleString('en-IN')}\nPlease provide delivery details and booking confirmation.`
                           )}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="py-1.5 px-2 bg-[#ffa41c] hover:bg-[#fa8900] active:scale-95 text-[#0f1111] font-bold rounded-full text-[11px] flex items-center justify-center gap-1 transition cursor-pointer shadow-sm border border-[#ff8f00]"
+                          className="w-full py-2 px-3 bg-emerald-600/90 hover:bg-emerald-600 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
-                          <span>Buy Now</span>
+                          <span>Order on WhatsApp</span>
                         </a>
-
-                        <button
-                          onClick={() => {
-                            setFinanceProduct({
-                              name: prod.name,
-                              price: prod.salePrice,
-                            });
-                            setIsFinanceEmiOpen(true);
-                          }}
-                          className="py-1.5 px-2 bg-[#232f3e] hover:bg-[#2c3a4d] text-slate-200 hover:text-white font-bold rounded-full text-[11px] flex items-center justify-center gap-1 transition cursor-pointer border border-slate-700"
-                        >
-                          <Calculator className="w-3 h-3 text-[#febd69]" />
-                          <span>EMI Calculator</span>
-                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         )}
       </main>
 
-      {/* ========================================================================================= */}
-      {/* 7. POINT 4: 30-MONTH SAVINGS SCHEME BIG PROMINENT BANNER (UNIQUE SELLING POINT)          */}
-      {/* ========================================================================================= */}
-      {landingConfig.showSchemeBanner !== false && (
-        <section className="max-w-[1500px] mx-auto px-3 sm:px-5 py-4 w-full">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#170e03] via-[#2a1705] to-[#120a02] border-2 border-amber-500/50 p-6 sm:p-10 shadow-2xl">
-            {/* Subtle Golden Glow Accents */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-amber-500/15 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-amber-600/10 blur-3xl pointer-events-none" />
-
-            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-              <div className="max-w-3xl space-y-4">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black tracking-wide uppercase shadow-sm">
-                  <Gift className="w-4 h-4 text-amber-400" />
-                  <span>{landingConfig.schemeBanner?.badge || "30-MONTH SAVINGS & MONTHLY LUCKY DRAW SCHEME • WARDHA'S #1 SAVINGS SCHEME"}</span>
-                </div>
-
-                <h2 className="text-2xl sm:text-4xl lg:text-4xl font-black text-white leading-tight">
-                  "{landingConfig.schemeBanner?.title || 'Buy Premium Furniture & Electronics on Wardha’s #1 30-Month Weekly Savings Scheme!'}"
-                </h2>
-
-                <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-medium">
-                  {landingConfig.schemeBanner?.subtitle || 'Save just ₹100 or ₹200 weekly! Enjoy transparent monthly lucky draws — if your card number is picked, you win your selected appliance or furniture immediately with zero remaining installments! After 30 months, all participants receive their full savings plus bonus guarantee. Zero risk!'}
-                </p>
-
-                {/* Key Features Badges */}
-                <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.weeklyBadge1 || 'Weekly Installment: Just ₹100 or ₹200 / Week'}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> {landingConfig.schemeBanner?.weeklyBadge2 || 'Monthly Lucky Draw Bumper Gifts'}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-amber-500/30 text-amber-300 font-bold">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> {landingConfig.schemeBanner?.highlightNote || '100% Safe & Guaranteed Delivery'}
-                  </span>
-                </div>
+      {/* 7. DIGITAL PASSBOOK & 30-MONTH SAVINGS SCHEME SECTION */}
+      <section
+        id="passbook-portal-section"
+        className="max-w-[1520px] mx-auto px-3 sm:px-6 py-6 w-full scroll-mt-20"
+      >
+        <div className="rounded-3xl bg-gradient-to-br from-[#0c1424] via-[#10192e] to-[#0a101d] border border-amber-500/30 p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                <Gift className="w-3.5 h-3.5 text-amber-400" />
+                <span>Shree Sai 30-Month Weekly Savings Scheme • Digital Passbook</span>
               </div>
-
-              {/* Quick Action Box */}
-              <div className="w-full lg:w-80 shrink-0 space-y-3 p-5 rounded-2xl bg-black/60 border border-amber-500/40 backdrop-blur-md shadow-xl text-center">
-                <span className="text-[11px] font-black uppercase text-amber-400 tracking-wider block">
-                  Digital Passbook & New Registration
-                </span>
-                <p className="text-xs text-slate-300">
-                  Check your card installments online or open a new savings card on WhatsApp instantly.
-                </p>
-
-                <button
-                  onClick={() => {
-                    const el = document.getElementById('passbook-portal-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="w-full py-3 px-4 bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black rounded-xl text-xs transition cursor-pointer shadow-lg hover:shadow-[#ffd814]/25 flex items-center justify-center gap-2 active:scale-95"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>Check Scheme Passbook</span>
-                </button>
-
-                <a
-                  href="https://wa.me/918600122978?text=Hello%20Shri%20Sai%20Enterprises,%20I%20want%20to%20enroll%20in%20the%2030-Month%20Savings%20Scheme%20in%20Wardha."
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py.2.5 px-4 bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer border border-emerald-400/40 active:scale-95"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Enroll via WhatsApp</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 8. DEDICATED PASSBOOK LOOKUP PORTAL (PLACED ALONGSIDE SCHEME FOR CLEAN STOREFRONT) */}
-      {landingConfig.showPassbookSection !== false && (
-        <section id="passbook-portal-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-3 w-full">
-          <div className="rounded-2xl border border-[#3b4b62] bg-gradient-to-r from-[#131b26] via-[#17212e] to-[#1a2535] p-5 sm:p-7 shadow-xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#2d3a4d]">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-black bg-[#febd69] text-[#131921] mb-1.5 uppercase tracking-wide shadow-sm">
-                  <CreditCard className="w-3.5 h-3.5" /> Customer Digital Passbook & Ledger
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white">
-                  Track Scheme Passbook & Paid Installments
-                </h2>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Shri Sai Weekly Savings members can enter their Card Number or 10-digit Phone Number to view total deposits, balance weeks, and lucky draw eligibility.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="px-3 py-1.5 rounded-lg bg-[#232f3e] text-amber-300 font-bold text-xs border border-slate-700 shadow-sm flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>{storeData.cardMembers.length} Active Member Cards</span>
-                </span>
-              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white font-serif tracking-tight">
+                Track Your Installment & Lucky Draw Status
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Save just ₹100 or ₹200 every week to participate in monthly lucky draws and win free appliances and furniture! Enter your card number or mobile number below to check your ledger:
+              </p>
             </div>
 
-            {/* Passbook Search Input Form */}
-            <form onSubmit={handleOnPageSearchPassbook} className="mt-4 flex flex-col sm:flex-row gap-2.5">
-              <div className="relative flex-1">
-                <CreditCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                <input
-                  type="text"
-                  placeholder="Enter your Card No (e.g. 1001, 1050, 1088) or 10-digit Mobile Number..."
-                  value={onPageCardQuery}
-                  onChange={(e) => {
-                    setOnPageCardQuery(e.target.value);
-                    setOnPageError('');
-                  }}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-700 bg-[#0f141c] text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#f90] shadow-inner"
-                />
-                {onPageCardQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOnPageCardQuery('');
-                      setOnPageMember(null);
-                      setOnPageError('');
-                    }}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-white text-xs px-1.5 py-0.5"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
+            {/* Direct On-Page Search Input */}
+            <form onSubmit={handleOnPageSearchPassbook} className="flex gap-2 w-full lg:w-96">
+              <input
+                type="text"
+                placeholder="Enter Card Number (e.g. 1001) or Mobile Number..."
+                value={onPageCardQuery}
+                onChange={(e) => setOnPageCardQuery(e.target.value)}
+                className="flex-1 p-2.5 rounded-xl border border-slate-700 bg-[#070b14] text-white text-xs font-semibold focus:outline-none focus:border-amber-400"
+              />
               <button
                 type="submit"
-                className="py-3 px-6 bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-bold text-sm rounded-xl transition cursor-pointer shadow-md border border-[#fcd200] flex items-center justify-center gap-2 shrink-0 active:scale-95"
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 shadow-md"
               >
-                <Search className="w-4 h-4 stroke-[2.5]" />
-                <span>Search Passbook</span>
+                <Search className="w-3.5 h-3.5" />
+                <span>Check Status</span>
               </button>
             </form>
+          </div>
 
-            {/* Error Message */}
-            {onPageError && (
-              <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{onPageError}</span>
+          {onPageError && (
+            <p className="text-rose-400 font-bold text-xs bg-rose-500/10 p-3 rounded-xl border border-rose-500/30">
+              {onPageError}
+            </p>
+          )}
+
+          {/* If Member Found, show details */}
+          {onPageMember && (
+            <div className="p-5 rounded-2xl border border-amber-500/30 bg-[#080d16] space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-amber-400">
+                    Card #{onPageMember.cardNo}
+                  </span>
+                  <h3 className="font-extrabold text-lg text-white font-serif">
+                    {onPageMember.memberName}
+                  </h3>
+                  <p className="text-slate-400 text-xs">
+                    {onPageMember.address || onPageMember.village} • {onPageMember.phone}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    {onPageMember.status || 'Active'} Member
+                  </span>
+                  <button
+                    onClick={() => {
+                      setSelectedPassbookMember(onPageMember);
+                      setIsCardPassbookModalOpen(true);
+                    }}
+                    className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow cursor-pointer flex items-center gap-1.5"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Open Full Passbook</span>
+                  </button>
+                </div>
               </div>
-            )}
 
-            {/* Found Member Live Passbook Card Result */}
-            {onPageMember && (() => {
-              const stats = calculateMemberStats(onPageMember);
-              return (
-                <div className="mt-5 rounded-2xl bg-[#17212e] border border-[#ff9900]/50 p-5 sm:p-6 shadow-2xl space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded text-xs font-black bg-[#febd69] text-[#131921]">
-                          Card #{onPageMember.cardNo}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          {onPageMember.status || 'Active'} Member
-                        </span>
-                        <span className="text-xs font-medium text-slate-400">
-                          Scheme: {onPageMember.schemeName || '30-Month Weekly Savings Scheme'}
-                        </span>
-                      </div>
-                      <h3 className="text-xl font-black text-white mt-1">
-                        {onPageMember.memberName}
-                      </h3>
-                      <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                        <span>{onPageMember.village || onPageMember.address || 'Wardha'}</span>
-                        <span>•</span>
-                        <Phone className="w-3.5 h-3.5 text-[#febd69]" />
-                        <span>{onPageMember.phone || 'Not Available'}</span>
-                      </p>
-                    </div>
-
-                    {/* Lucky Draw Status */}
-                    <div className="text-right flex sm:flex-col items-center sm:items-end justify-between gap-1">
-                      <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-600 text-white shadow-sm flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Lucky Draw Eligible
-                      </span>
-                      <span className="text-[11px] font-bold text-[#febd69]">
-                        Weekly Installment: ₹{stats.weeklyAmt} / wk
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Key Passbook Financial Summary Metric Blocks */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-xl bg-[#0f141c] border border-slate-700">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Weeks Paid
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-[#febd69] tabular-nums">
-                        {stats.paidWeeks} / {stats.totalWeeks} Weeks
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-[#0f141c] border border-slate-700">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Total Deposited
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-emerald-400 tabular-nums">
+              {/* Stats Calculation */}
+              {(() => {
+                const stats = calculateMemberStats(onPageMember);
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                    <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Total Paid Amount</span>
+                      <span className="font-black text-emerald-400 text-base tabular-nums">
                         ₹{stats.totalPaid.toLocaleString('en-IN')}
                       </span>
                     </div>
-
-                    <div className="p-3 rounded-xl bg-[#0f141c] border border-slate-700">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Weekly Installment
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-amber-300 tabular-nums">
-                        ₹{stats.weeklyAmt} <span className="text-xs font-normal">/wk</span>
+                    <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Weekly Installment</span>
+                      <span className="font-black text-amber-300 text-base tabular-nums">
+                        ₹{stats.weeklyAmt} / week
                       </span>
                     </div>
-
-                    <div className="p-3 rounded-xl bg-[#0f141c] border border-slate-700">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Next Due Installment
-                      </span>
-                      <span className="text-xl sm:text-2xl font-black text-purple-400 tabular-nums">
-                        Week #{stats.paidWeeks + 1}
+                    <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Paid Weeks</span>
+                      <span className="font-black text-white text-base">
+                        {stats.paidWeeks} Weeks Paid
                       </span>
                     </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] font-bold text-slate-300">
-                      <span>Scheme Completion Progress</span>
-                      <span>{Math.min(100, Math.round((stats.paidWeeks / stats.totalWeeks) * 100))}% Completed</span>
-                    </div>
-                    <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#f08804] to-[#febd69] transition-all duration-500"
-                        style={{ width: `${Math.min(100, Math.max(5, (stats.paidWeeks / stats.totalWeeks) * 100))}%` }}
-                      />
+                    <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">Lucky Draw Status</span>
+                      <span className="font-black text-purple-400 text-base">
+                        {onPageMember.isLuckyDrawEligible !== false ? 'Eligible' : 'Pending'}
+                      </span>
                     </div>
                   </div>
-
-                  {/* WhatsApp Statement Download Button */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700 text-xs">
-                    <span className="text-slate-400 text-[11px]">
-                      Shri Sai Enterprises • Opp. Matoshree Hall, Arvi Road, Wardha
-                    </span>
-
-                    <a
-                      href={`https://wa.me/917822859073?text=${encodeURIComponent(
-                        `Hello Shri Sai Enterprises, my Card No is ${onPageMember.cardNo} (${onPageMember.memberName}). I have paid ₹${stats.totalPaid} (${stats.paidWeeks} weeks). Please send my official ledger statement and Lucky Draw status.`
-                      )}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 transition shadow"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span>Get Statement via WhatsApp</span>
-                    </a>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </section>
-      )}
-
-      {/* ========================================================================================= */}
-      {/* 9. POINT 3: DEDICATED LANDING SECTION A — ELECTRONICS IN WARDHA (ADMIN TOGGLEABLE)        */}
-      {/* ========================================================================================= */}
-      {landingConfig.showElectronicsSection === true && (
-        <section id="electronics-wardha-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-6 w-full">
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0c1422] via-[#0f1a2c] to-[#070c14] border border-[#23354f] shadow-2xl space-y-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-[#1e2f47]">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
-                <Tv className="w-3.5 h-3.5" />
-                <span>Electronics in Wardha • Mega Showroom Expo</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Electronics in Wardha
-              </h2>
-              <p className="text-sm font-bold text-amber-400">
-                "Special Discounts on Branded Home Electronics in Wardha"
-              </p>
-              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                Smart 4K UHD LED TVs, Dual Inverter Refrigerators, 5-Star Washing Machines, Desert Coolers, and Split ACs. Authorized GST Invoice, Brand Warranty, Free Home Delivery & 0% Downpayment Easy EMI.
-              </p>
+                );
+              })()}
             </div>
-
-            <button
-              onClick={() => {
-                setSelectedCategory('Electronics');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
-            >
-              <span>View All Electronics</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* 4 Feature Category Cards for Electronics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div
-              onClick={() => {
-                setSelectedCategory('Electronics');
-                setSearchQuery('TV');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#141e30] border border-[#283c5a] hover:border-blue-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=600&auto=format&fit=crop&q=80"
-                  alt="Smart 4K LED TVs Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  32" to 65" UHD
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  Smart 4K UHD LED TVs
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Samsung, LG, Sony and Mi Smart TVs. Voice Remote, Netflix, Prime & YouTube support.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">EMI: ₹100 - ₹200 / wk</span>
-                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Appliances');
-                setSearchQuery('Fridge');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#141e30] border border-[#283c5a] hover:border-blue-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=600&auto=format&fit=crop&q=80"
-                  alt="Inverter Refrigerators Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  Inverter Fridge
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  Inverter Refrigerators
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  LG, Whirlpool and Godrej single & double door. 10-Year compressor warranty & energy saving.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹14,990</span>
-                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Appliances');
-                setSearchQuery('Washing');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#141e30] border border-[#283c5a] hover:border-blue-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=600&auto=format&fit=crop&q=80"
-                  alt="5-Star Washing Machines Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  5-Star Washing Machine
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  Fully Automatic Washing Machines
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Whirlpool & Samsung semi and fully automatic. Heavy-duty motor and quick dryer.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹11,990</span>
-                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Appliances');
-                setSearchQuery('Cooler');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#141e30] border border-[#283c5a] hover:border-blue-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=600&auto=format&fit=crop&q=80"
-                  alt="Air Coolers and Split AC Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white">
-                  Coolers & AC
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-blue-300 transition">
-                  Air Coolers & Inverter Split AC
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Voltas Inverter Split ACs and heavy-duty desert air coolers with high air throw.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹6,490</span>
-                  <span className="text-blue-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
-      )}
 
-      {/* ========================================================================================= */}
-      {/* 10. POINT 3: DEDICATED LANDING SECTION B — FURNITURE IN WARDHA (ADMIN TOGGLEABLE)         */}
-      {/* ========================================================================================= */}
-      {landingConfig.showFurnitureSection === true && (
-        <section id="furniture-wardha-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-6 w-full">
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#1c1107] via-[#24160a] to-[#120a03] border border-[#523315] shadow-2xl space-y-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-[#44280f]">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-                <Sofa className="w-3.5 h-3.5" />
-                <span>Furniture in Wardha • Pure Chandrapur Teakwood & Steel Furniture</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Furniture in Wardha
-              </h2>
-              <p className="text-sm font-bold text-amber-400">
-                "Top Quality Furniture at Direct Factory Wholesale Rates in Wardha"
-              </p>
-              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                Solid wood & modular sofa sets, double beds, hydraulic storage diwans, heavy wardrobes, dining tables and ergonomic chairs. Direct factory pricing, lifetime wood durability guarantee, and 5-year showroom warranty.
-              </p>
-            </div>
-
-            <button
-              onClick={() => {
-                setSelectedCategory('Furniture');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
-            >
-              <span>View All Furniture</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* 4 Feature Category Cards for Furniture */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div
-              onClick={() => {
-                setSelectedCategory('Furniture');
-                setSearchQuery('Sofa');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#20140a] border border-[#4a2e16] hover:border-amber-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&auto=format&fit=crop&q=80"
-                  alt="Teakwood Sofa Set Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  Pure Teakwood
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  Teakwood Sofas (3+1+1)
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  3+1+1 Royal Designer Teak Sofa. Genuine Chandrapur wood, high-density foam cushions & 5-year warranty.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Direct Factory Rate</span>
-                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Diwan');
-                setSearchQuery('Diwan');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#20140a] border border-[#4a2e16] hover:border-amber-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=600&auto=format&fit=crop&q=80"
-                  alt="Storage Box Diwan Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  Storage Diwan
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  Storage Box Diwans & Beds
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  4x6 and 5x6 Heavy Storage Box Diwan and Sheesham Cot. Smooth hydraulic lift & heavy commercial ply.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹8,990</span>
-                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Furniture');
-                setSearchQuery('Cupboard');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#20140a] border border-[#4a2e16] hover:border-amber-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=600&auto=format&fit=crop&q=80"
-                  alt="Steel Wardrobes and Almirahs Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  Heavy Steel Almirah
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  Steel Wardrobes & Almirahs
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Heavy-gauge steel almirah and 3-door designer wardrobe. High-security locker box and dressing mirror.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹9,490</span>
-                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setSelectedCategory('Furniture');
-                setSearchQuery('Dining');
-                const el = document.getElementById('products-catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="p-4 rounded-2xl bg-[#20140a] border border-[#4a2e16] hover:border-amber-400 transition cursor-pointer group space-y-3"
-            >
-              <div className="h-40 rounded-xl overflow-hidden bg-black/40 flex items-center justify-center p-2 relative">
-                <img
-                  src="https://images.unsplash.com/photo-1617806118233-18e1de247200?w=600&auto=format&fit=crop&q=80"
-                  alt="Dining Tables and Office Chairs Wardha"
-                  className="w-full h-full object-cover rounded-lg group-hover:scale-105 transition duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-amber-600 text-white">
-                  Dining & Chairs
-                </span>
-              </div>
-              <div>
-                <h4 className="font-extrabold text-sm text-white group-hover:text-amber-300 transition">
-                  Dining Tables & Office Chairs
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  4 & 6-Seater solid teakwood dining tables and ergonomic high-back revolving office chairs.
-                </p>
-                <div className="flex items-center justify-between pt-2 text-xs">
-                  <span className="text-[#febd69] font-bold">Starting from ₹5,990</span>
-                  <span className="text-amber-400 text-[11px] font-bold">Explore →</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      )}
-
-      {/* ========================================================================================= */}
-      {/* 11. SHOWROOM LOCATION, VERIFIED REVIEWS & STORE EXPERIENCE (ADMIN TOGGLEABLE)             */}
-      {/* ========================================================================================= */}
-      {landingConfig.showReviewsSection !== false && (
-        <section id="google-business-section" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-6 w-full">
-        <div className="rounded-3xl bg-[#0f1522] border-2 border-amber-500/40 p-5 sm:p-8 shadow-2xl space-y-6">
-          
-          {/* Header: Verified Store & Google Customer Rating */}
+      {/* 8. SHOWROOM VISIT, ADDRESS & GOOGLE REVIEWS SECTION */}
+      <section
+        id="google-business-section"
+        className="max-w-[1520px] mx-auto px-3 sm:px-6 py-6 w-full scroll-mt-20"
+      >
+        <div className="rounded-3xl bg-[#0d1424] border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
             <div className="flex items-start sm:items-center gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden shadow-2xl shrink-0 border-2 border-amber-400/50 bg-[#070a12] p-0.5">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-2xl shrink-0 border border-amber-400/40 bg-[#070a12] p-1">
                 <SaiLogoEmblem />
               </div>
 
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                    <BadgeCheck className="w-3.5 h-3.5" /> Verified Showroom
+                    <BadgeCheck className="w-3.5 h-3.5" /> Verified Flagship Showroom
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     Wardha Main Branch
                   </span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white">
-                  Shree Sai Enterprises • Electronics & Furniture Showroom, Wardha
+                <h3 className="text-xl sm:text-2xl font-black text-white font-sans">
+                  SHREE SAI ENTERPRISES • Main Showroom
                 </h3>
                 <p className="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-amber-400 font-bold">100% Genuine Teakwood</span>
+                  <span className="text-amber-400 font-bold">100% Solid Teakwood</span>
                   <span>•</span>
                   <span>Branded Smart TVs & Appliances</span>
                   <span>•</span>
-                  <span className="text-emerald-400 font-bold">Open Daily 9:30 AM to 9:30 PM</span>
+                  <span className="text-emerald-400 font-bold">Open Daily: 9:30 AM to 9:30 PM</span>
                 </p>
               </div>
             </div>
 
             {/* Google Rating Counter */}
-            <div className="flex items-center gap-3 bg-[#172132] px-4 py-3 rounded-2xl border border-slate-700 shrink-0">
+            <div className="flex items-center gap-3 bg-[#131b2e] px-4 py-3 rounded-2xl border border-slate-700 shrink-0">
               <div className="text-center">
                 <span className="text-2xl font-black text-white tabular-nums">4.9</span>
                 <div className="flex text-amber-400 text-xs">
@@ -2337,16 +1801,15 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 </div>
               </div>
               <div className="text-[11px] text-slate-300 border-l border-slate-700 pl-3">
-                <span className="font-bold block text-white">350+ Verified Reviews</span>
-                <span className="text-emerald-400 font-semibold">#1 Most Trusted in Wardha</span>
+                <span className="font-bold block text-white">350+ Verified Google Reviews</span>
+                <span className="text-emerald-400 font-semibold">#1 Trusted Showroom in Wardha</span>
               </div>
             </div>
           </div>
 
-          {/* Showroom Visit & Verified Testimonials Grid */}
+          {/* Showroom Visual & Testimonials Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            
-            {/* Left: Showroom Interior Display & Directions */}
+            {/* Showroom Interior Display & Directions */}
             <div className="lg:col-span-7 rounded-2xl overflow-hidden border border-slate-700 bg-black/60 relative group flex flex-col justify-between min-h-[360px]">
               <img
                 src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&auto=format&fit=crop&q=80"
@@ -2356,24 +1819,22 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/30" />
 
-              {/* Top Banner Tag */}
               <div className="relative z-10 p-4 flex items-center justify-between">
                 <span className="px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white text-xs font-bold flex items-center gap-1.5">
                   <Store className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Visit Our Showroom in Wardha</span>
+                  <span>Visit Our Showroom in Person</span>
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-600/90 text-white text-[11px] font-black uppercase shadow">
-                  OPEN TODAY
+                  Open Today
                 </span>
               </div>
 
-              {/* Bottom Info Overlay */}
               <div className="relative z-10 p-5 space-y-2.5">
-                <h4 className="text-lg sm:text-xl font-black text-white drop-shadow">
-                  Shree Sai Enterprises • Grand Electronics & Furniture Showroom
+                <h4 className="text-lg sm:text-xl font-black text-white font-serif">
+                  Shree Sai Enterprises • 2-Story Mega Showroom
                 </h4>
-                <p className="text-xs text-slate-200 drop-shadow max-w-xl leading-relaxed">
-                  Two-storey grand showroom: Ground floor features Samsung & LG 4K Smart TVs, Refrigerators & Washing Machines. First floor showcases genuine Chandrapur Teakwood Sofas, Storage Box Diwans and Heavy Steel Almirahs.
+                <p className="text-xs text-slate-200 max-w-xl leading-relaxed">
+                  Two-story grand showroom: Ground floor features Samsung, LG, Sony Smart TVs, refrigerators, and washing machines. First floor showcases genuine Chandrapur teakwood sofas, storage diwans, and heavy-gauge steel almirahs.
                 </p>
 
                 <div className="text-xs text-amber-300 font-medium flex items-center gap-1.5">
@@ -2386,10 +1847,10 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     href="https://www.google.com/maps/search/?api=1&query=Shri+Sai+Enterprises+Matoshree+Sabhagruh+Arvi+Road+Punjab+Colony+Wardha+442001"
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-xl bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-black transition flex items-center gap-1.5 shadow-lg active:scale-95 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black transition flex items-center gap-1.5 shadow-lg active:scale-95 cursor-pointer"
                   >
                     <Navigation className="w-3.5 h-3.5" />
-                    <span>Get Google Maps Directions</span>
+                    <span>Get Directions on Google Maps</span>
                   </a>
 
                   <a
@@ -2397,11 +1858,13 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold backdrop-blur-md border border-white/30 transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
                   >
                     <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Call: 8600122978</span>
+                    <span>Call Store: 8600122978</span>
                   </a>
 
                   <a
-                    href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent('Hello Shri Sai Enterprises, I want to visit the showroom / inquire about products.')}`}
+                    href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                      'Hello Shree Sai Enterprises, I am planning to visit the showroom.'
+                    )}`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
@@ -2413,57 +1876,56 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               </div>
             </div>
 
-            {/* Right: Verified Customer Testimonials & Store Timings */}
-            <div className="lg:col-span-5 rounded-2xl bg-[#141d2a] border border-slate-700/80 p-5 flex flex-col justify-between space-y-4">
+            {/* Verified Reviews & Timings */}
+            <div className="lg:col-span-5 rounded-2xl bg-[#090f1a] border border-slate-800 p-5 flex flex-col justify-between space-y-4">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <span className="font-black text-sm text-white flex items-center gap-1.5">
+                  <span className="font-black text-sm text-white flex items-center gap-1.5 font-serif">
                     <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span>Verified Customer Reviews</span>
+                    <span>Verified Customer Testimonials</span>
                   </span>
-                  <span className="text-[11px] font-bold text-amber-400">100% Genuine</span>
+                  <span className="text-[11px] font-bold text-amber-400">100% Real Reviews</span>
                 </div>
 
-                {/* 3 Real Customer Testimonials */}
                 <div className="space-y-2.5 mt-3">
-                  <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
+                  <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-white">Amol Deshmukh (Wardha)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "Enrolled in the 30-month savings scheme paying just ₹100 weekly. Won a genuine teakwood sofa in the Diwali lucky draw. The wood quality and finishing are truly top class!"
+                      "I was paying just ₹100 per week in the 30-month savings scheme. In the Diwali lucky draw, my card was selected and I won a royal teakwood sofa set! The wood finishing is outstanding!"
                     </p>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
+                  <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-white">Pradeep Thakare (Arvi)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "Got Samsung 55-inch 4K Smart TV at a price cheaper than Nagpur wholesale dealers. Free home delivery and installation were completed on the same day."
+                      "Got a 55-inch Samsung 4K Smart TV at a price cheaper than Nagpur! Same-day free doorstep delivery and wall-mounting installation completed."
                     </p>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-[#0e141f] border border-slate-800 space-y-1">
+                  <div className="p-3 rounded-xl bg-[#0f1726] border border-slate-800 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-white">Sunita Wankhede (Sewagram)</span>
                       <div className="flex text-amber-400 text-[10px]">★★★★★</div>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-snug">
-                      "The hydraulic storage diwan and heavy steel cupboard are exceptionally solid and well built. The showroom team was very polite and helpful."
+                      "Purchased a hydraulic storage diwan and heavy steel wardrobe. The structure is very strong and durable. The showroom staff was very courteous and helpful."
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Store Opening Hours & Direct Contact Bar */}
+              {/* Showroom Timings & Quick Contact */}
               <div className="pt-2 border-t border-slate-800 space-y-2.5 text-xs">
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#1a2536] border border-slate-700/60">
-                  <Clock className="w-4 h-4 text-[#febd69] shrink-0" />
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#0f1726] border border-slate-800">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                   <div>
-                    <span className="font-bold text-white block">Showroom Timings:</span>
+                    <span className="font-bold text-white block">Showroom Hours:</span>
                     <span className="text-slate-300 text-[11px]">
                       Monday to Sunday: 9:30 AM to 9:30 PM (Open all 7 days)
                     </span>
@@ -2473,19 +1935,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <a
                     href={`tel:${landingConfig.contactInfo.helpline1 || '8766486915'}`}
-                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold text-center text-xs transition cursor-pointer"
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-center text-xs transition cursor-pointer"
                   >
                     📞 {landingConfig.contactInfo.helpline1 || '8766486915'}
                   </a>
                   <a
                     href={`tel:${landingConfig.contactInfo.helpline2 || '8600122978'}`}
-                    className="flex-1 py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 font-bold text-center text-xs transition cursor-pointer"
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-center text-xs transition cursor-pointer"
                   >
                     📞 {landingConfig.contactInfo.helpline2 || '8600122978'}
                   </a>
                   <a
                     href={`tel:${landingConfig.contactInfo.helpline3 || '9175537365'}`}
-                    className="flex-1 py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 font-bold text-center text-xs transition cursor-pointer"
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-center text-xs transition cursor-pointer"
                   >
                     📞 {landingConfig.contactInfo.helpline3 || '9175537365'}
                   </a>
@@ -2495,169 +1957,121 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
           </div>
         </div>
       </section>
-      )}
 
-      {/* ========================================================================================= */}
-      {/* 11.5 WARDHA LOCAL RANKING & FAQ SECTION (MAXIMUM GOOGLE LOCAL SEO RELEVANCE)              */}
-      {/* ========================================================================================= */}
-      <section id="wardha-faq" className="max-w-[1500px] mx-auto px-3 sm:px-5 py-6 w-full scroll-mt-20">
-        <div className="rounded-3xl bg-gradient-to-br from-[#0e1626] via-[#121c30] to-[#0a101d] border border-[#23354f] p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-[#1e2f47]">
+      {/* 9. WARDHA LOCAL SEO FAQ & SEMANTIC SEARCH KEYWORDS */}
+      <section id="wardha-faq" className="max-w-[1520px] mx-auto px-3 sm:px-6 py-6 w-full scroll-mt-20">
+        <div className="rounded-3xl bg-gradient-to-br from-[#0c1424] via-[#10192e] to-[#0a101d] border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-slate-800">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Wardha’s #1 Store • Best Rates, Quality &amp; Budget Guarantee</span>
+                <span>Wardha’s #1 Electronics & Furniture Showroom • Quality & Trust</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Best Electronics, Home Appliances &amp; Furniture in Wardha
+              <h2 className="text-xl sm:text-2xl font-black text-white font-serif tracking-tight">
+                Best Price Guarantee on Electronics, Appliances & Furniture
               </h2>
               <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                Looking for the best electronics, branded home appliances, or durable teakwood furniture at genuine wholesale rates in Wardha? Shri Sai Enterprises offers unmatched quality, wholesale direct pricing, budget-friendly installment options, and prompt delivery across Wardha district.
+                Looking for branded 4K TVs, refrigerators, washing machines, or solid teakwood furniture in Wardha? Shree Sai Enterprises provides factory-direct wholesale pricing with 0% EMI and manufacturer warranties.
               </p>
             </div>
-            
+
             <a
-              href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent('Hello Shri Sai Enterprises, I want to inquire about best rates on electronics and furniture in Wardha.')}`}
+              href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                'Hello Shree Sai Enterprises, I would like to inquire about your best prices and offers in Wardha.'
+              )}`}
               target="_blank"
               rel="noreferrer"
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg active:scale-95"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Inquire Best Rates</span>
+              <span>Inquire Best Prices (WhatsApp)</span>
             </a>
           </div>
 
           {/* 3 Core Value Pillars */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+            <div className="p-4 rounded-2xl bg-[#090f1a] border border-slate-800 space-y-2">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <Award className="w-4 h-4" />
-                <span>Guaranteed Best Rates &amp; Budget</span>
+                <span>Guaranteed Best Prices & Direct Factory Savings</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Factory-direct wholesale pricing with zero middlemen margin. Compare our rates on Sony, LG, Samsung Smart TVs, and seasoned Teakwood furniture across Wardha &amp; Nagpur.
+                Direct factory wholesale pricing with zero middlemen markup. Compare our prices on Sony, LG, Samsung Smart TVs and solid teakwood furniture across Vidarbha.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+            <div className="p-4 rounded-2xl bg-[#090f1a] border border-slate-800 space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                 <ShieldCheck className="w-4 h-4" />
-                <span>100% Genuine Brand Bill &amp; Warranty</span>
+                <span>100% Authorized GST Invoice & Brand Warranty</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Every television, refrigerator, cooler, and washing machine includes official brand GST invoice, manufacturer warranty, and authorized local technician support.
+                Every TV, refrigerator, cooler, and washing machine comes with an authorized company GST invoice, manufacturer warranty, and local technician support.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#162238]/70 border border-[#2b3e60] space-y-2">
+            <div className="p-4 rounded-2xl bg-[#090f1a] border border-slate-800 space-y-2">
               <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
                 <Truck className="w-4 h-4" />
-                <span>Free Wardha District Delivery</span>
+                <span>Free Delivery Across Wardha District</span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Fast doorstep delivery and free wall-mount / unboxing installation in Wardha, Sevagram, Deoli, Arvi, Hinganghat, Seloo, Pulgaon, and surrounding towns.
+                Free safe doorstep delivery and wall-mount installation across Wardha, Sewagram, Deoli, Arvi, Hinganghat, Seloo, Pulgaon, and neighboring areas.
               </p>
             </div>
           </div>
 
-          {/* Frequently Asked Questions */}
+          {/* FAQs */}
           <div className="pt-2 space-y-3">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2 font-serif">
               <HelpCircle className="w-4 h-4 text-amber-400" />
-              <span>Frequently Asked Questions (Wardha Local Guide)</span>
+              <span>Frequently Asked Questions (FAQ)</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-[#090f1a] border border-slate-800 space-y-1">
                 <h4 className="font-bold text-slate-100">
-                  Q: Which is the best showroom for electronics and furniture in Wardha?
+                  Q: Which is the best showroom for furniture and electronics in Wardha?
                 </h4>
                 <p className="text-slate-300 leading-relaxed">
-                  A: Shri Sai Enterprises (Opp. Matoshree Sabhagruh, Arvi Road, Wardha) is rated 4.9/5 by 500+ local customers for offering genuine branded electronics, pure Chandrapur teakwood furniture, and flexible 30-Month Weekly Savings Scheme.
+                  A: Shree Sai Enterprises (Opp. Matoshree Sabhagruh, Arvi Road, Wardha) is the largest showroom with a 4.9★ rating. We provide branded electronics and authentic Chandrapur teakwood furniture at wholesale rates.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-[#090f1a] border border-slate-800 space-y-1">
                 <h4 className="font-bold text-slate-100">
-                  Q: Can I buy good quality furniture on a low monthly/weekly budget?
+                  Q: Can I purchase furniture or TVs on easy weekly installments or EMI?
                 </h4>
                 <p className="text-slate-300 leading-relaxed">
-                  A: Yes! You can join our 30-Month Weekly Savings Scheme starting at just ₹100 or ₹200/week, or choose 0% downpayment finance through TVS &amp; Bajaj Finance right at our counter.
+                  A: Yes! You can participate in our 30-Month Weekly Savings Scheme for just ₹100 or ₹200/week, or avail 0% down payment finance through Bajaj Finserv, TVS Credit, and HDB.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-[#090f1a] border border-slate-800 space-y-1">
                 <h4 className="font-bold text-slate-100">
-                  Q: What are the showroom timings and contact numbers?
+                  Q: What are your showroom timings and contact numbers?
                 </h4>
                 <p className="text-slate-300 leading-relaxed">
-                  A: We are open all 7 days from 9:30 AM to 9:30 PM. Call our helpline at 8600122978 / 9175537365 / 8766486915 or visit us opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha.
+                  A: The showroom is open all 7 days from 9:30 AM to 9:30 PM. Helpline: 8600122978 / 8766486915 / 9175537365.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#10192a] border border-slate-800 space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-[#090f1a] border border-slate-800 space-y-1">
                 <h4 className="font-bold text-slate-100">
-                  Q: How does the 30-Month Savings Scheme lucky draw work?
+                  Q: How does the 30-Month Weekly Lucky Draw Scheme operate?
                 </h4>
                 <p className="text-slate-300 leading-relaxed">
-                  A: A transparent monthly draw is conducted. If your card number is picked, you immediately win your appliance or furniture gift and all future weekly installments are 100% waived off!
+                  A: A transparent monthly lucky draw is conducted every month. If your member card is picked, you immediately receive your product, and all remaining installments are 100% waived off!
                 </p>
               </div>
-            </div>
-          </div>
-
-          {/* Popular Local Searches in Wardha (Google #1 SEO Semantic Search Index) */}
-          <div className="pt-4 border-t border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
-                <Search className="w-4 h-4 text-amber-400" />
-                <span>Popular Local Searches in Wardha (वर्ध्यातील लोकप्रिय शोध)</span>
-              </h3>
-              <span className="text-[11px] text-amber-400/90 font-bold hidden sm:inline">
-                ★ Ranked #1 Electronics &amp; Furniture Showroom
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-xs">
-              {[
-                { label: 'Wardha Best Furniture Shop', cat: 'Furniture' },
-                { label: 'Best Price Electronics Shop Wardha', cat: 'Electronics' },
-                { label: 'Teak Wood Sofa Set Wardha', cat: 'Furniture' },
-                { label: 'Smart LED TV Lowest Price Wardha', cat: 'Electronics' },
-                { label: 'Hydraulic Storage Bed Wardha', cat: 'Diwan' },
-                { label: 'Inverter Refrigerator Wardha', cat: 'Appliances' },
-                { label: 'Automatic Washing Machine Wardha', cat: 'Appliances' },
-                { label: 'Heavy Steel Almirah Wardrobe Wardha', cat: 'Furniture' },
-                { label: '30-Month Weekly Savings Scheme', cat: 'all' },
-                { label: '0% EMI Electronics & Furniture Wardha', cat: 'all' },
-                { label: 'Furniture Shop Near Me Wardha', cat: 'Furniture' },
-                { label: 'Wholesale Furniture Wardha', cat: 'Furniture' },
-                { label: 'Arvi Road Furniture Showroom', cat: 'all' },
-                { label: 'Pipri Wardha Electronics', cat: 'Electronics' },
-              ].map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    if (item.cat !== 'all') setSelectedCategory(item.cat as any);
-                    const el = document.getElementById('featured-products-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-[#141d2c] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700/80 hover:border-amber-500/50 transition cursor-pointer text-[11px] font-semibold flex items-center gap-1.5 group"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 group-hover:scale-125 transition"></span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ========================================================================================= */}
-      {/* 12. RICH FOOTER WITH LOCAL WARDHA SEO KEYWORDS & COPYRIGHT                                */}
-      {/* ========================================================================================= */}
-      <footer className="bg-[#0b1019] text-white border-t border-[#1e2a3b] mt-8">
-        <div className="max-w-[1500px] mx-auto px-3 sm:px-5 py-10 space-y-8">
+      {/* 10. SINGLE DISTINCTIVE LUXURY SHOWROOM FOOTER */}
+      <footer className="bg-[#05080e] text-white border-t border-slate-800/80 mt-12">
+        <div className="max-w-[1520px] mx-auto px-3 sm:px-6 py-12 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             
             {/* Col 1: Brand & Logo */}
@@ -2665,32 +2079,35 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               <div className="flex items-center gap-3">
                 <SaiLogo size="lg" glow={true} />
                 <div>
-                  <h4 className="font-black text-base text-white font-serif tracking-wide">SHREE SAI ENTERPRISES</h4>
-                  <p className="text-[11px] text-[#febd69]">Electronics & Furniture Showroom, Wardha</p>
+                  <h4 className="font-black text-base text-white font-sans tracking-wide">
+                    SHREE SAI ENTERPRISES
+                  </h4>
+                  <p className="text-[11px] text-amber-300 font-sans">Shree Sai Enterprises • Wardha Showroom</p>
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Wardha's most trusted showroom for furniture and electronics. Featuring our signature 30-Month Weekly Savings Scheme and transparent monthly lucky draws.
+                Wardha’s most trusted and reputed retail showroom. Authentic Chandrapur teakwood furniture, Smart 4K TVs, home appliances, and our celebrated 30-month weekly savings scheme.
               </p>
               <div className="pt-1 text-xs text-slate-300 space-y-1">
                 <p>📍 Opp. Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001</p>
-                <p className="text-[11px] text-slate-400 font-mono">(Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony)</p>
-                <p className="text-amber-300 font-medium">📞 Helpline: {landingConfig.contactInfo.helpline1 || '8766486915'} / {landingConfig.contactInfo.helpline2 || '8600122978'} / {landingConfig.contactInfo.helpline3 || '9175537365'}</p>
-                <p>🌐 Website: https://shrisaient.in</p>
-                
-                {/* Official Directory & Social Badges for Google & Customers */}
+                <p className="text-amber-300 font-medium">
+                  📞 Helpline: {landingConfig.contactInfo.helpline1 || '8766486915'} / {landingConfig.contactInfo.helpline2 || '8600122978'}
+                </p>
+                <p>🌐 Official Website: https://shrisaient.in</p>
+
+                {/* Social & Directory Links */}
                 <div className="pt-2 flex flex-wrap gap-2">
                   <a
                     href="https://www.justdial.com/jdmart/Wardha/Shree-Sai-Enterprises-Opposite-Matoshree-SabhagruhPipri-/9999P7152-7152-231230084013-U6K2_BZDET/catalogue"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#ff7a00]/15 hover:bg-[#ff7a00]/25 text-[#ff9436] border border-[#ff7a00]/40 text-[11px] font-bold transition shadow-xs cursor-pointer group"
-                    title="Shree Sai Enterprises Justdial Official Verified Profile"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#ff7a00]/15 hover:bg-[#ff7a00]/25 text-[#ff9436] border border-[#ff7a00]/40 text-[11px] font-bold transition shadow-xs cursor-pointer"
+                    title="Shree Sai Enterprises Justdial Verified"
                   >
-                    <span className="w-2 h-2 rounded-full bg-[#ff7a00] group-hover:scale-125 transition"></span>
                     <span>Justdial Verified</span>
                     <ExternalLink className="w-3 h-3 text-[#ff9436]" />
                   </a>
+
                   <a
                     href="https://share.google/pRPd28v4DoL3a5Ocr"
                     target="_blank"
@@ -2698,86 +2115,110 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer"
                     title="Google Business Profile & Maps"
                   >
-                    <span>📍 Google Business / Maps</span>
+                    <span>Google Maps</span>
                     <ExternalLink className="w-3 h-3 text-blue-300" />
                   </a>
+
                   <a
                     href="https://www.instagram.com/shreesaienterprisess"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 border border-pink-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer group"
-                    title="Shree Sai Enterprises Official Instagram"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 border border-pink-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer"
+                    title="Instagram"
                   >
-                    <Instagram className="w-3.5 h-3.5 text-pink-400 group-hover:scale-110 transition" />
+                    <Instagram className="w-3.5 h-3.5 text-pink-400" />
                     <span>Instagram</span>
-                    <ExternalLink className="w-3 h-3 text-pink-400" />
                   </a>
+
                   <a
                     href="https://www.facebook.com/profile.php?id=61554340030893"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer group"
-                    title="Shree Sai Enterprises Official Facebook Page"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition shadow-xs cursor-pointer"
+                    title="Facebook"
                   >
-                    <Facebook className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition" />
+                    <Facebook className="w-3.5 h-3.5 text-blue-400" />
                     <span>Facebook</span>
-                    <ExternalLink className="w-3 h-3 text-blue-400" />
                   </a>
                 </div>
               </div>
             </div>
 
-            {/* Col 2: Electronics in Wardha */}
+            {/* Col 2: Electronics */}
             <div className="space-y-2.5 text-xs">
-              <h5 className="font-extrabold text-sm text-[#febd69] uppercase tracking-wider">
-                Electronics in Wardha
+              <h5 className="font-extrabold text-sm text-amber-300 uppercase tracking-wider font-serif">
+                Electronics Department
               </h5>
               <ul className="space-y-1.5 text-slate-300">
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Electronics')}>
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Electronics')}
+                >
                   • Smart 4K UHD LED TVs (32" to 65")
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Appliances')}>
-                  • Inverter Double Door Refrigerators (LG, Whirlpool)
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Appliances')}
+                >
+                  • Inverter Double Door Refrigerators (LG, Whirlpool, Haier)
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Appliances')}>
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Appliances')}
+                >
                   • 5-Star Automatic Washing Machines
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Appliances')}>
-                  • Air Coolers & Inverter Split AC
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Appliances')}
+                >
+                  • Heavy Desert Air Coolers & Inverter Split ACs
                 </li>
-                <li className="text-slate-400">• 0% Downpayment Easy EMI Finance</li>
+                <li className="text-slate-400">• 0% Down Payment Easy EMI Finance</li>
               </ul>
             </div>
 
-            {/* Col 3: Furniture in Wardha */}
+            {/* Col 3: Furniture */}
             <div className="space-y-2.5 text-xs">
-              <h5 className="font-extrabold text-sm text-[#febd69] uppercase tracking-wider">
-                Furniture in Wardha
+              <h5 className="font-extrabold text-sm text-amber-300 uppercase tracking-wider font-serif">
+                Teakwood Furniture Department
               </h5>
               <ul className="space-y-1.5 text-slate-300">
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Furniture')}>
-                  • Royal Pure Teakwood Sofa Set (3+1+1)
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Furniture')}
+                >
+                  • Royal Solid Teakwood Sofa Sets (3+1+1)
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Diwan')}>
-                  • Heavy Storage Box Diwan (4x6 & 5x6)
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Diwan')}
+                >
+                  • Heavy Storage Box Diwans (4x6 & 5x6)
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Diwan')}>
-                  • Sheesham Wooden King & Queen Cots
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Diwan')}
+                >
+                  • Teakwood King & Queen Cots (Double Beds)
                 </li>
-                <li className="hover:text-amber-400 cursor-pointer" onClick={() => setSelectedCategory('Furniture')}>
-                  • Heavy-Gauge Steel Wardrobes & Almirahs
+                <li
+                  className="hover:text-amber-400 cursor-pointer"
+                  onClick={() => setSelectedCategory('Furniture')}
+                >
+                  • Heavy-Gauge Steel Cupboards & Godrej-Type Almirahs
                 </li>
-                <li className="text-slate-400">• Direct Factory Wholesale Rates & 5-Yr Warranty</li>
+                <li className="text-slate-400">• Factory-Direct Pricing & 5-Year Wood Warranty</li>
               </ul>
             </div>
 
-            {/* Col 4: 30-Month Scheme & Quick Links */}
+            {/* Col 4: 30-Month Scheme & ERP Portal */}
             <div className="space-y-2.5 text-xs">
-              <h5 className="font-extrabold text-sm text-[#febd69] uppercase tracking-wider">
-                30-Month Savings Scheme
+              <h5 className="font-extrabold text-sm text-amber-300 uppercase tracking-wider font-serif">
+                30-Month Scheme
               </h5>
               <p className="text-slate-400 leading-relaxed">
-                Save just ₹100 or ₹200 every week to win monthly lucky draws or take home 100% guaranteed furniture and appliances after 30 months.
+                Save just ₹100 or ₹200 weekly to participate in monthly lucky draws or receive guaranteed premium furniture at completion.
               </p>
               <div className="pt-2 flex flex-col gap-2">
                 <button
@@ -2785,23 +2226,23 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     const el = document.getElementById('passbook-portal-section');
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  className="w-full py-2 rounded-lg bg-[#232f3e] hover:bg-[#2e3e52] text-amber-300 font-bold border border-slate-700 transition cursor-pointer text-center"
+                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold border border-slate-700 transition cursor-pointer text-center"
                 >
                   Check Digital Passbook
                 </button>
                 <button
                   onClick={() => setIsAdminPinModalOpen(true)}
-                  className="w-full py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold border border-amber-500/30 transition cursor-pointer text-center flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold border border-amber-500/30 transition cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  <span>ERP Portal (Staff & Admin)</span>
+                  <span>Staff & Admin ERP Portal</span>
                 </button>
                 <button
                   onClick={() => {
                     if (onOpenAgentTerminal) onOpenAgentTerminal();
                     else setIsLocalAgentTerminalOpen(true);
                   }}
-                  className="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition cursor-pointer text-center flex items-center justify-center gap-1.5 text-[11px]"
+                  className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition cursor-pointer text-center flex items-center justify-center gap-1.5 text-[11px]"
                 >
                   <Smartphone className="w-3 h-3 text-emerald-500" />
                   <span>Field Agent Terminal</span>
@@ -2810,69 +2251,38 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             </div>
           </div>
 
-          {/* Bottom Copyright */}
-          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-            <p>© {new Date().getFullYear()} Shri Sai Enterprises, Wardha. All rights reserved.</p>
-            <div className="flex flex-wrap items-center gap-4">
-              <p className="flex items-center gap-1">
-                <span>Official Website:</span>
-                <a href="https://shrisaient.in" className="text-amber-400 font-bold hover:underline">
-                  https://shrisaient.in
-                </a>
-              </p>
-              <div className="flex items-center gap-3">
-                <a
-                  href="https://www.instagram.com/shreesaienterprisess"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-pink-400 hover:text-pink-300 font-bold transition"
-                  title="Follow us on Instagram"
-                >
-                  <Instagram className="w-3.5 h-3.5" />
-                  <span>Instagram</span>
-                </a>
-                <a
-                  href="https://www.facebook.com/profile.php?id=61554340030893"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-bold transition"
-                  title="Follow us on Facebook"
-                >
-                  <Facebook className="w-3.5 h-3.5" />
-                  <span>Facebook</span>
-                </a>
-                <a
-                  href="https://www.justdial.com/jdmart/Wardha/Shree-Sai-Enterprises-Opposite-Matoshree-SabhagruhPipri-/9999P7152-7152-231230084013-U6K2_BZDET/catalogue"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[#ff8533] hover:text-[#ff9436] font-bold transition"
-                  title="Justdial Catalogue"
-                >
-                  <span>Justdial</span>
-                </a>
-              </div>
-            </div>
+          {/* Bottom Copyright & Back to Top */}
+          <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-3">
+            <p>© {new Date().getFullYear()} Shree Sai Enterprises, Wardha. All rights reserved.</p>
+
+            <button
+              onClick={scrollToTop}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowUp className="w-3.5 h-3.5" />
+              <span>Back to Top</span>
+            </button>
           </div>
         </div>
       </footer>
 
-      {/* 8. QUICK VIEW PRODUCT DETAIL MODAL */}
+      {/* QUICK VIEW PRODUCT DETAIL MODAL */}
       {quickViewProduct && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="w-full max-w-3xl rounded-2xl bg-[#171f2a] border border-[#ff9900]/40 text-white shadow-2xl overflow-hidden flex flex-col md:flex-row">
-            
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-[#0d1424] border border-amber-500/40 text-white shadow-2xl overflow-hidden flex flex-col md:flex-row">
             {/* Image Showcase */}
-            <div className="w-full md:w-1/2 p-6 bg-[#111721] flex items-center justify-center relative border-b md:border-b-0 md:border-r border-slate-800">
+            <div className="w-full md:w-1/2 p-6 bg-[#070b14] flex items-center justify-center relative border-b md:border-b-0 md:border-r border-slate-800">
               <img
                 src={getGenuineProductImage(quickViewProduct)}
                 alt={quickViewProduct.name}
                 className="max-h-72 w-full object-contain"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
-                  e.currentTarget.src = 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
+                  e.currentTarget.src =
+                    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&auto=format&fit=crop&q=80';
                 }}
               />
-              <span className="absolute top-4 left-4 px-2.5 py-0.5 rounded bg-[#131921] text-[#febd69] text-xs font-black uppercase border border-slate-700">
+              <span className="absolute top-4 left-4 px-2.5 py-0.5 rounded bg-slate-900 text-amber-300 text-xs font-black uppercase border border-amber-500/30">
                 {quickViewProduct.brand}
               </span>
             </div>
@@ -2881,7 +2291,9 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             <div className="w-full md:w-1/2 p-6 flex flex-col justify-between space-y-4">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400">In Stock • Ready to Dispatch</span>
+                  <span className="text-xs font-bold text-emerald-400">
+                    In Stock • Ready for Same-Day Delivery
+                  </span>
                   <button
                     onClick={() => setQuickViewProduct(null)}
                     className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
@@ -2890,31 +2302,35 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   </button>
                 </div>
 
-                <h3 className="text-lg font-bold text-white mt-1 leading-snug">
+                <h3 className="text-lg font-bold text-white mt-1 leading-snug font-serif">
                   {quickViewProduct.name}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Model: {quickViewProduct.model || quickViewProduct.code} • Category: {quickViewProduct.category}
+                  Model: {quickViewProduct.model || quickViewProduct.code} • Department:{' '}
+                  {quickViewProduct.category}
                 </p>
 
                 <div className="flex items-baseline gap-2 mt-3">
                   <span className="text-2xl font-black text-white tabular-nums">
                     ₹{quickViewProduct.salePrice.toLocaleString('en-IN')}
                   </span>
-                  <span className="text-xs text-slate-400 line-through">
-                    M.R.P.: ₹{quickViewProduct.mrp.toLocaleString('en-IN')}
-                  </span>
+                  {quickViewProduct.mrp && quickViewProduct.mrp > quickViewProduct.salePrice && (
+                    <span className="text-xs text-slate-400 line-through">
+                      M.R.P.: ₹{quickViewProduct.mrp.toLocaleString('en-IN')}
+                    </span>
+                  )}
                 </div>
 
-                <div className="mt-3 p-3 rounded-xl bg-[#111721] border border-slate-800 text-xs space-y-1.5">
+                <div className="mt-3 p-3 rounded-xl bg-[#070b14] border border-slate-800 text-xs space-y-1.5">
                   <p className="text-slate-300 font-medium">
-                    {quickViewProduct.description || 'Premium material, authentic showroom finishing and authorized warranty.'}
+                    {quickViewProduct.description ||
+                      'Authentic quality, premium finish, and official brand warranty.'}
                   </p>
                   <p className="text-amber-300 font-bold">
-                    💳 30-Month Weekly Savings Scheme: Only ₹100 to ₹200 / week!
+                    💳 30-Month Scheme: Just ₹100 to ₹200 / week!
                   </p>
                   <p className="text-slate-400 text-[11px]">
-                    🚚 Free Express Home Delivery in Wardha City & 50km Radius.
+                    🚚 Free doorstep delivery across Wardha city and within 50 km.
                   </p>
                 </div>
               </div>
@@ -2925,19 +2341,19 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     addToCart(quickViewProduct);
                     setQuickViewProduct(null);
                   }}
-                  className="w-full py-2.5 bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-bold rounded-full text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer border border-[#fcd200]"
+                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
                 >
                   <ShoppingCart className="w-4 h-4" />
                   <span>Add to Cart</span>
                 </button>
 
                 <a
-                  href={`https://wa.me/918766486915?text=${encodeURIComponent(
-                    `Hello Shri Sai Enterprises, I want to order:\nProduct: ${quickViewProduct.name}\nPrice: ₹${quickViewProduct.salePrice.toLocaleString('en-IN')}`
+                  href={`https://wa.me/${landingConfig.contactInfo.whatsappNumber}?text=${encodeURIComponent(
+                    `Hello Shree Sai Enterprises, I would like to order this product:\nProduct: ${quickViewProduct.name}\nPrice: ₹${quickViewProduct.salePrice.toLocaleString('en-IN')}`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2 bg-[#ffa41c] hover:bg-[#fa8900] text-[#0f1111] font-bold rounded-full text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer border border-[#ff8f00]"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Order via WhatsApp</span>
@@ -2948,15 +2364,17 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         </div>
       )}
 
-      {/* 9. CART DRAWER (AMAZON DARK THEME) */}
+      {/* CART DRAWER */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
-          <div className="w-full max-w-md h-full flex flex-col bg-[#171f2a] text-white shadow-2xl border-l border-slate-800">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex justify-end">
+          <div className="w-full max-w-md h-full flex flex-col bg-[#0d1424] text-white shadow-2xl border-l border-slate-800">
             {/* Header */}
-            <div className="p-4 bg-[#131921] border-b border-slate-800 flex items-center justify-between">
+            <div className="p-4 bg-[#070b14] border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-[#febd69]" />
-                <h3 className="font-extrabold text-sm">Your Shopping Cart ({cartItemCount})</h3>
+                <ShoppingCart className="w-5 h-5 text-amber-400" />
+                <h3 className="font-extrabold text-sm font-serif">
+                  Your Cart / Quote ({cartItemCount} items)
+                </h3>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
@@ -2974,7 +2392,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                   <p className="text-sm font-semibold">Your cart is currently empty.</p>
                   <button
                     onClick={() => setIsCartOpen(false)}
-                    className="px-4 py-2 bg-[#ffd814] text-[#0f1111] font-bold rounded-full text-xs cursor-pointer"
+                    className="px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs cursor-pointer"
                   >
                     Start Shopping
                   </button>
@@ -2983,18 +2401,18 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 cart.map((item) => (
                   <div
                     key={item.stock.id}
-                    className="p-3 rounded-xl border border-slate-700 bg-[#121820] flex items-center justify-between gap-3"
+                    className="p-3 rounded-xl border border-slate-800 bg-[#070b14] flex items-center justify-between gap-3"
                   >
                     <img
                       src={getGenuineProductImage(item.stock)}
                       alt={item.stock.name}
-                      className="w-14 h-14 object-contain bg-[#171f2a] p-1 rounded-lg shrink-0"
+                      className="w-14 h-14 object-contain bg-[#0f1726] p-1 rounded-lg shrink-0"
                       referrerPolicy="no-referrer"
                     />
 
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-xs truncate text-white">{item.stock.name}</p>
-                      <p className="text-[11px] text-[#febd69] font-bold tabular-nums">
+                      <p className="text-[11px] text-amber-300 font-bold tabular-nums">
                         ₹{item.stock.salePrice.toLocaleString('en-IN')} × {item.qty} = ₹
                         {(item.stock.salePrice * item.qty).toLocaleString('en-IN')}
                       </p>
@@ -3003,7 +2421,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => updateCartQty(item.stock.id, -1)}
-                        className="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
+                        className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -3012,7 +2430,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                       </span>
                       <button
                         onClick={() => updateCartQty(item.stock.id, 1)}
-                        className="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
+                        className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -3024,29 +2442,29 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
               {/* Delivery Details Form */}
               {cart.length > 0 && (
                 <div className="pt-4 border-t border-slate-800 space-y-2.5 text-xs">
-                  <label className="font-bold text-[11px] text-[#febd69] uppercase tracking-wider block">
+                  <label className="font-bold text-[11px] text-amber-300 uppercase tracking-wider block">
                     Delivery & Contact Details:
                   </label>
                   <input
                     type="text"
-                    placeholder="Your Full Name (e.g. Gajananrao Pawar)"
+                    placeholder="Your Full Name (e.g. Rahul Sharma)"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-700 bg-[#121820] text-white text-xs outline-none focus:ring-1 focus:ring-[#f90]"
+                    className="w-full p-2.5 rounded-xl border border-slate-700 bg-[#070b14] text-white text-xs outline-none focus:border-amber-400"
                   />
                   <input
                     type="tel"
-                    placeholder="Mobile Number (WhatsApp Enabled)"
+                    placeholder="Mobile Number (WhatsApp preferred)"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-700 bg-[#121820] text-white text-xs outline-none focus:ring-1 focus:ring-[#f90]"
+                    className="w-full p-2.5 rounded-xl border border-slate-700 bg-[#070b14] text-white text-xs outline-none focus:border-amber-400"
                   />
                   <textarea
-                    placeholder="Delivery Address or Town/Village (e.g. Arvi Road, Wardha)"
+                    placeholder="Delivery Address / Area (e.g. Arvi Road, Wardha)"
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
                     rows={2}
-                    className="w-full p-2.5 rounded-lg border border-slate-700 bg-[#121820] text-white text-xs outline-none focus:ring-1 focus:ring-[#f90]"
+                    className="w-full p-2.5 rounded-xl border border-slate-700 bg-[#070b14] text-white text-xs outline-none focus:border-amber-400"
                   />
                 </div>
               )}
@@ -3054,20 +2472,20 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
 
             {/* Cart Footer */}
             {cart.length > 0 && (
-              <div className="p-4 bg-[#131921] border-t border-slate-800 space-y-3">
+              <div className="p-4 bg-[#070b14] border-t border-slate-800 space-y-3">
                 <div className="flex justify-between items-center text-sm font-bold">
-                  <span className="text-slate-300">Subtotal:</span>
-                  <span className="text-[#febd69] text-xl font-black tabular-nums">
+                  <span className="text-slate-300">Total Amount:</span>
+                  <span className="text-amber-300 text-xl font-black tabular-nums">
                     ₹{cartTotalAmount.toLocaleString('en-IN')}
                   </span>
                 </div>
 
                 <button
                   onClick={handleCheckoutWhatsApp}
-                  className="w-full py-3 bg-[#ffd814] hover:bg-[#f7ca00] text-[#0f1111] font-bold rounded-full text-xs flex items-center justify-center gap-2 shadow-lg transition cursor-pointer border border-[#fcd200]"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4 text-emerald-800" />
-                  <span>Proceed to Buy via WhatsApp</span>
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Send Order via WhatsApp</span>
                 </button>
               </div>
             )}
@@ -3075,14 +2493,14 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         </div>
       )}
 
-      {/* 10. ONLINE PASSBOOK MODAL */}
+      {/* ONLINE PASSBOOK MODAL */}
       {isOpenPassbookModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-700 bg-[#171f2a] text-white flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="p-4 sm:p-5 bg-[#131921] border-b border-slate-700 flex items-center justify-between">
+          <div className="w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-800 bg-[#0d1424] text-white flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="p-4 sm:p-5 bg-[#070b14] border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <CreditCard className="w-5 h-5 text-[#febd69]" />
-                <h2 className="font-extrabold text-base">
+                <CreditCard className="w-5 h-5 text-amber-400" />
+                <h2 className="font-extrabold text-base font-serif">
                   Weekly Savings Digital Passbook & Ledger
                 </h2>
               </div>
@@ -3099,21 +2517,20 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-              {/* Search Form */}
               <form onSubmit={handleSearchPassbook} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Enter Card No (e.g. 1001, 1050) or 10-digit Phone..."
+                  placeholder="Enter Card Number (e.g. 1001, 1050) or Mobile Number..."
                   value={passbookCardQuery}
                   onChange={(e) => setPassbookCardQuery(e.target.value)}
-                  className="flex-1 p-2.5 rounded-xl border border-slate-700 bg-[#121820] text-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#f90]"
+                  className="flex-1 p-2.5 rounded-xl border border-slate-700 bg-[#070b14] text-white text-xs font-semibold focus:outline-none focus:border-amber-400"
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-[#ffd814] text-[#0f1111] font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Search className="w-3.5 h-3.5" />
-                  <span>Search</span>
+                  <span>Check Status</span>
                 </button>
               </form>
 
@@ -3121,16 +2538,15 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                 <p className="text-rose-400 font-bold text-xs">{passbookError}</p>
               )}
 
-              {/* Searched Member Passbook Display */}
               {searchedMember && (
                 <div className="space-y-4 pt-2">
-                  <div className="p-4 rounded-xl border border-slate-700 bg-[#121820] space-y-2">
+                  <div className="p-4 rounded-xl border border-slate-800 bg-[#070b14] space-y-2">
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] font-black uppercase text-[#febd69]">
+                        <span className="text-[10px] font-black uppercase text-amber-400">
                           Card #{searchedMember.cardNo}
                         </span>
-                        <h3 className="font-extrabold text-base text-white">
+                        <h3 className="font-extrabold text-base text-white font-serif">
                           {searchedMember.memberName}
                         </h3>
                         <p className="text-slate-400 text-xs">
@@ -3138,31 +2554,36 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                         </p>
                       </div>
 
-                      <span className="px-2.5 py-1 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                         {searchedMember.status || 'Active'} Member
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-center">
-                      <div className="p-2 rounded-xl bg-[#171f2a] border border-slate-700">
-                        <span className="text-[10px] text-slate-400 block">Total Deposited</span>
+                      <div className="p-2 rounded-xl bg-[#0f1726] border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Total Paid Amount</span>
                         <span className="font-black text-emerald-400 text-sm tabular-nums">
-                          ₹{(searchedMember.totalAmountPaid ?? searchedMember.totalPaid ?? 0).toLocaleString('en-IN')}
+                          ₹
+                          {(
+                            searchedMember.totalAmountPaid ??
+                            searchedMember.totalPaid ??
+                            0
+                          ).toLocaleString('en-IN')}
                         </span>
                       </div>
-                      <div className="p-2 rounded-xl bg-[#171f2a] border border-slate-700">
+                      <div className="p-2 rounded-xl bg-[#0f1726] border border-slate-800">
                         <span className="text-[10px] text-slate-400 block">Weekly Installment</span>
-                        <span className="font-black text-[#febd69] text-sm tabular-nums">
-                          ₹{searchedMember.monthlyAmount || 100} / wk
+                        <span className="font-black text-amber-300 text-sm tabular-nums">
+                          ₹{searchedMember.monthlyAmount || 100} / week
                         </span>
                       </div>
-                      <div className="p-2 rounded-xl bg-[#171f2a] border border-slate-700">
-                        <span className="text-[10px] text-slate-400 block">Tenure</span>
+                      <div className="p-2 rounded-xl bg-[#0f1726] border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block">Duration</span>
                         <span className="font-black text-sm text-white">
                           {searchedMember.durationMonths || 30} Months (130 Weeks)
                         </span>
                       </div>
-                      <div className="p-2 rounded-xl bg-[#171f2a] border border-slate-700">
+                      <div className="p-2 rounded-xl bg-[#0f1726] border border-slate-800">
                         <span className="text-[10px] text-slate-400 block">Lucky Draw Status</span>
                         <span className="font-black text-purple-400 text-sm">
                           {searchedMember.isLuckyDrawEligible !== false ? 'Eligible' : 'Pending'}
@@ -3170,7 +2591,6 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Open Full Official 30-Month Passbook Card & 1-Page Print */}
                     <div className="pt-2">
                       <button
                         type="button"
@@ -3181,7 +2601,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
                         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <BookOpen className="w-4 h-4 text-slate-950" />
-                        <span>📜 Open Full 30-Month Passbook Card & Print 1-Page</span>
+                        <span>Open Full 30-Month Passbook Card & Print</span>
                       </button>
                     </div>
                   </div>
@@ -3192,7 +2612,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         </div>
       )}
 
-      {/* 10.1 FULL 30-MONTH PASSBOOK CARD & 1-PAGE PRINT MODAL */}
+      {/* FULL 30-MONTH PASSBOOK CARD & 1-PAGE PRINT MODAL */}
       {isCardPassbookModalOpen && selectedPassbookMember && (
         <CardPassbookPrintModal
           member={selectedPassbookMember}
@@ -3206,7 +2626,7 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         />
       )}
 
-      {/* 11. SECURE ADMIN ERP LOGIN, SIGN UP & ADMIN APPROVALS MODAL */}
+      {/* SECURE ADMIN ERP LOGIN, SIGN UP & ADMIN APPROVALS MODAL */}
       {isAdminPinModalOpen && (
         <SecureErpLoginModal
           storeData={storeData}
@@ -3222,7 +2642,6 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
         />
       )}
 
-
       {/* Finance EMI Calculator Modal */}
       {isFinanceEmiOpen && (
         <FinanceEmiModal
@@ -3233,75 +2652,6 @@ export const CustomerShowroomView: React.FC<CustomerShowroomViewProps> = ({
           productTitle={financeProduct.name}
         />
       )}
-
-      {/* 12. AMAZON SIGNATURE DARK FOOTER */}
-      <footer className="border-t border-[#232f3e] bg-[#131921] text-slate-300 text-xs">
-        {/* Back to top button */}
-        <button
-          onClick={scrollToTop}
-          className="w-full py-3.5 bg-[#232f3e] hover:bg-[#2c3a4d] text-slate-200 hover:text-white text-xs font-semibold text-center transition cursor-pointer flex items-center justify-center gap-1.5"
-        >
-          <ArrowUp className="w-3.5 h-3.5" />
-          <span>Back to Top</span>
-        </button>
-
-        {/* Footer Link Columns */}
-        <div className="max-w-[1500px] mx-auto px-5 py-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">About Shri Sai Enterprises</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Shri Sai Enterprises (Wardha) is the premier showroom for leading Electronics, Home Appliances, and authentic Chandrapur Teakwood Furniture.
-            </p>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">30-Month Savings Scheme</h4>
-            <ul className="space-y-1.5 text-xs text-slate-400">
-              <li>• Weekly installment only ₹100 to ₹200</li>
-              <li>• Monthly Grand Lucky Draw eligibility</li>
-              <li>• Free product delivery if card wins in draw</li>
-              <li>• Instant online digital passbook tracker</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Authorized Brands</h4>
-            <ul className="space-y-1.5 text-xs text-slate-400">
-              <li>• Samsung Crystal 4K UHD TVs</li>
-              <li>• LG Smart Inverter Refrigerators</li>
-              <li>• Voltas Split Inverter Air Conditioners</li>
-              <li>• Whirlpool 5-Star Washing Machines</li>
-              <li>• Sai Artisan Handcrafted Teakwood Sofas</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-white text-sm mb-3">Contact & Store Location</h4>
-            <p className="text-xs text-slate-400">
-              Opposite Matoshree Sabhagruh, Arvi Road, Punjab Colony, Wardha - 442001
-            </p>
-            <div className="pt-2 space-y-1 text-xs">
-              <p className="text-[#febd69] font-bold">
-                📞 <a href="tel:8600122978" className="hover:underline">8600122978</a>
-              </p>
-              <p className="text-amber-300 font-bold">
-                📞 <a href="tel:9175537365" className="hover:underline">9175537365</a>
-              </p>
-              <p className="text-blue-300 font-bold">
-                📞 <a href="tel:8766486915" className="hover:underline">8766486915</a>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Copyright & Disclaimer Bar */}
-        <div className="border-t border-[#232f3e] py-4 text-center text-[11px] text-slate-500">
-          <p>© 2026 SHRI SAI ENTERPRISES, WARDHA • GSTIN: 27ALOPL0030G2ZC</p>
-          <p className="text-[10px] text-slate-600 mt-0.5">
-            All brand products carry manufacturer warranties with authentic tax invoices. All rights reserved.
-          </p>
-        </div>
-      </footer>
 
       {/* Field Agent Terminal Direct View / Modal */}
       {isLocalAgentTerminalOpen && (

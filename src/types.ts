@@ -71,6 +71,7 @@ export interface StoreSettings {
     totalBenefit: string;
   };
   schemesList?: SchemeDefinition[];
+  monthlyDrawPrizes?: Record<number, string>;
   termsAndConditions: string[];
 }
 
@@ -147,6 +148,7 @@ export interface LandingContactInfo {
   helpline3: string;
   whatsappNumber: string;
   addressHindi: string;
+  address?: string;
   landmark: string;
   googleMapLink: string;
   timings: string;

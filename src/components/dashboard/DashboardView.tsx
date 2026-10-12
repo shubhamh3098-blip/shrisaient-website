@@ -617,12 +617,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </GalaxyButton>
           <GalaxyButton
             id="btn-quick-draw-machine"
-            onClick={() => onNavigate('draw-machine')}
+            onClick={() => onNavigate('lucky-draw')}
             variant="amber"
             size="sm"
             icon={<Trophy className="w-4 h-4" />}
           >
-            <span>लकी ड्रॉ मशीन <span className="text-[10px] font-normal opacity-85 hidden sm:inline">(Live Spinner)</span></span>
+            <span>लकी ड्रॉ व विजेते <span className="text-[10px] font-normal opacity-85 hidden sm:inline">(योजना १, २, ३)</span></span>
           </GalaxyButton>
         </div>
       </div>

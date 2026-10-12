@@ -29,7 +29,8 @@ import {
   Trash2,
   Landmark,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  FolderArchive
 } from 'lucide-react';
 import { Customer, InvoiceItem, StockItem, StoreData, Transaction, BillReceipt, CardMember } from '../../types';
 import { StorageService } from '../../services/storageService';
@@ -65,6 +66,7 @@ interface AddEntryViewProps {
   onBackToDashboard: () => void;
   initialOrderData?: InitialBillingOrderData | null;
   onClearInitialOrderData?: () => void;
+  onNavigateToOldEntry?: () => void;
 }
 
 export const AddEntryView: React.FC<AddEntryViewProps> = ({
@@ -74,6 +76,7 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
   onBackToDashboard,
   initialOrderData,
   onClearInitialOrderData,
+  onNavigateToOldEntry,
 }) => {
   const { isDayMode } = useTheme();
 
@@ -824,6 +827,16 @@ export const AddEntryView: React.FC<AddEntryViewProps> = ({
             <Building2 className="w-3.5 h-3.5" />
             <span>Quotation (अंदाजपत्रक)</span>
           </button>
+          {onNavigateToOldEntry && (
+            <button
+              onClick={onNavigateToOldEntry}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30"
+              title="जुने बिल, पावती व योजना १, २, ३ कार्ड्स नोंदवा"
+            >
+              <FolderArchive className="w-3.5 h-3.5" />
+              <span>जुने बिल व कार्ड नोंदणी (Old Records)</span>
+            </button>
+          )}
         </div>
       </div>
 

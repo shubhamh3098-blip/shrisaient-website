@@ -57,6 +57,7 @@ import { CustomerLoyaltyReferralView } from './components/loyalty/CustomerLoyalt
 import { EwayDeliveryChallanView } from './components/delivery/EwayDeliveryChallanView';
 import { FinanceEmiCaseTrackerView } from './components/finance/FinanceEmiCaseTrackerView';
 import { DigitalLuckyDrawMachineView } from './components/scheme/DigitalLuckyDrawMachineView';
+import { OldRecordEntryView } from './components/entry/OldRecordEntryView';
 import { CustomerCreditRiskShieldView } from './components/customers/CustomerCreditRiskShieldView';
 import { BarcodeLabelStudioView } from './components/barcode/BarcodeLabelStudioView';
 
@@ -183,16 +184,24 @@ function AppContent() {
       }
     }, 60000);
 
+    let lastActivityLogged = Date.now();
     const handleUserActivity = () => {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('sai_last_activity_time', String(Date.now()));
+      const now = Date.now();
+      // Throttle: only update localStorage at most once every 30 seconds to prevent laptop UI freezes
+      if (now - lastActivityLogged > 30000) {
+        lastActivityLogged = now;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('sai_last_activity_time', String(now));
+          } catch {}
+        }
       }
     };
 
-    window.addEventListener('mousemove', handleUserActivity);
-    window.addEventListener('keydown', handleUserActivity);
-    window.addEventListener('click', handleUserActivity);
-    window.addEventListener('touchstart', handleUserActivity);
+    window.addEventListener('mousemove', handleUserActivity, { passive: true });
+    window.addEventListener('keydown', handleUserActivity, { passive: true });
+    window.addEventListener('click', handleUserActivity, { passive: true });
+    window.addEventListener('touchstart', handleUserActivity, { passive: true });
 
     return () => {
       clearInterval(interval);
@@ -397,6 +406,16 @@ function AppContent() {
                     onRefreshData={handleRefreshData}
                     onPrintInvoice={(tx) => setPrintingInvoice(tx)}
                     onBackToDashboard={() => setCurrentTab('dashboard')}
+                    onNavigateToOldEntry={() => setCurrentTab('old-entry')}
+                  />
+                )}
+
+                {/* 2b. Old Record Entry (Bills, Invoices, Receipts & Scheme 1, 2, 3 Cards) */}
+                {currentTab === 'old-entry' && (
+                  <OldRecordEntryView
+                    storeData={storeData}
+                    onRefreshData={handleRefreshData}
+                    onNavigate={(tab) => setCurrentTab(tab as any)}
                   />
                 )}
 
@@ -422,6 +441,7 @@ function AppContent() {
                     }}
                     onPrintReceipt={(r) => setPrintingReceipt(r)}
                     onRefreshData={handleRefreshData}
+                    onNavigateToOldEntry={() => setCurrentTab('old-entry')}
                   />
                 )}
 
@@ -454,6 +474,7 @@ function AppContent() {
                   <SchemeManagerView
                     storeData={storeData}
                     onRefreshData={handleRefreshData}
+                    onNavigateToOldEntry={() => setCurrentTab('old-entry')}
                   />
                 )}
 
@@ -574,9 +595,9 @@ function AppContent() {
                   />
                 )}
 
-                {/* 21. 30-Month Lucky Draw & Maturity Bonus Tracker */}
-                {currentTab === 'lucky-draw' && (
-                  <LuckyDrawMaturityView
+                {/* 21. 30-Month Lucky Draw Machine, Winners & Maturity Tracker (Unified Section) */}
+                {(currentTab === 'lucky-draw' || currentTab === 'draw-machine') && (
+                  <DigitalLuckyDrawMachineView
                     storeData={storeData}
                     onRefreshData={handleRefreshData}
                   />
@@ -692,14 +713,6 @@ function AppContent() {
                 {/* 36. Bajaj/TVS NBFC Consumer Durable EMI Case Tracker */}
                 {currentTab === 'finance-tracker' && (
                   <FinanceEmiCaseTrackerView
-                    storeData={storeData}
-                    onRefreshData={handleRefreshData}
-                  />
-                )}
-
-                {/* 37. Digital Transparent Lucky Draw Machine & Drum Roller */}
-                {currentTab === 'draw-machine' && (
-                  <DigitalLuckyDrawMachineView
                     storeData={storeData}
                     onRefreshData={handleRefreshData}
                   />

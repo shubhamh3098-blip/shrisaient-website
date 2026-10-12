@@ -127,14 +127,13 @@ export const RouteBeatPlannerView: React.FC<RouteBeatPlannerViewProps> = ({
 
     const activeVillagesLower = activeBeat.villagesCovered.map((v) => v.toLowerCase());
 
-    // 1. Check 30-Month cardholders
+    // 1. Check 30-Month cardholders in the beat villages
     storeData.cardMembers.forEach((m) => {
       const matchVillage = activeVillagesLower.some((v) =>
         (m.village || '').toLowerCase().includes(v) || (m.address || '').toLowerCase().includes(v)
       );
 
-      // If matches or sample allocation for demonstration
-      if (matchVillage || m.cardNo.endsWith('1') || m.cardNo.endsWith('3')) {
+      if (matchVillage) {
         const remainingMonths = Math.max(0, (m.durationMonths || 30) - (m.totalPaidMonths || 0));
         if (remainingMonths > 0) {
           list.push({
@@ -151,6 +150,23 @@ export const RouteBeatPlannerView: React.FC<RouteBeatPlannerViewProps> = ({
         }
       }
     });
+
+    // If no specific village match, take first 15 active cards as sample beat list
+    if (list.length === 0) {
+      storeData.cardMembers.slice(0, 15).forEach((m) => {
+        list.push({
+          id: m.id,
+          name: m.memberName,
+          phone: m.phone,
+          village: m.village || activeBeat.villagesCovered[0],
+          type: '30-Mo Scheme',
+          dueAmount: m.monthlyAmount || 1000,
+          lastPaymentDate: m.startDate,
+          cardNo: m.cardNo,
+          status: 'Pending Collection',
+        });
+      });
+    }
 
     // 2. Check Khata Book Customers with outstanding balance
     storeData.customers.forEach((c) => {

@@ -683,12 +683,10 @@ export class StorageService {
           this.isConnected = true;
           this.lastSyncTimestamp = new Date().toISOString();
 
-          const current = this.loadData();
-          const { merged, hasLocalChanges } = StorageService.mergeStoreData(current, firestoreData);
+          const current = this.cachedData || this.loadData();
+          // Non-destructive merge incoming cloud data without re-triggering a push loop
+          const { merged } = StorageService.mergeStoreData(current, firestoreData);
           notifyListeners(merged);
-          if (hasLocalChanges) {
-            pushStoreDataToFirestore(merged).catch(() => {});
-          }
         },
         (status) => {
           if (status.isConnected) {

@@ -27,7 +27,8 @@ import {
   Edit3,
   MessageCircle,
   ShieldCheck,
-  BookOpen
+  BookOpen,
+  FolderArchive
 } from 'lucide-react';
 import { CardMember, CardTransaction, StoreData } from '../../types';
 import { StorageService } from '../../services/storageService';
@@ -53,11 +54,13 @@ import { getLivePassbookUrl, getWhatsAppGroupDisplay } from '../../utils/passboo
 interface SchemeManagerViewProps {
   storeData: StoreData;
   onRefreshData: () => void;
+  onNavigateToOldEntry?: () => void;
 }
 
 export const SchemeManagerView: React.FC<SchemeManagerViewProps> = ({
   storeData,
   onRefreshData,
+  onNavigateToOldEntry,
 }) => {
   const { isDayMode } = useTheme();
 
@@ -604,6 +607,17 @@ ${groupDisplay.displayText}
               <Trophy className="w-4 h-4 text-slate-950 shrink-0" />
               <span>Lucky Draw</span>
             </button>
+
+            {onNavigateToOldEntry && (
+              <button
+                id="btn-old-card-entry"
+                onClick={onNavigateToOldEntry}
+                className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 font-bold px-3 py-2 rounded-xl text-xs transition cursor-pointer border border-amber-500/40 shadow-sm active:scale-95 whitespace-nowrap"
+              >
+                <FolderArchive className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>जुने कार्ड नोंदवा (Scheme 1, 2, 3)</span>
+              </button>
+            )}
 
             <button
               id="btn-add-scheme-member"

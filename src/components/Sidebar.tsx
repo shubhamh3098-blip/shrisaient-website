@@ -50,6 +50,7 @@ import { GalaxyButton } from './common/GalaxyButton';
 export type NavTab = 
   | 'dashboard'
   | 'add-entry'
+  | 'old-entry'
   | 'master-search'
   | 'receipts'
   | 'pos'
@@ -180,6 +181,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: PlusCircle,
         },
         {
+          id: 'old-entry',
+          label: 'Old Bills & Cards Entry',
+          marathi: 'जुने बिल, पावती व कार्ड नोंद (१, २, ३)',
+          icon: FolderArchive,
+          badge: 'Import',
+          badgeColor: isDayMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        },
+        {
           id: 'all-transactions',
           label: 'Sales Bills History',
           marathi: 'विक्री बिले',
@@ -187,11 +196,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'receipts',
-          label: 'Bill Receipts #1079',
-          marathi: 'जमा पावत्या',
+          label: 'Receipt Section & Collection',
+          marathi: 'अधिकृत पावती विभाग (#1079+)',
           icon: Receipt,
-          badge: `${totalReceiptsCount}`,
-          badgeColor: isDayMode ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+          badge: `${totalReceiptsCount} पावत्या`,
+          badgeColor: isDayMode ? 'bg-teal-100 text-teal-800 border-teal-300' : 'bg-teal-500/20 text-teal-400 border-teal-500/30',
         },
         {
           id: 'customers',
@@ -316,19 +325,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'lucky-draw',
-          label: 'Lucky Draw & Maturity',
-          marathi: 'लकी ड्रॉ व मॅच्युरिटी',
+          label: 'Lucky Draw & Winner Machine',
+          marathi: 'पारदर्शक लकी ड्रॉ व विजेते (योजना १, २, ३)',
           icon: Trophy,
-          badge: 'Draw',
+          badge: 'Live',
           badgeColor: isDayMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-        },
-        {
-          id: 'draw-machine',
-          label: 'Digital Lucky Draw Machine',
-          marathi: 'पारदर्शक लकी ड्रॉ मशीन',
-          icon: Trophy,
-          badge: 'Live Spinner',
-          badgeColor: isDayMode ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30',
         },
         {
           id: 'finance-tracker',

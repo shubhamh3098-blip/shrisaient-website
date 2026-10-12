@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FileText,
   Search,
@@ -29,22 +29,29 @@ export const AllTransactionsView: React.FC<AllTransactionsViewProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Paid' | 'Partial' | 'Unpaid'>('All');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [displayLimit, setDisplayLimit] = useState<number>(50);
 
-  const filteredTransactions = storeData.transactions.filter((tx) => {
-    const matchesSearch =
-      !search ||
-      tx.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
-      tx.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      tx.customerPhone.includes(search) ||
-      (tx.customerAddress && tx.customerAddress.toLowerCase().includes(search.toLowerCase()));
+  const filteredTransactions: Transaction[] = useMemo(() => {
+    return storeData.transactions.filter((tx: Transaction) => {
+      const matchesSearch =
+        !search ||
+        tx.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
+        tx.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        tx.customerPhone.includes(search) ||
+        (tx.customerAddress && tx.customerAddress.toLowerCase().includes(search.toLowerCase()));
 
-    const matchesStatus = statusFilter === 'All' || tx.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+      const matchesStatus = statusFilter === 'All' || tx.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [storeData.transactions, search, statusFilter]);
 
-  const totalSalesVal = storeData.transactions.reduce((acc, t) => acc + t.grandTotal, 0);
-  const totalPaidVal = storeData.transactions.reduce((acc, t) => acc + t.paidAmount, 0);
-  const totalDueVal = storeData.transactions.reduce((acc, t) => acc + t.balanceDue, 0);
+  const displayedTransactions: Transaction[] = useMemo(() => {
+    return filteredTransactions.slice(0, displayLimit);
+  }, [filteredTransactions, displayLimit]);
+
+  const totalSalesVal = useMemo(() => storeData.transactions.reduce((acc, t) => acc + t.grandTotal, 0), [storeData.transactions]);
+  const totalPaidVal = useMemo(() => storeData.transactions.reduce((acc, t) => acc + t.paidAmount, 0), [storeData.transactions]);
+  const totalDueVal = useMemo(() => storeData.transactions.reduce((acc, t) => acc + t.balanceDue, 0), [storeData.transactions]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -141,7 +148,7 @@ export const AllTransactionsView: React.FC<AllTransactionsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredTransactions.map((tx) => (
+              {displayedTransactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-slate-800/40 transition">
                   <td className="py-3 px-4">
                     <div className="font-bold text-white font-mono">{tx.invoiceNo}</div>
@@ -211,6 +218,31 @@ export const AllTransactionsView: React.FC<AllTransactionsViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Progressive Loading Footer for Blazing Fast Laptop Performance */}
+        {filteredTransactions.length > displayedTransactions.length && (
+          <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              दाखवत आहे: <strong className="text-blue-400 font-bold">{displayedTransactions.length}</strong> / एकूण {filteredTransactions.length} बिले (सुपरफास्ट मोड)
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDisplayLimit((prev) => Math.min(prev + 50, filteredTransactions.length))}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition border border-slate-700"
+              >
+                + आणखी ५० बिले दाखवा
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayLimit(filteredTransactions.length)}
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer transition border border-slate-800"
+              >
+                सर्व ({filteredTransactions.length})
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Invoice Modal */}
